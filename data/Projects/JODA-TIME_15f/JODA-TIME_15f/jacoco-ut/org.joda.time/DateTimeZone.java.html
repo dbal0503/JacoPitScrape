@@ -1,0 +1,1302 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DateTimeZone.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Joda time</a> &gt; <a href="index.source.html" class="el_package">org.joda.time</a> &gt; <span class="el_source">DateTimeZone.java</span></div><h1>DateTimeZone.java</h1><pre class="source lang-java linenums">/*
+ *  Copyright 2001-2012 Stephen Colebourne
+ *
+ *  Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+package org.joda.time;
+
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.ObjectStreamException;
+import java.io.Serializable;
+import java.lang.ref.Reference;
+import java.lang.ref.SoftReference;
+import java.util.HashMap;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.TimeZone;
+
+import org.joda.convert.FromString;
+import org.joda.convert.ToString;
+import org.joda.time.chrono.BaseChronology;
+import org.joda.time.field.FieldUtils;
+import org.joda.time.format.DateTimeFormat;
+import org.joda.time.format.DateTimeFormatter;
+import org.joda.time.format.DateTimeFormatterBuilder;
+import org.joda.time.format.FormatUtils;
+import org.joda.time.tz.DefaultNameProvider;
+import org.joda.time.tz.FixedDateTimeZone;
+import org.joda.time.tz.NameProvider;
+import org.joda.time.tz.Provider;
+import org.joda.time.tz.UTCProvider;
+import org.joda.time.tz.ZoneInfoProvider;
+
+/**
+ * DateTimeZone represents a time zone.
+ * &lt;p&gt;
+ * A time zone is a system of rules to convert time from one geographic 
+ * location to another. For example, Paris, France is one hour ahead of
+ * London, England. Thus when it is 10:00 in London, it is 11:00 in Paris.
+ * &lt;p&gt;
+ * All time zone rules are expressed, for historical reasons, relative to
+ * Greenwich, London. Local time in Greenwich is referred to as Greenwich Mean
+ * Time (GMT).  This is similar, but not precisely identical, to Universal 
+ * Coordinated Time, or UTC. This library only uses the term UTC.
+ * &lt;p&gt;
+ * Using this system, America/Los_Angeles is expressed as UTC-08:00, or UTC-07:00
+ * in the summer. The offset -08:00 indicates that America/Los_Angeles time is
+ * obtained from UTC by adding -08:00, that is, by subtracting 8 hours.
+ * &lt;p&gt;
+ * The offset differs in the summer because of daylight saving time, or DST.
+ * The following definitions of time are generally used:
+ * &lt;ul&gt;
+ * &lt;li&gt;UTC - The reference time.
+ * &lt;li&gt;Standard Time - The local time without a daylight saving time offset.
+ * For example, in Paris, standard time is UTC+01:00.
+ * &lt;li&gt;Daylight Saving Time - The local time with a daylight saving time 
+ * offset. This offset is typically one hour, but not always. It is typically
+ * used in most countries away from the equator.  In Paris, daylight saving 
+ * time is UTC+02:00.
+ * &lt;li&gt;Wall Time - This is what a local clock on the wall reads. This will be
+ * either Standard Time or Daylight Saving Time depending on the time of year
+ * and whether the location uses Daylight Saving Time.
+ * &lt;/ul&gt;
+ * &lt;p&gt;
+ * Unlike the Java TimeZone class, DateTimeZone is immutable. It also only
+ * supports long format time zone ids. Thus EST and ECT are not accepted.
+ * However, the factory that accepts a TimeZone will attempt to convert from
+ * the old short id to a suitable long id.
+ * &lt;p&gt;
+ * DateTimeZone is thread-safe and immutable, and all subclasses must be as
+ * well.
+ * 
+ * @author Brian S O'Neill
+ * @author Stephen Colebourne
+ * @since 1.0
+ */
+public abstract class DateTimeZone implements Serializable {
+    
+    /** Serialization version. */
+    private static final long serialVersionUID = 5546345482340108586L;
+
+    /** The time zone for Universal Coordinated Time */
+<span class="fc" id="L95">    public static final DateTimeZone UTC = new FixedDateTimeZone(&quot;UTC&quot;, &quot;UTC&quot;, 0, 0);</span>
+
+    /** The instance that is providing time zones. */
+    private static Provider cProvider;
+    /** The instance that is providing time zone names. */
+    private static NameProvider cNameProvider;
+    /** The set of ID strings. */
+    private static Set&lt;String&gt; cAvailableIDs;
+    /** The default time zone. */
+    private static volatile DateTimeZone cDefault;
+    /** A formatter for printing and parsing zones. */
+    private static DateTimeFormatter cOffsetFormatter;
+
+    /** Cache that maps fixed offset strings to softly referenced DateTimeZones */
+    private static Map&lt;String, SoftReference&lt;DateTimeZone&gt;&gt; iFixedOffsetCache;
+
+    /** Cache of old zone IDs to new zone IDs */
+    private static Map&lt;String, String&gt; cZoneIdConversion;
+
+    static {
+<span class="fc" id="L115">        setProvider0(null);</span>
+<span class="fc" id="L116">        setNameProvider0(null);</span>
+<span class="fc" id="L117">    }</span>
+
+    //-----------------------------------------------------------------------
+    /**
+     * Gets the default time zone.
+     * &lt;p&gt;
+     * The default time zone is derived from the system property {@code user.timezone}.
+     * If that is {@code null} or is not a valid identifier, then the value of the
+     * JDK {@code TimeZone} default is converted. If that fails, {@code UTC} is used.
+     * &lt;p&gt;
+     * NOTE: If the {@code java.util.TimeZone} default is updated &lt;i&gt;after&lt;/i&gt; calling this
+     * method, then the change will not be picked up here.
+     * 
+     * @return the default datetime zone object
+     */
+    public static DateTimeZone getDefault() {
+<span class="fc" id="L133">        DateTimeZone zone = cDefault;</span>
+<span class="fc bfc" id="L134" title="All 2 branches covered.">        if (zone == null) {</span>
+<span class="fc" id="L135">            synchronized(DateTimeZone.class) {</span>
+<span class="fc" id="L136">                zone = cDefault;</span>
+<span class="pc bpc" id="L137" title="1 of 2 branches missed.">                if (zone == null) {</span>
+<span class="fc" id="L138">                    DateTimeZone temp = null;</span>
+                    try {
+                        try {
+<span class="fc" id="L141">                            String id = System.getProperty(&quot;user.timezone&quot;);</span>
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">                            if (id != null) {  // null check avoids stack overflow</span>
+<span class="nc" id="L143">                                temp = forID(id);</span>
+                            }
+<span class="fc" id="L145">                        } catch (RuntimeException ex) {</span>
+                            // ignored
+<span class="nc" id="L147">                        }</span>
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">                        if (temp == null) {</span>
+<span class="fc" id="L149">                            temp = forTimeZone(TimeZone.getDefault());</span>
+                        }
+<span class="nc" id="L151">                    } catch (IllegalArgumentException ex) {</span>
+                        // ignored
+<span class="fc" id="L153">                    }</span>
+<span class="pc bpc" id="L154" title="1 of 2 branches missed.">                    if (temp == null) {</span>
+<span class="nc" id="L155">                        temp = UTC;</span>
+                    }
+<span class="fc" id="L157">                    cDefault = zone = temp;</span>
+                }
+<span class="fc" id="L159">            }</span>
+        }
+<span class="fc" id="L161">        return zone;</span>
+    }
+
+    /**
+     * Sets the default time zone.
+     * &lt;p&gt;
+     * NOTE: Calling this method does &lt;i&gt;not&lt;/i&gt; set the {@code java.util.TimeZone} default.
+     * 
+     * @param zone  the default datetime zone object, must not be null
+     * @throws IllegalArgumentException if the zone is null
+     * @throws SecurityException if the application has insufficient security rights
+     */
+    public static void setDefault(DateTimeZone zone) throws SecurityException {
+<span class="fc" id="L174">        SecurityManager sm = System.getSecurityManager();</span>
+<span class="pc bpc" id="L175" title="1 of 2 branches missed.">        if (sm != null) {</span>
+<span class="nc" id="L176">            sm.checkPermission(new JodaTimePermission(&quot;DateTimeZone.setDefault&quot;));</span>
+        }
+<span class="fc bfc" id="L178" title="All 2 branches covered.">        if (zone == null) {</span>
+<span class="fc" id="L179">            throw new IllegalArgumentException(&quot;The datetime zone must not be null&quot;);</span>
+        }
+<span class="fc" id="L181">        synchronized(DateTimeZone.class) {</span>
+<span class="fc" id="L182">            cDefault = zone;</span>
+<span class="fc" id="L183">        }</span>
+<span class="fc" id="L184">    }</span>
+
+    //-----------------------------------------------------------------------
+    /**
+     * Gets a time zone instance for the specified time zone id.
+     * &lt;p&gt;
+     * The time zone id may be one of those returned by getAvailableIDs.
+     * Short ids, as accepted by {@link java.util.TimeZone}, are not accepted.
+     * All IDs must be specified in the long format.
+     * The exception is UTC, which is an acceptable id.
+     * &lt;p&gt;
+     * Alternatively a locale independent, fixed offset, datetime zone can
+     * be specified. The form &lt;code&gt;[+-]hh:mm&lt;/code&gt; can be used.
+     * 
+     * @param id  the ID of the datetime zone, null means default
+     * @return the DateTimeZone object for the ID
+     * @throws IllegalArgumentException if the ID is not recognised
+     */
+    @FromString
+    public static DateTimeZone forID(String id) {
+<span class="fc bfc" id="L204" title="All 2 branches covered.">        if (id == null) {</span>
+<span class="fc" id="L205">            return getDefault();</span>
+        }
+<span class="fc bfc" id="L207" title="All 2 branches covered.">        if (id.equals(&quot;UTC&quot;)) {</span>
+<span class="fc" id="L208">            return DateTimeZone.UTC;</span>
+        }
+<span class="fc" id="L210">        DateTimeZone zone = cProvider.getZone(id);</span>
+<span class="fc bfc" id="L211" title="All 2 branches covered.">        if (zone != null) {</span>
+<span class="fc" id="L212">            return zone;</span>
+        }
+<span class="fc bfc" id="L214" title="All 4 branches covered.">        if (id.startsWith(&quot;+&quot;) || id.startsWith(&quot;-&quot;)) {</span>
+<span class="fc" id="L215">            int offset = parseOffset(id);</span>
+<span class="fc bfc" id="L216" title="All 2 branches covered.">            if (offset == 0L) {</span>
+<span class="fc" id="L217">                return DateTimeZone.UTC;</span>
+            } else {
+<span class="fc" id="L219">                id = printOffset(offset);</span>
+<span class="fc" id="L220">                return fixedOffsetZone(id, offset);</span>
+            }
+        }
+<span class="fc" id="L223">        throw new IllegalArgumentException(&quot;The datetime zone id '&quot; + id + &quot;' is not recognised&quot;);</span>
+    }
+
+    /**
+     * Gets a time zone instance for the specified offset to UTC in hours.
+     * This method assumes standard length hours.
+     * &lt;p&gt;
+     * This factory is a convenient way of constructing zones with a fixed offset.
+     * 
+     * @param hoursOffset  the offset in hours from UTC
+     * @return the DateTimeZone object for the offset
+     * @throws IllegalArgumentException if the offset is too large or too small
+     */
+    public static DateTimeZone forOffsetHours(int hoursOffset) throws IllegalArgumentException {
+<span class="fc" id="L237">        return forOffsetHoursMinutes(hoursOffset, 0);</span>
+    }
+
+    /**
+     * Gets a time zone instance for the specified offset to UTC in hours and minutes.
+     * This method assumes 60 minutes in an hour, and standard length minutes.
+     * &lt;p&gt;
+     * This factory is a convenient way of constructing zones with a fixed offset.
+     * The minutes value is always positive and in the range 0 to 59.
+     * If constructed with the values (-2, 30), the resulting zone is '-02:30'.
+     * 
+     * @param hoursOffset  the offset in hours from UTC
+     * @param minutesOffset  the offset in minutes from UTC, must be between 0 and 59 inclusive
+     * @return the DateTimeZone object for the offset
+     * @throws IllegalArgumentException if the offset or minute is too large or too small
+     */
+    public static DateTimeZone forOffsetHoursMinutes(int hoursOffset, int minutesOffset) throws IllegalArgumentException {
+<span class="fc bfc" id="L254" title="All 4 branches covered.">        if (hoursOffset == 0 &amp;&amp; minutesOffset == 0) {</span>
+<span class="fc" id="L255">            return DateTimeZone.UTC;</span>
+        }
+<span class="fc bfc" id="L257" title="All 4 branches covered.">        if (minutesOffset &lt; 0 || minutesOffset &gt; 59) {</span>
+<span class="fc" id="L258">            throw new IllegalArgumentException(&quot;Minutes out of range: &quot; + minutesOffset);</span>
+        }
+<span class="fc" id="L260">        int offset = 0;</span>
+        try {
+<span class="fc" id="L262">            int hoursInMinutes = FieldUtils.safeMultiply(hoursOffset, 60);</span>
+<span class="fc bfc" id="L263" title="All 2 branches covered.">            if (hoursInMinutes &lt; 0) {</span>
+<span class="fc" id="L264">                minutesOffset = FieldUtils.safeAdd(hoursInMinutes, -minutesOffset);</span>
+            } else {
+<span class="fc" id="L266">                minutesOffset = FieldUtils.safeAdd(hoursInMinutes, minutesOffset);</span>
+            }
+<span class="fc" id="L268">            offset = FieldUtils.safeMultiply(minutesOffset, DateTimeConstants.MILLIS_PER_MINUTE);</span>
+<span class="fc" id="L269">        } catch (ArithmeticException ex) {</span>
+<span class="fc" id="L270">            throw new IllegalArgumentException(&quot;Offset is too large&quot;);</span>
+<span class="fc" id="L271">        }</span>
+<span class="fc" id="L272">        return forOffsetMillis(offset);</span>
+    }
+
+    /**
+     * Gets a time zone instance for the specified offset to UTC in milliseconds.
+     *
+     * @param millisOffset  the offset in millis from UTC
+     * @return the DateTimeZone object for the offset
+     */
+    public static DateTimeZone forOffsetMillis(int millisOffset) {
+<span class="fc" id="L282">        String id = printOffset(millisOffset);</span>
+<span class="fc" id="L283">        return fixedOffsetZone(id, millisOffset);</span>
+    }
+
+    /**
+     * Gets a time zone instance for a JDK TimeZone.
+     * &lt;p&gt;
+     * DateTimeZone only accepts a subset of the IDs from TimeZone. The
+     * excluded IDs are the short three letter form (except UTC). This 
+     * method will attempt to convert between time zones created using the
+     * short IDs and the full version.
+     * &lt;p&gt;
+     * This method is not designed to parse time zones with rules created by
+     * applications using &lt;code&gt;SimpleTimeZone&lt;/code&gt; directly.
+     * 
+     * @param zone  the zone to convert, null means default
+     * @return the DateTimeZone object for the zone
+     * @throws IllegalArgumentException if the zone is not recognised
+     */
+    public static DateTimeZone forTimeZone(TimeZone zone) {
+<span class="fc bfc" id="L302" title="All 2 branches covered.">        if (zone == null) {</span>
+<span class="fc" id="L303">            return getDefault();</span>
+        }
+<span class="fc" id="L305">        final String id = zone.getID();</span>
+<span class="fc bfc" id="L306" title="All 2 branches covered.">        if (id.equals(&quot;UTC&quot;)) {</span>
+<span class="fc" id="L307">            return DateTimeZone.UTC;</span>
+        }
+
+        // Convert from old alias before consulting provider since they may differ.
+<span class="fc" id="L311">        DateTimeZone dtz = null;</span>
+<span class="fc" id="L312">        String convId = getConvertedId(id);</span>
+<span class="fc bfc" id="L313" title="All 2 branches covered.">        if (convId != null) {</span>
+<span class="fc" id="L314">            dtz = cProvider.getZone(convId);</span>
+        }
+<span class="fc bfc" id="L316" title="All 2 branches covered.">        if (dtz == null) {</span>
+<span class="fc" id="L317">            dtz = cProvider.getZone(id);</span>
+        }
+<span class="fc bfc" id="L319" title="All 2 branches covered.">        if (dtz != null) {</span>
+<span class="fc" id="L320">            return dtz;</span>
+        }
+
+        // Support GMT+/-hh:mm formats
+<span class="pc bpc" id="L324" title="1 of 2 branches missed.">        if (convId == null) {</span>
+<span class="fc" id="L325">            convId = zone.getID();</span>
+<span class="fc bfc" id="L326" title="All 4 branches covered.">            if (convId.startsWith(&quot;GMT+&quot;) || convId.startsWith(&quot;GMT-&quot;)) {</span>
+<span class="fc" id="L327">                convId = convId.substring(3);</span>
+<span class="fc" id="L328">                int offset = parseOffset(convId);</span>
+<span class="fc bfc" id="L329" title="All 2 branches covered.">                if (offset == 0L) {</span>
+<span class="fc" id="L330">                    return DateTimeZone.UTC;</span>
+                } else {
+<span class="fc" id="L332">                    convId = printOffset(offset);</span>
+<span class="fc" id="L333">                    return fixedOffsetZone(convId, offset);</span>
+                }
+            }
+        }
+<span class="fc" id="L337">        throw new IllegalArgumentException(&quot;The datetime zone id '&quot; + id + &quot;' is not recognised&quot;);</span>
+    }
+
+    //-----------------------------------------------------------------------
+    /**
+     * Gets the zone using a fixed offset amount.
+     * 
+     * @param id  the zone id
+     * @param offset  the offset in millis
+     * @return the zone
+     */
+    private static synchronized DateTimeZone fixedOffsetZone(String id, int offset) {
+<span class="fc bfc" id="L349" title="All 2 branches covered.">        if (offset == 0) {</span>
+<span class="fc" id="L350">            return DateTimeZone.UTC;</span>
+        }
+<span class="fc bfc" id="L352" title="All 2 branches covered.">        if (iFixedOffsetCache == null) {</span>
+<span class="fc" id="L353">            iFixedOffsetCache = new HashMap&lt;String, SoftReference&lt;DateTimeZone&gt;&gt;();</span>
+        }
+        DateTimeZone zone;
+<span class="fc" id="L356">        Reference&lt;DateTimeZone&gt; ref = iFixedOffsetCache.get(id);</span>
+<span class="fc bfc" id="L357" title="All 2 branches covered.">        if (ref != null) {</span>
+<span class="fc" id="L358">            zone = ref.get();</span>
+<span class="pc bpc" id="L359" title="1 of 2 branches missed.">            if (zone != null) {</span>
+<span class="fc" id="L360">                return zone;</span>
+            }
+        }
+<span class="fc" id="L363">        zone = new FixedDateTimeZone(id, null, offset, offset);</span>
+<span class="fc" id="L364">        iFixedOffsetCache.put(id, new SoftReference&lt;DateTimeZone&gt;(zone));</span>
+<span class="fc" id="L365">        return zone;</span>
+    }
+
+    /**
+     * Gets all the available IDs supported.
+     * 
+     * @return an unmodifiable Set of String IDs
+     */
+    public static Set&lt;String&gt; getAvailableIDs() {
+<span class="fc" id="L374">        return cAvailableIDs;</span>
+    }
+
+    //-----------------------------------------------------------------------
+    /**
+     * Gets the zone provider factory.
+     * &lt;p&gt;
+     * The zone provider is a pluggable instance factory that supplies the
+     * actual instances of DateTimeZone.
+     * 
+     * @return the provider
+     */
+    public static Provider getProvider() {
+<span class="fc" id="L387">        return cProvider;</span>
+    }
+
+    /**
+     * Sets the zone provider factory.
+     * &lt;p&gt;
+     * The zone provider is a pluggable instance factory that supplies the
+     * actual instances of DateTimeZone.
+     * 
+     * @param provider  provider to use, or null for default
+     * @throws SecurityException if you do not have the permission DateTimeZone.setProvider
+     * @throws IllegalArgumentException if the provider is invalid
+     */
+    public static void setProvider(Provider provider) throws SecurityException {
+<span class="fc" id="L401">        SecurityManager sm = System.getSecurityManager();</span>
+<span class="pc bpc" id="L402" title="1 of 2 branches missed.">        if (sm != null) {</span>
+<span class="nc" id="L403">            sm.checkPermission(new JodaTimePermission(&quot;DateTimeZone.setProvider&quot;));</span>
+        }
+<span class="fc" id="L405">        setProvider0(provider);</span>
+<span class="fc" id="L406">    }</span>
+
+    /**
+     * Sets the zone provider factory without performing the security check.
+     * 
+     * @param provider  provider to use, or null for default
+     * @throws IllegalArgumentException if the provider is invalid
+     */
+    private static void setProvider0(Provider provider) {
+<span class="fc bfc" id="L415" title="All 2 branches covered.">        if (provider == null) {</span>
+<span class="fc" id="L416">            provider = getDefaultProvider();</span>
+        }
+<span class="fc" id="L418">        Set&lt;String&gt; ids = provider.getAvailableIDs();</span>
+<span class="fc bfc" id="L419" title="All 4 branches covered.">        if (ids == null || ids.size() == 0) {</span>
+<span class="fc" id="L420">            throw new IllegalArgumentException</span>
+                (&quot;The provider doesn't have any available ids&quot;);
+        }
+<span class="fc bfc" id="L423" title="All 2 branches covered.">        if (!ids.contains(&quot;UTC&quot;)) {</span>
+<span class="fc" id="L424">            throw new IllegalArgumentException(&quot;The provider doesn't support UTC&quot;);</span>
+        }
+<span class="fc bfc" id="L426" title="All 2 branches covered.">        if (!UTC.equals(provider.getZone(&quot;UTC&quot;))) {</span>
+<span class="fc" id="L427">            throw new IllegalArgumentException(&quot;Invalid UTC zone provided&quot;);</span>
+        }
+<span class="fc" id="L429">        cProvider = provider;</span>
+<span class="fc" id="L430">        cAvailableIDs = ids;</span>
+<span class="fc" id="L431">    }</span>
+
+    /**
+     * Gets the default zone provider.
+     * &lt;p&gt;
+     * Tries the system property &lt;code&gt;org.joda.time.DateTimeZone.Provider&lt;/code&gt;.
+     * Then tries a &lt;code&gt;ZoneInfoProvider&lt;/code&gt; using the data in &lt;code&gt;org/joda/time/tz/data&lt;/code&gt;.
+     * Then uses &lt;code&gt;UTCProvider&lt;/code&gt;.
+     * 
+     * @return the default name provider
+     */
+    private static Provider getDefaultProvider() {
+<span class="fc" id="L443">        Provider provider = null;</span>
+
+        try {
+<span class="fc" id="L446">            String providerClass =</span>
+<span class="fc" id="L447">                System.getProperty(&quot;org.joda.time.DateTimeZone.Provider&quot;);</span>
+<span class="fc bfc" id="L448" title="All 2 branches covered.">            if (providerClass != null) {</span>
+                try {
+<span class="fc" id="L450">                    provider = (Provider) Class.forName(providerClass).newInstance();</span>
+<span class="fc" id="L451">                } catch (Exception ex) {</span>
+<span class="fc" id="L452">                    Thread thread = Thread.currentThread();</span>
+<span class="fc" id="L453">                    thread.getThreadGroup().uncaughtException(thread, ex);</span>
+<span class="fc" id="L454">                }</span>
+            }
+<span class="nc" id="L456">        } catch (SecurityException ex) {</span>
+            // ignored
+<span class="fc" id="L458">        }</span>
+
+<span class="fc bfc" id="L460" title="All 2 branches covered.">        if (provider == null) {</span>
+            try {
+<span class="fc" id="L462">                provider = new ZoneInfoProvider(&quot;org/joda/time/tz/data&quot;);</span>
+<span class="nc" id="L463">            } catch (Exception ex) {</span>
+<span class="nc" id="L464">                Thread thread = Thread.currentThread();</span>
+<span class="nc" id="L465">                thread.getThreadGroup().uncaughtException(thread, ex);</span>
+<span class="fc" id="L466">            }</span>
+        }
+
+<span class="pc bpc" id="L469" title="1 of 2 branches missed.">        if (provider == null) {</span>
+<span class="nc" id="L470">            provider = new UTCProvider();</span>
+        }
+
+<span class="fc" id="L473">        return provider;</span>
+    }
+
+    //-----------------------------------------------------------------------
+    /**
+     * Gets the name provider factory.
+     * &lt;p&gt;
+     * The name provider is a pluggable instance factory that supplies the
+     * names of each DateTimeZone.
+     * 
+     * @return the provider
+     */
+    public static NameProvider getNameProvider() {
+<span class="fc" id="L486">        return cNameProvider;</span>
+    }
+
+    /**
+     * Sets the name provider factory.
+     * &lt;p&gt;
+     * The name provider is a pluggable instance factory that supplies the
+     * names of each DateTimeZone.
+     * 
+     * @param nameProvider  provider to use, or null for default
+     * @throws SecurityException if you do not have the permission DateTimeZone.setNameProvider
+     * @throws IllegalArgumentException if the provider is invalid
+     */
+    public static void setNameProvider(NameProvider nameProvider) throws SecurityException {
+<span class="fc" id="L500">        SecurityManager sm = System.getSecurityManager();</span>
+<span class="pc bpc" id="L501" title="1 of 2 branches missed.">        if (sm != null) {</span>
+<span class="nc" id="L502">            sm.checkPermission(new JodaTimePermission(&quot;DateTimeZone.setNameProvider&quot;));</span>
+        }
+<span class="fc" id="L504">        setNameProvider0(nameProvider);</span>
+<span class="fc" id="L505">    }</span>
+
+    /**
+     * Sets the name provider factory without performing the security check.
+     * 
+     * @param nameProvider  provider to use, or null for default
+     * @throws IllegalArgumentException if the provider is invalid
+     */
+    private static void setNameProvider0(NameProvider nameProvider) {
+<span class="fc bfc" id="L514" title="All 2 branches covered.">        if (nameProvider == null) {</span>
+<span class="fc" id="L515">            nameProvider = getDefaultNameProvider();</span>
+        }
+<span class="fc" id="L517">        cNameProvider = nameProvider;</span>
+<span class="fc" id="L518">    }</span>
+
+    /**
+     * Gets the default name provider.
+     * &lt;p&gt;
+     * Tries the system property &lt;code&gt;org.joda.time.DateTimeZone.NameProvider&lt;/code&gt;.
+     * Then uses &lt;code&gt;DefaultNameProvider&lt;/code&gt;.
+     * 
+     * @return the default name provider
+     */
+    private static NameProvider getDefaultNameProvider() {
+<span class="fc" id="L529">        NameProvider nameProvider = null;</span>
+        try {
+<span class="fc" id="L531">            String providerClass = System.getProperty(&quot;org.joda.time.DateTimeZone.NameProvider&quot;);</span>
+<span class="fc bfc" id="L532" title="All 2 branches covered.">            if (providerClass != null) {</span>
+                try {
+<span class="fc" id="L534">                    nameProvider = (NameProvider) Class.forName(providerClass).newInstance();</span>
+<span class="fc" id="L535">                } catch (Exception ex) {</span>
+<span class="fc" id="L536">                    Thread thread = Thread.currentThread();</span>
+<span class="fc" id="L537">                    thread.getThreadGroup().uncaughtException(thread, ex);</span>
+<span class="fc" id="L538">                }</span>
+            }
+<span class="nc" id="L540">        } catch (SecurityException ex) {</span>
+            // ignore
+<span class="fc" id="L542">        }</span>
+
+<span class="fc bfc" id="L544" title="All 2 branches covered.">        if (nameProvider == null) {</span>
+<span class="fc" id="L545">            nameProvider = new DefaultNameProvider();</span>
+        }
+
+<span class="fc" id="L548">        return nameProvider;</span>
+    }
+
+    //-----------------------------------------------------------------------
+    /**
+     * Converts an old style id to a new style id.
+     * 
+     * @param id  the old style id
+     * @return the new style id, null if not found
+     */
+    private static synchronized String getConvertedId(String id) {
+<span class="fc" id="L559">        Map&lt;String, String&gt; map = cZoneIdConversion;</span>
+<span class="fc bfc" id="L560" title="All 2 branches covered.">        if (map == null) {</span>
+            // Backwards compatibility with TimeZone.
+<span class="fc" id="L562">            map = new HashMap&lt;String, String&gt;();</span>
+<span class="fc" id="L563">            map.put(&quot;GMT&quot;, &quot;UTC&quot;);</span>
+<span class="fc" id="L564">            map.put(&quot;WET&quot;, &quot;WET&quot;);</span>
+<span class="fc" id="L565">            map.put(&quot;CET&quot;, &quot;CET&quot;);</span>
+<span class="fc" id="L566">            map.put(&quot;MET&quot;, &quot;CET&quot;);</span>
+<span class="fc" id="L567">            map.put(&quot;ECT&quot;, &quot;CET&quot;);</span>
+<span class="fc" id="L568">            map.put(&quot;EET&quot;, &quot;EET&quot;);</span>
+<span class="fc" id="L569">            map.put(&quot;MIT&quot;, &quot;Pacific/Apia&quot;);</span>
+<span class="fc" id="L570">            map.put(&quot;HST&quot;, &quot;Pacific/Honolulu&quot;);  // JDK 1.1 compatible</span>
+<span class="fc" id="L571">            map.put(&quot;AST&quot;, &quot;America/Anchorage&quot;);</span>
+<span class="fc" id="L572">            map.put(&quot;PST&quot;, &quot;America/Los_Angeles&quot;);</span>
+<span class="fc" id="L573">            map.put(&quot;MST&quot;, &quot;America/Denver&quot;);  // JDK 1.1 compatible</span>
+<span class="fc" id="L574">            map.put(&quot;PNT&quot;, &quot;America/Phoenix&quot;);</span>
+<span class="fc" id="L575">            map.put(&quot;CST&quot;, &quot;America/Chicago&quot;);</span>
+<span class="fc" id="L576">            map.put(&quot;EST&quot;, &quot;America/New_York&quot;);  // JDK 1.1 compatible</span>
+<span class="fc" id="L577">            map.put(&quot;IET&quot;, &quot;America/Indiana/Indianapolis&quot;);</span>
+<span class="fc" id="L578">            map.put(&quot;PRT&quot;, &quot;America/Puerto_Rico&quot;);</span>
+<span class="fc" id="L579">            map.put(&quot;CNT&quot;, &quot;America/St_Johns&quot;);</span>
+<span class="fc" id="L580">            map.put(&quot;AGT&quot;, &quot;America/Argentina/Buenos_Aires&quot;);</span>
+<span class="fc" id="L581">            map.put(&quot;BET&quot;, &quot;America/Sao_Paulo&quot;);</span>
+<span class="fc" id="L582">            map.put(&quot;ART&quot;, &quot;Africa/Cairo&quot;);</span>
+<span class="fc" id="L583">            map.put(&quot;CAT&quot;, &quot;Africa/Harare&quot;);</span>
+<span class="fc" id="L584">            map.put(&quot;EAT&quot;, &quot;Africa/Addis_Ababa&quot;);</span>
+<span class="fc" id="L585">            map.put(&quot;NET&quot;, &quot;Asia/Yerevan&quot;);</span>
+<span class="fc" id="L586">            map.put(&quot;PLT&quot;, &quot;Asia/Karachi&quot;);</span>
+<span class="fc" id="L587">            map.put(&quot;IST&quot;, &quot;Asia/Kolkata&quot;);</span>
+<span class="fc" id="L588">            map.put(&quot;BST&quot;, &quot;Asia/Dhaka&quot;);</span>
+<span class="fc" id="L589">            map.put(&quot;VST&quot;, &quot;Asia/Ho_Chi_Minh&quot;);</span>
+<span class="fc" id="L590">            map.put(&quot;CTT&quot;, &quot;Asia/Shanghai&quot;);</span>
+<span class="fc" id="L591">            map.put(&quot;JST&quot;, &quot;Asia/Tokyo&quot;);</span>
+<span class="fc" id="L592">            map.put(&quot;ACT&quot;, &quot;Australia/Darwin&quot;);</span>
+<span class="fc" id="L593">            map.put(&quot;AET&quot;, &quot;Australia/Sydney&quot;);</span>
+<span class="fc" id="L594">            map.put(&quot;SST&quot;, &quot;Pacific/Guadalcanal&quot;);</span>
+<span class="fc" id="L595">            map.put(&quot;NST&quot;, &quot;Pacific/Auckland&quot;);</span>
+<span class="fc" id="L596">            cZoneIdConversion = map;</span>
+        }
+<span class="fc" id="L598">        return map.get(id);</span>
+    }
+
+    private static int parseOffset(String str) {
+        // Can't use a real chronology if called during class
+        // initialization. Offset parser doesn't need it anyhow.
+<span class="fc" id="L604">        Chronology chrono = new BaseChronology() {</span>
+            public DateTimeZone getZone() {
+<span class="fc" id="L606">                return null;</span>
+            }
+            public Chronology withUTC() {
+<span class="fc" id="L609">                return this;</span>
+            }
+            public Chronology withZone(DateTimeZone zone) {
+<span class="nc" id="L612">                return this;</span>
+            }
+            public String toString() {
+<span class="nc" id="L615">                return getClass().getName();</span>
+            }
+        };
+<span class="fc" id="L618">        return -(int) offsetFormatter().withChronology(chrono).parseMillis(str);</span>
+    }
+
+    /**
+     * Formats a timezone offset string.
+     * &lt;p&gt;
+     * This method is kept separate from the formatting classes to speed and
+     * simplify startup and classloading.
+     * 
+     * @param offset  the offset in milliseconds
+     * @return the time zone string
+     */
+    private static String printOffset(int offset) {
+<span class="fc" id="L631">        StringBuffer buf = new StringBuffer();</span>
+<span class="fc bfc" id="L632" title="All 2 branches covered.">        if (offset &gt;= 0) {</span>
+<span class="fc" id="L633">            buf.append('+');</span>
+        } else {
+<span class="fc" id="L635">            buf.append('-');</span>
+<span class="fc" id="L636">            offset = -offset;</span>
+        }
+
+<span class="fc" id="L639">        int hours = offset / DateTimeConstants.MILLIS_PER_HOUR;</span>
+<span class="fc" id="L640">        FormatUtils.appendPaddedInteger(buf, hours, 2);</span>
+<span class="fc" id="L641">        offset -= hours * (int) DateTimeConstants.MILLIS_PER_HOUR;</span>
+
+<span class="fc" id="L643">        int minutes = offset / DateTimeConstants.MILLIS_PER_MINUTE;</span>
+<span class="fc" id="L644">        buf.append(':');</span>
+<span class="fc" id="L645">        FormatUtils.appendPaddedInteger(buf, minutes, 2);</span>
+<span class="fc" id="L646">        offset -= minutes * DateTimeConstants.MILLIS_PER_MINUTE;</span>
+<span class="fc bfc" id="L647" title="All 2 branches covered.">        if (offset == 0) {</span>
+<span class="fc" id="L648">            return buf.toString();</span>
+        }
+
+<span class="fc" id="L651">        int seconds = offset / DateTimeConstants.MILLIS_PER_SECOND;</span>
+<span class="fc" id="L652">        buf.append(':');</span>
+<span class="fc" id="L653">        FormatUtils.appendPaddedInteger(buf, seconds, 2);</span>
+<span class="fc" id="L654">        offset -= seconds * DateTimeConstants.MILLIS_PER_SECOND;</span>
+<span class="fc bfc" id="L655" title="All 2 branches covered.">        if (offset == 0) {</span>
+<span class="fc" id="L656">            return buf.toString();</span>
+        }
+
+<span class="fc" id="L659">        buf.append('.');</span>
+<span class="fc" id="L660">        FormatUtils.appendPaddedInteger(buf, offset, 3);</span>
+<span class="fc" id="L661">        return buf.toString();</span>
+    }
+
+    /**
+     * Gets a printer/parser for managing the offset id formatting.
+     * 
+     * @return the formatter
+     */
+    private static synchronized DateTimeFormatter offsetFormatter() {
+<span class="fc bfc" id="L670" title="All 2 branches covered.">        if (cOffsetFormatter == null) {</span>
+<span class="fc" id="L671">            cOffsetFormatter = new DateTimeFormatterBuilder()</span>
+<span class="fc" id="L672">                .appendTimeZoneOffset(null, true, 2, 4)</span>
+<span class="fc" id="L673">                .toFormatter();</span>
+        }
+<span class="fc" id="L675">        return cOffsetFormatter;</span>
+    }
+
+    // Instance fields and methods
+    //--------------------------------------------------------------------
+
+    private final String iID;
+
+    /**
+     * Constructor.
+     * 
+     * @param id  the id to use
+     * @throws IllegalArgumentException if the id is null
+     */
+<span class="fc" id="L689">    protected DateTimeZone(String id) {</span>
+<span class="fc bfc" id="L690" title="All 2 branches covered.">        if (id == null) {</span>
+<span class="fc" id="L691">            throw new IllegalArgumentException(&quot;Id must not be null&quot;);</span>
+        }
+<span class="fc" id="L693">        iID = id;</span>
+<span class="fc" id="L694">    }</span>
+
+    // Principal methods
+    //--------------------------------------------------------------------
+
+    /**
+     * Gets the ID of this datetime zone.
+     * 
+     * @return the ID of this datetime zone
+     */
+    @ToString
+    public final String getID() {
+<span class="fc" id="L706">        return iID;</span>
+    }
+
+    /**
+     * Returns a non-localized name that is unique to this time zone. It can be
+     * combined with id to form a unique key for fetching localized names.
+     *
+     * @param instant  milliseconds from 1970-01-01T00:00:00Z to get the name for
+     * @return name key or null if id should be used for names
+     */
+    public abstract String getNameKey(long instant);
+
+    /**
+     * Gets the short name of this datetime zone suitable for display using
+     * the default locale.
+     * &lt;p&gt;
+     * If the name is not available for the locale, then this method returns a
+     * string in the format &lt;code&gt;[+-]hh:mm&lt;/code&gt;.
+     * 
+     * @param instant  milliseconds from 1970-01-01T00:00:00Z to get the name for
+     * @return the human-readable short name in the default locale
+     */
+    public final String getShortName(long instant) {
+<span class="fc" id="L729">        return getShortName(instant, null);</span>
+    }
+
+    /**
+     * Gets the short name of this datetime zone suitable for display using
+     * the specified locale.
+     * &lt;p&gt;
+     * If the name is not available for the locale, then this method returns a
+     * string in the format &lt;code&gt;[+-]hh:mm&lt;/code&gt;.
+     * 
+     * @param instant  milliseconds from 1970-01-01T00:00:00Z to get the name for
+     * @param locale  the locale to get the name for
+     * @return the human-readable short name in the specified locale
+     */
+    public String getShortName(long instant, Locale locale) {
+<span class="fc bfc" id="L744" title="All 2 branches covered.">        if (locale == null) {</span>
+<span class="fc" id="L745">            locale = Locale.getDefault();</span>
+        }
+<span class="fc" id="L747">        String nameKey = getNameKey(instant);</span>
+<span class="fc bfc" id="L748" title="All 2 branches covered.">        if (nameKey == null) {</span>
+<span class="fc" id="L749">            return iID;</span>
+        }
+<span class="fc" id="L751">        String name = cNameProvider.getShortName(locale, iID, nameKey);</span>
+<span class="pc bpc" id="L752" title="1 of 2 branches missed.">        if (name != null) {</span>
+<span class="nc" id="L753">            return name;</span>
+        }
+<span class="fc" id="L755">        return printOffset(getOffset(instant));</span>
+    }
+
+    /**
+     * Gets the long name of this datetime zone suitable for display using
+     * the default locale.
+     * &lt;p&gt;
+     * If the name is not available for the locale, then this method returns a
+     * string in the format &lt;code&gt;[+-]hh:mm&lt;/code&gt;.
+     * 
+     * @param instant  milliseconds from 1970-01-01T00:00:00Z to get the name for
+     * @return the human-readable long name in the default locale
+     */
+    public final String getName(long instant) {
+<span class="fc" id="L769">        return getName(instant, null);</span>
+    }
+
+    /**
+     * Gets the long name of this datetime zone suitable for display using
+     * the specified locale.
+     * &lt;p&gt;
+     * If the name is not available for the locale, then this method returns a
+     * string in the format &lt;code&gt;[+-]hh:mm&lt;/code&gt;.
+     * 
+     * @param instant  milliseconds from 1970-01-01T00:00:00Z to get the name for
+     * @param locale  the locale to get the name for
+     * @return the human-readable long name in the specified locale
+     */
+    public String getName(long instant, Locale locale) {
+<span class="fc bfc" id="L784" title="All 2 branches covered.">        if (locale == null) {</span>
+<span class="fc" id="L785">            locale = Locale.getDefault();</span>
+        }
+<span class="fc" id="L787">        String nameKey = getNameKey(instant);</span>
+<span class="fc bfc" id="L788" title="All 2 branches covered.">        if (nameKey == null) {</span>
+<span class="fc" id="L789">            return iID;</span>
+        }
+<span class="fc" id="L791">        String name = cNameProvider.getName(locale, iID, nameKey);</span>
+<span class="pc bpc" id="L792" title="1 of 2 branches missed.">        if (name != null) {</span>
+<span class="nc" id="L793">            return name;</span>
+        }
+<span class="fc" id="L795">        return printOffset(getOffset(instant));</span>
+    }
+
+    /**
+     * Gets the millisecond offset to add to UTC to get local time.
+     * 
+     * @param instant  milliseconds from 1970-01-01T00:00:00Z to get the offset for
+     * @return the millisecond offset to add to UTC to get local time
+     */
+    public abstract int getOffset(long instant);
+
+    /**
+     * Gets the millisecond offset to add to UTC to get local time.
+     * 
+     * @param instant  instant to get the offset for, null means now
+     * @return the millisecond offset to add to UTC to get local time
+     */
+    public final int getOffset(ReadableInstant instant) {
+<span class="fc bfc" id="L813" title="All 2 branches covered.">        if (instant == null) {</span>
+<span class="fc" id="L814">            return getOffset(DateTimeUtils.currentTimeMillis());</span>
+        }
+<span class="fc" id="L816">        return getOffset(instant.getMillis());</span>
+    }
+
+    /**
+     * Gets the standard millisecond offset to add to UTC to get local time,
+     * when standard time is in effect.
+     * 
+     * @param instant  milliseconds from 1970-01-01T00:00:00Z to get the offset for
+     * @return the millisecond offset to add to UTC to get local time
+     */
+    public abstract int getStandardOffset(long instant);
+
+    /**
+     * Checks whether, at a particular instant, the offset is standard or not.
+     * &lt;p&gt;
+     * This method can be used to determine whether Summer Time (DST) applies.
+     * As a general rule, if the offset at the specified instant is standard,
+     * then either Winter time applies, or there is no Summer Time. If the
+     * instant is not standard, then Summer Time applies.
+     * &lt;p&gt;
+     * The implementation of the method is simply whether {@link #getOffset(long)}
+     * equals {@link #getStandardOffset(long)} at the specified instant.
+     * 
+     * @param instant  milliseconds from 1970-01-01T00:00:00Z to get the offset for
+     * @return true if the offset at the given instant is the standard offset
+     * @since 1.5
+     */
+    public boolean isStandardOffset(long instant) {
+<span class="fc bfc" id="L844" title="All 2 branches covered.">        return getOffset(instant) == getStandardOffset(instant);</span>
+    }
+
+    /**
+     * Gets the millisecond offset to subtract from local time to get UTC time.
+     * This offset can be used to undo adding the offset obtained by getOffset.
+     *
+     * &lt;pre&gt;
+     * millisLocal == millisUTC   + getOffset(millisUTC)
+     * millisUTC   == millisLocal - getOffsetFromLocal(millisLocal)
+     * &lt;/pre&gt;
+     *
+     * NOTE: After calculating millisLocal, some error may be introduced. At
+     * offset transitions (due to DST or other historical changes), ranges of
+     * local times may map to different UTC times.
+     * &lt;p&gt;
+     * This method will return an offset suitable for calculating an instant
+     * after any DST gap. For example, consider a zone with a cutover
+     * from 01:00 to 01:59:&lt;br /&gt;
+     * Input: 00:00  Output: 00:00&lt;br /&gt;
+     * Input: 00:30  Output: 00:30&lt;br /&gt;
+     * Input: 01:00  Output: 02:00&lt;br /&gt;
+     * Input: 01:30  Output: 02:30&lt;br /&gt;
+     * Input: 02:00  Output: 02:00&lt;br /&gt;
+     * Input: 02:30  Output: 02:30&lt;br /&gt;
+     * &lt;p&gt;
+     * During a DST overlap (where the local time is ambiguous) this method will return
+     * the earlier instant. The combination of these two rules is to always favour
+     * daylight (summer) time over standard (winter) time.
+     * &lt;p&gt;
+     * NOTE: Prior to v2.0, the DST overlap behaviour was not defined and varied by hemisphere.
+     * Prior to v1.5, the DST gap behaviour was also not defined.
+     *
+     * @param instantLocal  the millisecond instant, relative to this time zone, to get the offset for
+     * @return the millisecond offset to subtract from local time to get UTC time
+     */
+    public int getOffsetFromLocal(long instantLocal) {
+        // get the offset at instantLocal (first estimate)
+<span class="fc" id="L882">        final int offsetLocal = getOffset(instantLocal);</span>
+        // adjust instantLocal using the estimate and recalc the offset
+<span class="fc" id="L884">        final long instantAdjusted = instantLocal - offsetLocal;</span>
+<span class="fc" id="L885">        final int offsetAdjusted = getOffset(instantAdjusted);</span>
+        // if the offsets differ, we must be near a DST boundary
+<span class="fc bfc" id="L887" title="All 2 branches covered.">        if (offsetLocal != offsetAdjusted) {</span>
+            // we need to ensure that time is always after the DST gap
+            // this happens naturally for positive offsets, but not for negative
+<span class="fc bfc" id="L890" title="All 2 branches covered.">            if ((offsetLocal - offsetAdjusted) &lt; 0) {</span>
+                // if we just return offsetAdjusted then the time is pushed
+                // back before the transition, whereas it should be
+                // on or after the transition
+<span class="fc" id="L894">                long nextLocal = nextTransition(instantAdjusted);</span>
+<span class="fc" id="L895">                long nextAdjusted = nextTransition(instantLocal - offsetAdjusted);</span>
+<span class="fc bfc" id="L896" title="All 2 branches covered.">                if (nextLocal != nextAdjusted) {</span>
+<span class="fc" id="L897">                    return offsetLocal;</span>
+                }
+<span class="fc" id="L899">            }</span>
+<span class="fc bfc" id="L900" title="All 2 branches covered.">        } else if (offsetLocal &gt;= 0) {</span>
+<span class="fc" id="L901">            long prev = previousTransition(instantAdjusted);</span>
+<span class="pc bpc" id="L902" title="1 of 2 branches missed.">            if (prev &lt; instantAdjusted) {</span>
+<span class="fc" id="L903">                int offsetPrev = getOffset(prev);</span>
+<span class="fc" id="L904">                int diff = offsetPrev - offsetLocal;</span>
+<span class="fc bfc" id="L905" title="All 2 branches covered.">                if (instantAdjusted - prev &lt;= diff) {</span>
+<span class="fc" id="L906">                    return offsetPrev;</span>
+                }
+            }
+        }
+<span class="fc" id="L910">        return offsetAdjusted;</span>
+    }
+
+    /**
+     * Converts a standard UTC instant to a local instant with the same
+     * local time. This conversion is used before performing a calculation
+     * so that the calculation can be done using a simple local zone.
+     *
+     * @param instantUTC  the UTC instant to convert to local
+     * @return the local instant with the same local time
+     * @throws ArithmeticException if the result overflows a long
+     * @since 1.5
+     */
+    public long convertUTCToLocal(long instantUTC) {
+<span class="fc" id="L924">        int offset = getOffset(instantUTC);</span>
+<span class="fc" id="L925">        long instantLocal = instantUTC + offset;</span>
+        // If there is a sign change, but the two values have the same sign...
+<span class="pc bpc" id="L927" title="1 of 4 branches missed.">        if ((instantUTC ^ instantLocal) &lt; 0 &amp;&amp; (instantUTC ^ offset) &gt;= 0) {</span>
+<span class="nc" id="L928">            throw new ArithmeticException(&quot;Adding time zone offset caused overflow&quot;);</span>
+        }
+<span class="fc" id="L930">        return instantLocal;</span>
+    }
+
+    /**
+     * Converts a local instant to a standard UTC instant with the same
+     * local time attempting to use the same offset as the original.
+     * &lt;p&gt;
+     * This conversion is used after performing a calculation
+     * where the calculation was done using a simple local zone.
+     * Whenever possible, the same offset as the original offset will be used.
+     * This is most significant during a daylight savings overlap.
+     *
+     * @param instantLocal  the local instant to convert to UTC
+     * @param strict  whether the conversion should reject non-existent local times
+     * @param originalInstantUTC  the original instant that the calculation is based on
+     * @return the UTC instant with the same local time, 
+     * @throws ArithmeticException if the result overflows a long
+     * @throws IllegalArgumentException if the zone has no equivalent local time
+     * @since 2.0
+     */
+    public long convertLocalToUTC(long instantLocal, boolean strict, long originalInstantUTC) {
+<span class="fc" id="L951">        int offsetOriginal = getOffset(originalInstantUTC);</span>
+<span class="fc" id="L952">        long instantUTC = instantLocal - offsetOriginal;</span>
+<span class="fc" id="L953">        int offsetLocalFromOriginal = getOffset(instantUTC);</span>
+<span class="fc bfc" id="L954" title="All 2 branches covered.">        if (offsetLocalFromOriginal == offsetOriginal) {</span>
+<span class="fc" id="L955">            return instantUTC;</span>
+        }
+<span class="fc" id="L957">        return convertLocalToUTC(instantLocal, strict);</span>
+    }
+
+    /**
+     * Converts a local instant to a standard UTC instant with the same
+     * local time. This conversion is used after performing a calculation
+     * where the calculation was done using a simple local zone.
+     *
+     * @param instantLocal  the local instant to convert to UTC
+     * @param strict  whether the conversion should reject non-existent local times
+     * @return the UTC instant with the same local time, 
+     * @throws ArithmeticException if the result overflows a long
+     * @throws IllegalArgumentException if the zone has no equivalent local time
+     * @since 1.5
+     */
+    public long convertLocalToUTC(long instantLocal, boolean strict) {
+        // get the offset at instantLocal (first estimate)
+<span class="fc" id="L974">        int offsetLocal = getOffset(instantLocal);</span>
+        // adjust instantLocal using the estimate and recalc the offset
+<span class="fc" id="L976">        int offset = getOffset(instantLocal - offsetLocal);</span>
+        // if the offsets differ, we must be near a DST boundary
+<span class="fc bfc" id="L978" title="All 2 branches covered.">        if (offsetLocal != offset) {</span>
+            // if strict then always check if in DST gap
+            // otherwise only check if zone in Western hemisphere (as the
+            // value of offset is already correct for Eastern hemisphere)
+<span class="pc bpc" id="L982" title="1 of 4 branches missed.">            if (strict || offsetLocal &lt; 0) {</span>
+                // determine if we are in the DST gap
+<span class="fc" id="L984">                long nextLocal = nextTransition(instantLocal - offsetLocal);</span>
+<span class="pc bpc" id="L985" title="1 of 2 branches missed.">                if (nextLocal == (instantLocal - offsetLocal)) {</span>
+<span class="nc" id="L986">                    nextLocal = Long.MAX_VALUE;</span>
+                }
+<span class="fc" id="L988">                long nextAdjusted = nextTransition(instantLocal - offset);</span>
+<span class="pc bpc" id="L989" title="1 of 2 branches missed.">                if (nextAdjusted == (instantLocal - offset)) {</span>
+<span class="nc" id="L990">                    nextAdjusted = Long.MAX_VALUE;</span>
+                }
+<span class="fc bfc" id="L992" title="All 2 branches covered.">                if (nextLocal != nextAdjusted) {</span>
+                    // yes we are in the DST gap
+<span class="pc bpc" id="L994" title="1 of 2 branches missed.">                    if (strict) {</span>
+                        // DST gap is not acceptable
+<span class="nc" id="L996">                        throw new IllegalArgumentException(&quot;Illegal instant due to time zone offset transition: &quot; +</span>
+<span class="nc" id="L997">                                DateTimeFormat.forPattern(&quot;yyyy-MM-dd'T'HH:mm:ss.SSS&quot;).print(new Instant(instantLocal)) +</span>
+<span class="nc" id="L998">                                &quot; (&quot; + getID() + &quot;)&quot;);</span>
+                    } else {
+                        // DST gap is acceptable, but for the Western hemisphere
+                        // the offset is wrong and will result in local times
+                        // before the cutover so use the offsetLocal instead
+<span class="fc" id="L1003">                        offset = offsetLocal;</span>
+                    }
+                }
+            }
+        }
+        // check for overflow
+<span class="fc" id="L1009">        long instantUTC = instantLocal - offset;</span>
+        // If there is a sign change, but the two values have different signs...
+<span class="pc bpc" id="L1011" title="3 of 4 branches missed.">        if ((instantLocal ^ instantUTC) &lt; 0 &amp;&amp; (instantLocal ^ offset) &lt; 0) {</span>
+<span class="nc" id="L1012">            throw new ArithmeticException(&quot;Subtracting time zone offset caused overflow&quot;);</span>
+        }
+<span class="fc" id="L1014">        return instantUTC;</span>
+    }
+
+    /**
+     * Gets the millisecond instant in another zone keeping the same local time.
+     * &lt;p&gt;
+     * The conversion is performed by converting the specified UTC millis to local
+     * millis in this zone, then converting back to UTC millis in the new zone.
+     *
+     * @param newZone  the new zone, null means default
+     * @param oldInstant  the UTC millisecond instant to convert
+     * @return the UTC millisecond instant with the same local time in the new zone
+     */
+    public long getMillisKeepLocal(DateTimeZone newZone, long oldInstant) {
+<span class="fc bfc" id="L1028" title="All 2 branches covered.">        if (newZone == null) {</span>
+<span class="fc" id="L1029">            newZone = DateTimeZone.getDefault();</span>
+        }
+<span class="fc bfc" id="L1031" title="All 2 branches covered.">        if (newZone == this) {</span>
+<span class="fc" id="L1032">            return oldInstant;</span>
+        }
+<span class="fc" id="L1034">        long instantLocal = convertUTCToLocal(oldInstant);</span>
+<span class="fc" id="L1035">        return newZone.convertLocalToUTC(instantLocal, false, oldInstant);</span>
+    }
+
+//    //-----------------------------------------------------------------------
+//    /**
+//     * Checks if the given {@link LocalDateTime} is within an overlap.
+//     * &lt;p&gt;
+//     * When switching from Daylight Savings Time to standard time there is
+//     * typically an overlap where the same clock hour occurs twice. This
+//     * method identifies whether the local datetime refers to such an overlap.
+//     * 
+//     * @param localDateTime  the time to check, not null
+//     * @return true if the given datetime refers to an overlap
+//     */
+//    public boolean isLocalDateTimeOverlap(LocalDateTime localDateTime) {
+//        if (isFixed()) {
+//            return false;
+//        }
+//        long instantLocal = localDateTime.toDateTime(DateTimeZone.UTC).getMillis();
+//        // get the offset at instantLocal (first estimate)
+//        int offsetLocal = getOffset(instantLocal);
+//        // adjust instantLocal using the estimate and recalc the offset
+//        int offset = getOffset(instantLocal - offsetLocal);
+//        // if the offsets differ, we must be near a DST boundary
+//        if (offsetLocal != offset) {
+//            long nextLocal = nextTransition(instantLocal - offsetLocal);
+//            long nextAdjusted = nextTransition(instantLocal - offset);
+//            if (nextLocal != nextAdjusted) {
+//                // in DST gap
+//                return false;
+//            }
+//            long diff = Math.abs(offset - offsetLocal);
+//            DateTime dateTime = localDateTime.toDateTime(this);
+//            DateTime adjusted = dateTime.plus(diff);
+//            if (dateTime.getHourOfDay() == adjusted.getHourOfDay() &amp;&amp;
+//                    dateTime.getMinuteOfHour() == adjusted.getMinuteOfHour() &amp;&amp;
+//                    dateTime.getSecondOfMinute() == adjusted.getSecondOfMinute()) {
+//                return true;
+//            }
+//            adjusted = dateTime.minus(diff);
+//            if (dateTime.getHourOfDay() == adjusted.getHourOfDay() &amp;&amp;
+//                    dateTime.getMinuteOfHour() == adjusted.getMinuteOfHour() &amp;&amp;
+//                    dateTime.getSecondOfMinute() == adjusted.getSecondOfMinute()) {
+//                return true;
+//            }
+//            return false;
+//        }
+//        return false;
+//    }
+//        
+//        
+//        DateTime dateTime = null;
+//        try {
+//            dateTime = localDateTime.toDateTime(this);
+//        } catch (IllegalArgumentException ex) {
+//            return false;  // it is a gap, not an overlap
+//        }
+//        long offset1 = Math.abs(getOffset(dateTime.getMillis() + 1) - getStandardOffset(dateTime.getMillis() + 1));
+//        long offset2 = Math.abs(getOffset(dateTime.getMillis() - 1) - getStandardOffset(dateTime.getMillis() - 1));
+//        long offset = Math.max(offset1, offset2);
+//        if (offset == 0) {
+//            return false;
+//        }
+//        DateTime adjusted = dateTime.plus(offset);
+//        if (dateTime.getHourOfDay() == adjusted.getHourOfDay() &amp;&amp;
+//                dateTime.getMinuteOfHour() == adjusted.getMinuteOfHour() &amp;&amp;
+//                dateTime.getSecondOfMinute() == adjusted.getSecondOfMinute()) {
+//            return true;
+//        }
+//        adjusted = dateTime.minus(offset);
+//        if (dateTime.getHourOfDay() == adjusted.getHourOfDay() &amp;&amp;
+//                dateTime.getMinuteOfHour() == adjusted.getMinuteOfHour() &amp;&amp;
+//                dateTime.getSecondOfMinute() == adjusted.getSecondOfMinute()) {
+//            return true;
+//        }
+//        return false;
+        
+//        long millis = dateTime.getMillis();
+//        long nextTransition = nextTransition(millis);
+//        long previousTransition = previousTransition(millis);
+//        long deltaToPreviousTransition = millis - previousTransition;
+//        long deltaToNextTransition = nextTransition - millis;
+//        if (deltaToNextTransition &lt; deltaToPreviousTransition) {
+//            int offset = getOffset(nextTransition);
+//            int standardOffset = getStandardOffset(nextTransition);
+//            if (Math.abs(offset - standardOffset) &gt;= deltaToNextTransition) {
+//                return true;
+//            }
+//        } else  {
+//            int offset = getOffset(previousTransition);
+//            int standardOffset = getStandardOffset(previousTransition);
+//            if (Math.abs(offset - standardOffset) &gt;= deltaToPreviousTransition) {
+//                return true;
+//            }
+//        }
+//        return false;
+//    }
+
+    /**
+     * Checks if the given {@link LocalDateTime} is within a gap.
+     * &lt;p&gt;
+     * When switching from standard time to Daylight Savings Time there is
+     * typically a gap where a clock hour is missing. This method identifies
+     * whether the local datetime refers to such a gap.
+     * 
+     * @param localDateTime  the time to check, not null
+     * @return true if the given datetime refers to a gap
+     * @since 1.6
+     */
+    public boolean isLocalDateTimeGap(LocalDateTime localDateTime) {
+<span class="pc bpc" id="L1145" title="1 of 2 branches missed.">        if (isFixed()) {</span>
+<span class="nc" id="L1146">            return false;</span>
+        }
+        try {
+<span class="fc" id="L1149">            localDateTime.toDateTime(this);</span>
+<span class="fc" id="L1150">            return false;</span>
+<span class="fc" id="L1151">        } catch (IllegalArgumentException ex) {</span>
+<span class="fc" id="L1152">            return true;</span>
+        }
+    }
+
+    /**
+     * Adjusts the offset to be the earlier or later one during an overlap.
+     * 
+     * @param instant  the instant to adjust
+     * @param earlierOrLater  false for earlier, true for later
+     * @return the adjusted instant millis
+     */
+    public long adjustOffset(long instant, boolean earlierOrLater) {
+        // a bit messy, but will work in all non-pathological cases
+        
+        // evaluate 3 hours before and after to work out if anything is happening
+<span class="fc" id="L1167">        long instantBefore = instant - 3 * DateTimeConstants.MILLIS_PER_HOUR;</span>
+<span class="fc" id="L1168">        long instantAfter = instant + 3 * DateTimeConstants.MILLIS_PER_HOUR;</span>
+<span class="fc" id="L1169">        long offsetBefore = getOffset(instantBefore);</span>
+<span class="fc" id="L1170">        long offsetAfter = getOffset(instantAfter);</span>
+<span class="fc bfc" id="L1171" title="All 2 branches covered.">        if (offsetBefore &lt;= offsetAfter) {</span>
+<span class="fc" id="L1172">            return instant;  // not an overlap (less than is a gap, equal is normal case)</span>
+        }
+        
+        // work out range of instants that have duplicate local times
+<span class="fc" id="L1176">        long diff = offsetBefore - offsetAfter;</span>
+<span class="fc" id="L1177">        long transition = nextTransition(instantBefore);</span>
+<span class="fc" id="L1178">        long overlapStart = transition - diff;</span>
+<span class="fc" id="L1179">        long overlapEnd = transition + diff;</span>
+<span class="fc bfc" id="L1180" title="All 4 branches covered.">        if (instant &lt; overlapStart || instant &gt;= overlapEnd) {</span>
+<span class="fc" id="L1181">          return instant;  // not an overlap</span>
+        }
+        
+        // calculate result
+<span class="fc" id="L1185">        long afterStart = instant - overlapStart;</span>
+<span class="fc bfc" id="L1186" title="All 2 branches covered.">        if (afterStart &gt;= diff) {</span>
+          // currently in later offset
+<span class="fc bfc" id="L1188" title="All 2 branches covered.">          return earlierOrLater ? instant : instant - diff;</span>
+        } else {
+          // currently in earlier offset
+<span class="fc bfc" id="L1191" title="All 2 branches covered.">          return earlierOrLater ? instant + diff : instant;</span>
+        }
+    }
+//    System.out.println(new DateTime(transitionStart, DateTimeZone.UTC) + &quot; &quot; + new DateTime(transitionStart, this));
+
+    //-----------------------------------------------------------------------
+    /**
+     * Returns true if this time zone has no transitions.
+     *
+     * @return true if no transitions
+     */
+    public abstract boolean isFixed();
+
+    /**
+     * Advances the given instant to where the time zone offset or name changes.
+     * If the instant returned is exactly the same as passed in, then
+     * no changes occur after the given instant.
+     *
+     * @param instant  milliseconds from 1970-01-01T00:00:00Z
+     * @return milliseconds from 1970-01-01T00:00:00Z
+     */
+    public abstract long nextTransition(long instant);
+
+    /**
+     * Retreats the given instant to where the time zone offset or name changes.
+     * If the instant returned is exactly the same as passed in, then
+     * no changes occur before the given instant.
+     *
+     * @param instant  milliseconds from 1970-01-01T00:00:00Z
+     * @return milliseconds from 1970-01-01T00:00:00Z
+     */
+    public abstract long previousTransition(long instant);
+
+    // Basic methods
+    //--------------------------------------------------------------------
+
+    /**
+     * Get the datetime zone as a {@link java.util.TimeZone}.
+     * 
+     * @return the closest matching TimeZone object
+     */
+    public java.util.TimeZone toTimeZone() {
+<span class="fc" id="L1233">        return java.util.TimeZone.getTimeZone(iID);</span>
+    }
+
+    /**
+     * Compare this datetime zone with another.
+     * 
+     * @param object the object to compare with
+     * @return true if equal, based on the ID and all internal rules
+     */
+    public abstract boolean equals(Object object);
+
+    /**
+     * Gets a hash code compatable with equals.
+     * 
+     * @return suitable hashcode
+     */
+    public int hashCode() {
+<span class="fc" id="L1250">        return 57 + getID().hashCode();</span>
+    }
+
+    /**
+     * Gets the datetime zone as a string, which is simply its ID.
+     * @return the id of the zone
+     */
+    public String toString() {
+<span class="fc" id="L1258">        return getID();</span>
+    }
+
+    /**
+     * By default, when DateTimeZones are serialized, only a &quot;stub&quot; object
+     * referring to the id is written out. When the stub is read in, it
+     * replaces itself with a DateTimeZone object.
+     * @return a stub object to go in the stream
+     */
+    protected Object writeReplace() throws ObjectStreamException {
+<span class="fc" id="L1268">        return new Stub(iID);</span>
+    }
+
+    /**
+     * Used to serialize DateTimeZones by id.
+     */
+    private static final class Stub implements Serializable {
+        /** Serialization lock. */
+        private static final long serialVersionUID = -6471952376487863581L;
+        /** The ID of the zone. */
+        private transient String iID;
+
+        /**
+         * Constructor.
+         * @param id  the id of the zone
+         */
+<span class="fc" id="L1284">        Stub(String id) {</span>
+<span class="fc" id="L1285">            iID = id;</span>
+<span class="fc" id="L1286">        }</span>
+
+        private void writeObject(ObjectOutputStream out) throws IOException {
+<span class="fc" id="L1289">            out.writeUTF(iID);</span>
+<span class="fc" id="L1290">        }</span>
+
+        private void readObject(ObjectInputStream in) throws IOException {
+<span class="fc" id="L1293">            iID = in.readUTF();</span>
+<span class="fc" id="L1294">        }</span>
+
+        private Object readResolve() throws ObjectStreamException {
+<span class="fc" id="L1297">            return forID(iID);</span>
+        }
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

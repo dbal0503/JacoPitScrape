@@ -1,0 +1,182 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SparseFieldMatrix.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Commons Math</a> &gt; <a href="index.source.html" class="el_package">org.apache.commons.math.linear</a> &gt; <span class="el_source">SparseFieldMatrix.java</span></div><h1>SparseFieldMatrix.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.commons.math.linear;
+
+import org.apache.commons.math.Field;
+import org.apache.commons.math.FieldElement;
+import org.apache.commons.math.util.OpenIntToFieldHashMap;
+
+/**
+ * Sparse matrix implementation based on an open addressed map.
+ *
+ * @param &lt;T&gt; the type of the field elements
+ * @version $Id$
+ * @since 2.0
+ */
+public class SparseFieldMatrix&lt;T extends FieldElement&lt;T&gt;&gt; extends AbstractFieldMatrix&lt;T&gt; {
+
+    /** Storage for (sparse) matrix elements. */
+    private final OpenIntToFieldHashMap&lt;T&gt; entries;
+    /** Row dimension. */
+    private final int rows;
+    /** Column dimension. */
+    private final int columns;
+
+    /**
+     * Create a matrix with no data.
+     *
+     * @param field Field to which the elements belong.
+     */
+    public SparseFieldMatrix(final Field&lt;T&gt; field) {
+<span class="nc" id="L45">        super(field);</span>
+<span class="nc" id="L46">        rows = 0;</span>
+<span class="nc" id="L47">        columns= 0;</span>
+<span class="nc" id="L48">        entries = new OpenIntToFieldHashMap&lt;T&gt;(field);</span>
+<span class="nc" id="L49">    }</span>
+
+    /**
+     * Create a new SparseFieldMatrix&lt;T&gt; with the supplied row and column
+     * dimensions.
+     *
+     * @param field Field to which the elements belong.
+     * @param rowDimension Number of rows in the new matrix.
+     * @param columnDimension Number of columns in the new matrix.
+     * @throws org.apache.commons.math.exception.NotStrictlyPositiveException
+     * if row or column dimension is not positive.
+     */
+    public SparseFieldMatrix(final Field&lt;T&gt; field,
+                             final int rowDimension, final int columnDimension) {
+<span class="fc" id="L63">        super(field, rowDimension, columnDimension);</span>
+<span class="fc" id="L64">        this.rows = rowDimension;</span>
+<span class="fc" id="L65">        this.columns = columnDimension;</span>
+<span class="fc" id="L66">        entries = new OpenIntToFieldHashMap&lt;T&gt;(field);</span>
+<span class="fc" id="L67">    }</span>
+
+    /**
+     * Copy constructor.
+     *
+     * @param other Instance to copy.
+     */
+    public SparseFieldMatrix(SparseFieldMatrix&lt;T&gt; other) {
+<span class="fc" id="L75">        super(other.getField(), other.getRowDimension(), other.getColumnDimension());</span>
+<span class="fc" id="L76">        rows = other.getRowDimension();</span>
+<span class="fc" id="L77">        columns = other.getColumnDimension();</span>
+<span class="fc" id="L78">        entries = new OpenIntToFieldHashMap&lt;T&gt;(other.entries);</span>
+<span class="fc" id="L79">    }</span>
+
+    /**
+     * Generic copy constructor.
+     *
+     * @param other Instance to copy.
+     */
+    public SparseFieldMatrix(FieldMatrix&lt;T&gt; other){
+<span class="nc" id="L87">        super(other.getField(), other.getRowDimension(), other.getColumnDimension());</span>
+<span class="nc" id="L88">        rows = other.getRowDimension();</span>
+<span class="nc" id="L89">        columns = other.getColumnDimension();</span>
+<span class="nc" id="L90">        entries = new OpenIntToFieldHashMap&lt;T&gt;(getField());</span>
+<span class="nc bnc" id="L91" title="All 2 branches missed.">        for (int i = 0; i &lt; rows; i++) {</span>
+<span class="nc bnc" id="L92" title="All 2 branches missed.">            for (int j = 0; j &lt; columns; j++) {</span>
+<span class="nc" id="L93">                setEntry(i, j, other.getEntry(i, j));</span>
+            }
+        }
+<span class="nc" id="L96">    }</span>
+
+    /** {@inheritDoc} */
+    @Override
+    public void addToEntry(int row, int column, T increment) {
+<span class="nc" id="L101">        checkRowIndex(row);</span>
+<span class="nc" id="L102">        checkColumnIndex(column);</span>
+<span class="nc" id="L103">        final int key = computeKey(row, column);</span>
+<span class="nc" id="L104">        final T value = entries.get(key).add(increment);</span>
+<span class="nc bnc" id="L105" title="All 2 branches missed.">        if (getField().getZero().equals(value)) {</span>
+<span class="nc" id="L106">            entries.remove(key);</span>
+        } else {
+<span class="nc" id="L108">            entries.put(key, value);</span>
+        }
+<span class="nc" id="L110">    }</span>
+
+    /** {@inheritDoc} */
+    @Override
+    public FieldMatrix&lt;T&gt; copy() {
+<span class="fc" id="L115">        return new SparseFieldMatrix&lt;T&gt;(this);</span>
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public FieldMatrix&lt;T&gt; createMatrix(int rowDimension, int columnDimension) {
+<span class="fc" id="L121">        return new SparseFieldMatrix&lt;T&gt;(getField(), rowDimension, columnDimension);</span>
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public int getColumnDimension() {
+<span class="fc" id="L127">        return columns;</span>
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public T getEntry(int row, int column) {
+<span class="fc" id="L133">        checkRowIndex(row);</span>
+<span class="fc" id="L134">        checkColumnIndex(column);</span>
+<span class="fc" id="L135">        return entries.get(computeKey(row, column));</span>
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public int getRowDimension() {
+<span class="fc" id="L141">        return rows;</span>
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public void multiplyEntry(int row, int column, T factor) {
+<span class="nc" id="L147">        checkRowIndex(row);</span>
+<span class="nc" id="L148">        checkColumnIndex(column);</span>
+<span class="nc" id="L149">        final int key = computeKey(row, column);</span>
+<span class="nc" id="L150">        final T value = entries.get(key).multiply(factor);</span>
+<span class="nc bnc" id="L151" title="All 2 branches missed.">        if (getField().getZero().equals(value)) {</span>
+<span class="nc" id="L152">            entries.remove(key);</span>
+        } else {
+<span class="nc" id="L154">            entries.put(key, value);</span>
+        }
+
+<span class="nc" id="L157">    }</span>
+
+    /** {@inheritDoc} */
+    @Override
+    public void setEntry(int row, int column, T value) {
+<span class="fc" id="L162">        checkRowIndex(row);</span>
+<span class="fc" id="L163">        checkColumnIndex(column);</span>
+<span class="fc bfc" id="L164" title="All 2 branches covered.">        if (getField().getZero().equals(value)) {</span>
+<span class="fc" id="L165">            entries.remove(computeKey(row, column));</span>
+        } else {
+<span class="fc" id="L167">            entries.put(computeKey(row, column), value);</span>
+        }
+<span class="fc" id="L169">    }</span>
+
+    /**
+     * Compute the key to access a matrix element.
+     *
+     * @param row Row index of the matrix element.
+     * @param column Column index of the matrix element.
+     * @return the key within the map to access the matrix element.
+     */
+    private int computeKey(int row, int column) {
+<span class="fc" id="L179">        return row * columns + column;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

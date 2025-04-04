@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BaseAbstractScalarOptimizer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Commons Math</a> &gt; <a href="index.source.html" class="el_package">org.apache.commons.math.optimization.direct</a> &gt; <span class="el_source">BaseAbstractScalarOptimizer.java</span></div><h1>BaseAbstractScalarOptimizer.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.commons.math.optimization.direct;
+
+import org.apache.commons.math.util.Incrementor;
+import org.apache.commons.math.exception.MaxCountExceededException;
+import org.apache.commons.math.exception.TooManyEvaluationsException;
+import org.apache.commons.math.exception.NullArgumentException;
+import org.apache.commons.math.analysis.MultivariateFunction;
+import org.apache.commons.math.optimization.BaseMultivariateRealOptimizer;
+import org.apache.commons.math.optimization.GoalType;
+import org.apache.commons.math.optimization.ConvergenceChecker;
+import org.apache.commons.math.optimization.RealPointValuePair;
+import org.apache.commons.math.optimization.SimpleScalarValueChecker;
+
+/**
+ * Base class for implementing optimizers for multivariate scalar functions.
+ * This base class handles the boiler-plate methods associated to thresholds
+ * settings, iterations and evaluations counting.
+ *
+ * @param &lt;FUNC&gt; Type of the objective function to be optimized.
+ *
+ * @version $Id$
+ * @since 2.2
+ */
+public abstract class BaseAbstractScalarOptimizer&lt;FUNC extends MultivariateFunction&gt;
+    implements BaseMultivariateRealOptimizer&lt;FUNC&gt; {
+    /** Evaluations counter. */
+<span class="fc" id="L44">    protected final Incrementor evaluations = new Incrementor();</span>
+    /** Convergence checker. */
+    private ConvergenceChecker&lt;RealPointValuePair&gt; checker;
+    /** Type of optimization. */
+    private GoalType goal;
+    /** Initial guess. */
+    private double[] start;
+    /** Objective function. */
+    private MultivariateFunction function;
+
+    /**
+     * Simple constructor with default settings.
+     * The convergence check is set to a {@link SimpleScalarValueChecker} and
+     * the allowed number of evaluations is set to {@link Integer#MAX_VALUE}.
+     */
+    protected BaseAbstractScalarOptimizer() {
+<span class="fc" id="L60">        this(new SimpleScalarValueChecker());</span>
+<span class="fc" id="L61">    }</span>
+    /**
+     * @param checker Convergence checker.
+     */
+<span class="fc" id="L65">    protected BaseAbstractScalarOptimizer(ConvergenceChecker&lt;RealPointValuePair&gt; checker) {</span>
+<span class="fc" id="L66">        this.checker = checker;</span>
+<span class="fc" id="L67">    }</span>
+
+    /** {@inheritDoc} */
+    public int getMaxEvaluations() {
+<span class="fc" id="L71">        return evaluations.getMaximalCount();</span>
+    }
+
+    /** {@inheritDoc} */
+    public int getEvaluations() {
+<span class="fc" id="L76">        return evaluations.getCount();</span>
+    }
+
+    /** {@inheritDoc} */
+    public ConvergenceChecker&lt;RealPointValuePair&gt; getConvergenceChecker() {
+<span class="fc" id="L81">        return checker;</span>
+    }
+
+    /**
+     * Compute the objective function value.
+     *
+     * @param point Point at which the objective function must be evaluated.
+     * @return the objective function value at the specified point.
+     * @throws TooManyEvaluationsException if the maximal number of
+     * evaluations is exceeded.
+     */
+    protected double computeObjectiveValue(double[] point) {
+        try {
+<span class="fc" id="L94">            evaluations.incrementCount();</span>
+<span class="fc" id="L95">        } catch (MaxCountExceededException e) {</span>
+<span class="fc" id="L96">            throw new TooManyEvaluationsException(e.getMax());</span>
+<span class="fc" id="L97">        }</span>
+<span class="fc" id="L98">        return function.value(point);</span>
+    }
+
+    /** {@inheritDoc} */
+    public RealPointValuePair optimize(int maxEval, FUNC f, GoalType goalType,
+                                       double[] startPoint) {
+        // Checks.
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">        if (f == null) {</span>
+<span class="nc" id="L106">            throw new NullArgumentException();</span>
+        }
+<span class="pc bpc" id="L108" title="1 of 2 branches missed.">        if (goalType == null) {</span>
+<span class="nc" id="L109">            throw new NullArgumentException();</span>
+        }
+<span class="pc bpc" id="L111" title="1 of 2 branches missed.">        if (startPoint == null) {</span>
+<span class="nc" id="L112">            throw new NullArgumentException();</span>
+        }
+
+        // Reset.
+<span class="fc" id="L116">        evaluations.setMaximalCount(maxEval);</span>
+<span class="fc" id="L117">        evaluations.resetCount();</span>
+
+        // Store optimization problem characteristics.
+<span class="fc" id="L120">        function = f;</span>
+<span class="fc" id="L121">        goal = goalType;</span>
+<span class="fc" id="L122">        start = startPoint.clone();</span>
+
+        // Perform computation.
+<span class="fc" id="L125">        return doOptimize();</span>
+    }
+
+    /**
+     * @return the optimization type.
+     */
+    public GoalType getGoalType() {
+<span class="fc" id="L132">        return goal;</span>
+    }
+
+    /**
+     * @return the initial guess.
+     */
+    public double[] getStartPoint() {
+<span class="fc" id="L139">        return start.clone();</span>
+    }
+
+    /**
+     * Perform the bulk of the optimization algorithm.
+     *
+     * @return the point/value pair giving the optimal value for the
+     * objective function.
+     */
+    protected abstract RealPointValuePair doOptimize();
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

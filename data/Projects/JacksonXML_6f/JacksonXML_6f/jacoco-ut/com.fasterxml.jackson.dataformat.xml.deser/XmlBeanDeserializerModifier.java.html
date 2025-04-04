@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>XmlBeanDeserializerModifier.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Jackson-dataformat-XML</a> &gt; <a href="index.source.html" class="el_package">com.fasterxml.jackson.dataformat.xml.deser</a> &gt; <span class="el_source">XmlBeanDeserializerModifier.java</span></div><h1>XmlBeanDeserializerModifier.java</h1><pre class="source lang-java linenums">package com.fasterxml.jackson.dataformat.xml.deser;
+
+import java.util.*;
+
+import com.fasterxml.jackson.databind.*;
+import com.fasterxml.jackson.databind.deser.*;
+import com.fasterxml.jackson.databind.introspect.AnnotatedMember;
+import com.fasterxml.jackson.databind.introspect.BeanPropertyDefinition;
+import com.fasterxml.jackson.dataformat.xml.util.AnnotationUtil;
+
+/**
+ * The main reason for a modifier is to support handling of
+ * 'wrapped' Collection types.
+ */
+public class XmlBeanDeserializerModifier
+    extends BeanDeserializerModifier
+    implements java.io.Serializable
+{
+    private static final long serialVersionUID = 1L;
+
+    /**
+     * Virtual name used for text segments.
+     */
+<span class="fc" id="L24">    protected String _cfgNameForTextValue = &quot;&quot;;</span>
+
+    public XmlBeanDeserializerModifier(String nameForTextValue)
+<span class="fc" id="L27">    {</span>
+<span class="fc" id="L28">        _cfgNameForTextValue = nameForTextValue;</span>
+<span class="fc" id="L29">    }</span>
+    
+    @Override
+    public List&lt;BeanPropertyDefinition&gt; updateProperties(DeserializationConfig config,
+            BeanDescription beanDesc, List&lt;BeanPropertyDefinition&gt; propDefs)
+    {
+<span class="fc" id="L35">        final AnnotationIntrospector intr = config.getAnnotationIntrospector();</span>
+<span class="fc" id="L36">        int changed = 0;</span>
+        
+<span class="fc bfc" id="L38" title="All 2 branches covered.">        for (int i = 0, propCount = propDefs.size(); i &lt; propCount; ++i) {</span>
+<span class="fc" id="L39">            BeanPropertyDefinition prop = propDefs.get(i);</span>
+<span class="fc" id="L40">            AnnotatedMember acc = prop.getPrimaryMember();</span>
+            // should not be null, but just in case:
+<span class="pc bpc" id="L42" title="1 of 2 branches missed.">            if (acc == null) {</span>
+<span class="nc" id="L43">                continue;</span>
+            }
+            /* First: handle &quot;as text&quot;? Such properties
+             * are exposed as values of 'unnamed' fields; so one way to
+             * map them is to rename property to have name &quot;&quot;... (and
+             * hope this does not break other parts...)
+             */
+<span class="fc" id="L50">            Boolean b = AnnotationUtil.findIsTextAnnotation(intr, acc);</span>
+<span class="pc bpc" id="L51" title="1 of 4 branches missed.">            if (b != null &amp;&amp; b.booleanValue()) {</span>
+                // unwrapped properties will appear as 'unnamed' (empty String)
+<span class="fc" id="L53">                BeanPropertyDefinition newProp = prop.withSimpleName(_cfgNameForTextValue);</span>
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">                if (newProp != prop) {</span>
+<span class="fc" id="L55">                    propDefs.set(i, newProp);</span>
+                }
+                continue;
+            }
+            // second: do we need to handle wrapping (for Lists)?
+<span class="fc" id="L60">            PropertyName wrapperName = prop.getWrapperName();</span>
+            
+<span class="fc bfc" id="L62" title="All 4 branches covered.">            if (wrapperName != null &amp;&amp; wrapperName != PropertyName.NO_NAME) {</span>
+<span class="fc" id="L63">                String localName = wrapperName.getSimpleName();</span>
+<span class="pc bpc" id="L64" title="1 of 4 branches missed.">                if ((localName != null &amp;&amp; localName.length() &gt; 0)</span>
+<span class="pc bpc" id="L65" title="1 of 2 branches missed.">                        &amp;&amp; !localName.equals(prop.getName())) {</span>
+                    // make copy-on-write as necessary
+<span class="fc bfc" id="L67" title="All 2 branches covered.">                    if (changed == 0) {</span>
+<span class="fc" id="L68">                        propDefs = new ArrayList&lt;BeanPropertyDefinition&gt;(propDefs);</span>
+                    }
+<span class="fc" id="L70">                    ++changed;</span>
+<span class="fc" id="L71">                    propDefs.set(i, prop.withSimpleName(localName));</span>
+<span class="fc" id="L72">                    continue;</span>
+                }
+                // otherwise unwrapped; needs handling but later on
+            }
+        }
+<span class="fc" id="L77">        return propDefs;</span>
+    }
+
+    @Override
+    public JsonDeserializer&lt;?&gt; modifyDeserializer(DeserializationConfig config,
+            BeanDescription beanDesc, JsonDeserializer&lt;?&gt; deser0)
+    {
+<span class="fc bfc" id="L84" title="All 2 branches covered.">        if (!(deser0 instanceof BeanDeserializerBase)) {</span>
+<span class="fc" id="L85">            return deser0;</span>
+        }
+        /* 17-Aug-2013, tatu: One important special case first: if we have one &quot;XML Text&quot;
+         * property, it may be exposed as VALUE_STRING token (depending on whether any attribute
+         * values are exposed): and to deserialize from that, we need special handling unless POJO
+         * has appropriate single-string creator method.
+         */
+<span class="fc" id="L92">        BeanDeserializerBase deser = (BeanDeserializerBase) deser0;</span>
+
+        // Heuristics are bit tricky; but for now let's assume that if POJO
+        // can already work with VALUE_STRING, it's ok and doesn't need extra support
+<span class="fc" id="L96">        ValueInstantiator inst = deser.getValueInstantiator();</span>
+        // 03-Aug-2017, tatu: [dataformat-xml#254] suggests we also should
+        //    allow passing `int`/`Integer`/`long`/`Long` cases, BUT
+        //    unfortunately we can not simple use default handling. Would need
+        //    coercion.
+<span class="fc bfc" id="L101" title="All 2 branches covered.">        if (!inst.canCreateFromString()) {</span>
+<span class="fc" id="L102">            SettableBeanProperty textProp = _findSoleTextProp(config, deser.properties());</span>
+<span class="fc bfc" id="L103" title="All 2 branches covered.">            if (textProp != null) {</span>
+<span class="fc" id="L104">                return new XmlTextDeserializer(deser, textProp);</span>
+            }
+        }
+<span class="fc" id="L107">        return new WrapperHandlingDeserializer(deser);</span>
+    }
+
+    private SettableBeanProperty _findSoleTextProp(DeserializationConfig config,
+            Iterator&lt;SettableBeanProperty&gt; propIt)
+    {
+<span class="fc" id="L113">        final AnnotationIntrospector ai = config.getAnnotationIntrospector();</span>
+<span class="fc" id="L114">        SettableBeanProperty textProp = null;</span>
+<span class="fc bfc" id="L115" title="All 2 branches covered.">        while (propIt.hasNext()) {</span>
+<span class="fc" id="L116">            SettableBeanProperty prop = propIt.next();</span>
+<span class="fc" id="L117">            AnnotatedMember m = prop.getMember();</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">            if (m != null) {</span>
+                // Ok, let's use a simple check: we should have renamed it earlier so:
+<span class="fc" id="L120">                PropertyName n = prop.getFullName();</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">                if (_cfgNameForTextValue.equals(n.getSimpleName())) {</span>
+                    // should we verify we only got one?
+<span class="fc" id="L123">                    textProp = prop;</span>
+<span class="fc" id="L124">                    continue;</span>
+                }
+                // as-attribute are ok as well
+<span class="fc" id="L127">                Boolean b = AnnotationUtil.findIsAttributeAnnotation(ai, m);</span>
+<span class="fc bfc" id="L128" title="All 4 branches covered.">                if (b != null &amp;&amp; b.booleanValue()) {</span>
+<span class="fc" id="L129">                    continue;</span>
+                }
+            }
+            // Otherwise, it's something else; no go
+<span class="fc" id="L133">            return null;</span>
+        }
+<span class="fc" id="L135">        return textProp;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

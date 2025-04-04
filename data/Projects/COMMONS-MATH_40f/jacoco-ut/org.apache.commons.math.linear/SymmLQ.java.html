@@ -1,0 +1,1237 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SymmLQ.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Commons Math</a> &gt; <a href="index.source.html" class="el_package">org.apache.commons.math.linear</a> &gt; <span class="el_source">SymmLQ.java</span></div><h1>SymmLQ.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.commons.math.linear;
+
+import org.apache.commons.math.exception.DimensionMismatchException;
+import org.apache.commons.math.exception.MaxCountExceededException;
+import org.apache.commons.math.exception.NullArgumentException;
+import org.apache.commons.math.exception.util.ExceptionContext;
+import org.apache.commons.math.util.FastMath;
+import org.apache.commons.math.util.IterationManager;
+import org.apache.commons.math.util.MathUtils;
+
+/**
+ * &lt;p&gt;
+ * Implementation of the SYMMLQ iterative linear solver proposed by &lt;a
+ * href=&quot;#PAIG1975&quot;&gt;Paige and Saunders (1975)&lt;/a&gt;. This implementation is
+ * largely based on the FORTRAN code by Pr. Michael A. Saunders, available &lt;a
+ * href=&quot;http://www.stanford.edu/group/SOL/software/symmlq/f77/&quot;&gt;here&lt;/a&gt;.
+ * &lt;/p&gt;
+ * &lt;p&gt;
+ * SYMMLQ is designed to solve the system of linear equations A &amp;middot; x = b
+ * where A is an n &amp;times; n self-adjoint linear operator (defined as a
+ * {@link RealLinearOperator}), and b is a given vector. The operator A is not
+ * required to be positive definite. If A is known to be definite, the method of
+ * conjugate gradients might be preferred, since it will require about the same
+ * number of iterations as SYMMLQ but slightly less work per iteration.
+ * &lt;/p&gt;
+ * &lt;p&gt;
+ * SYMMLQ is designed to solve the system (A - shift &amp;middot; I) &amp;middot; x = b,
+ * where shift is a specified scalar value. If shift and b are suitably chosen,
+ * the computed vector x may approximate an (unnormalized) eigenvector of A, as
+ * in the methods of inverse iteration and/or Rayleigh-quotient iteration.
+ * Again, the linear operator (A - shift &amp;middot; I) need not be positive
+ * definite (but &lt;em&gt;must&lt;/em&gt; be self-adjoint). The work per iteration is very
+ * slightly less if shift = 0.
+ * &lt;/p&gt;
+ * &lt;h3&gt;Preconditioning&lt;/h3&gt;
+ * &lt;p&gt;
+ * Preconditioning may reduce the number of iterations required. The solver may be
+ * provided with a positive definite preconditioner M = C &amp;middot; C&lt;sup&gt;T&lt;/sup&gt;
+ * that is known to approximate (A - shift &amp;middot; I) in some sense, where
+ * systems of the form M &amp;middot; y = x can be solved efficiently. Then SYMMLQ
+ * will implicitly solve the system of equations P &amp;middot; (A - shift &amp;middot;
+ * I) &amp;middot; P&lt;sup&gt;T&lt;/sup&gt; &amp;middot; xhat = P &amp;middot; b, i.e. Ahat &amp;middot;
+ * xhat = bhat, where P = C&lt;sup&gt;-1&lt;/sup&gt;, Ahat = P &amp;middot; (A - shift &amp;middot;
+ * I) &amp;middot; P&lt;sup&gt;T&lt;/sup&gt;, bhat = P &amp;middot; b, and return the solution x =
+ * P&lt;sup&gt;T&lt;/sup&gt; &amp;middot; xhat. The associated residual is rhat = bhat - Ahat
+ * &amp;middot; xhat = P &amp;middot; [b - (A - shift &amp;middot; I) &amp;middot; x] = P
+ * &amp;middot; r.
+ * &lt;/p&gt;
+ * &lt;h3&gt;&lt;a id=&quot;stopcrit&quot;&gt;Default stopping criterion&lt;/a&gt;&lt;/h3&gt;
+ * &lt;p&gt;
+ * A default stopping criterion is implemented. The iterations stop when || rhat
+ * || &amp;le; &amp;delta; || Ahat || || xhat ||, where xhat is the current estimate of
+ * the solution of the transformed system, rhat the current estimate of the
+ * corresponding residual, and &amp;delta; a user-specified tolerance.
+ * &lt;/p&gt;
+ * &lt;h3&gt;Iteration count&lt;/h3&gt;
+ * &lt;p&gt;
+ * In the present context, an iteration should be understood as one evaluation
+ * of the matrix-vector product A &amp;middot; x. The initialization phase therefore
+ * counts as one iteration. If the user requires checks on the symmetry of A,
+ * this entails one further matrix-vector product in the initial phase. This
+ * further product is &lt;em&gt;not&lt;/em&gt; accounted for in the iteration count. In
+ * other words, the number of iterations required to reach convergence will be
+ * identical, whether checks have been required or not.
+ * &lt;/p&gt;
+ * &lt;p&gt;
+ * The present definition of the iteration count differs from that adopted in
+ * the original FOTRAN code, where the initialization phase was &lt;em&gt;not&lt;/em&gt;
+ * taken into account.
+ * &lt;/p&gt;
+ * &lt;h3&gt;&lt;a id=&quot;initguess&quot;&gt;Initial guess of the solution&lt;/a&gt;&lt;/h3&gt;
+ * &lt;p&gt;
+ * The {@code x} parameter in
+ * &lt;ul&gt;
+ * &lt;li&gt;{@link #solve(RealLinearOperator, RealVector, RealVector)},&lt;/li&gt;
+ * &lt;li&gt;{@link #solve(RealLinearOperator, InvertibleRealLinearOperator, RealVector, RealVector)}},&lt;/li&gt;
+ * &lt;li&gt;{@link #solveInPlace(RealLinearOperator, RealVector, RealVector)},&lt;/li&gt;
+ * &lt;li&gt;{@link #solveInPlace(RealLinearOperator, InvertibleRealLinearOperator, RealVector, RealVector)},&lt;/li&gt;
+ * &lt;li&gt;{@link #solveInPlace(RealLinearOperator, InvertibleRealLinearOperator, RealVector, RealVector, boolean, double)},&lt;/li&gt;
+ * &lt;/ul&gt;
+ * should not be considered as an initial guess, as it is set to zero in the
+ * initial phase. If x&lt;sub&gt;0&lt;/sub&gt; is known to be a good approximation to x, one
+ * should compute r&lt;sub&gt;0&lt;/sub&gt; = b - A &amp;middot; x, solve A &amp;middot; dx = r0,
+ * and set x = x&lt;sub&gt;0&lt;/sub&gt; + dx.
+ * &lt;/p&gt;
+ * &lt;h3&gt;&lt;a id=&quot;context&quot;&gt;Exception context&lt;/a&gt;&lt;/h3&gt;
+ * &lt;p&gt;
+ * Besides standard {@link DimensionMismatchException}, this class might throw
+ * {@link NonSelfAdjointOperatorException} if the linear operator or the
+ * preconditioner are not symmetric. In this case, the {@link ExceptionContext}
+ * provides more information
+ * &lt;ul&gt;
+ * &lt;li&gt;key {@code &quot;operator&quot;} points to the offending linear operator, say L,&lt;/li&gt;
+ * &lt;li&gt;key {@code &quot;vector1&quot;} points to the first offending vector, say x,
+ * &lt;li&gt;key {@code &quot;vector2&quot;} points to the second offending vector, say y, such
+ * that x&lt;sup&gt;T&lt;/sup&gt; &amp;middot; L &amp;middot; y &amp;ne; y&lt;sup&gt;T&lt;/sup&gt; &amp;middot; L
+ * &amp;middot; x (within a certain accuracy).&lt;/li&gt;
+ * &lt;/ul&gt;
+ * &lt;/p&gt;
+ * &lt;p&gt;
+ * {@link NonPositiveDefiniteOperatorException} might also be thrown in case the
+ * preconditioner is not positive definite. The relevant keys to the
+ * {@link ExceptionContext} are
+ * &lt;ul&gt;
+ * &lt;li&gt;key {@code &quot;operator&quot;}, which points to the offending linear operator,
+ * say L,&lt;/li&gt;
+ * &lt;li&gt;key {@code &quot;vector&quot;}, which points to the offending vector, say x, such
+ * that x&lt;sup&gt;T&lt;/sup&gt; &amp;middot; L &amp;middot; x &lt; 0.&lt;/li&gt;
+ * &lt;/ul&gt;
+ * &lt;/p&gt;
+ * &lt;h3&gt;References&lt;/h3&gt;
+ * &lt;dl&gt;
+ * &lt;dt&gt;&lt;a id=&quot;PAIG1975&quot;&gt;Paige and Saunders (1975)&lt;/a&gt;&lt;/dt&gt;
+ * &lt;dd&gt;C. C. Paige and M. A. Saunders, &lt;a
+ * href=&quot;http://www.stanford.edu/group/SOL/software/symmlq/PS75.pdf&quot;&gt;&lt;em&gt;
+ * Solution of Sparse Indefinite Systems of Linear Equations&lt;/em&gt;&lt;/a&gt;, SIAM
+ * Journal on Numerical Analysis 12(4): 617-629, 1975&lt;/dd&gt;
+ * &lt;/dl&gt;
+ *
+ * @version $Id$
+ * @since 3.0
+ */
+public class SymmLQ
+    extends PreconditionedIterativeLinearSolver {
+
+    /*
+     * IMPLEMENTATION NOTES
+     * --------------------
+     * The implementation follows as closely as possible the notations of Paige
+     * and Saunders (1975). Attention must be paid to the fact that some
+     * quantities which are relevant to iteration k can only be computed in
+     * iteration (k+1). Therefore, minute attention must be paid to the index of
+     * each state variable of this algorithm.
+     *
+     * 1. Preconditioning
+     *    ---------------
+     * The Lanczos iterations associated with Ahat and bhat read
+     *   beta[1] = ||P * b||
+     *   v[1] = P * b / beta[1]
+     *   beta[k+1] * v[k+1] = Ahat * v[k] - alpha[k] * v[k] - beta[k] * v[k-1]
+     *                      = P * (A - shift * I) * P' * v[k] - alpha[k] * v[k]
+     *                        - beta[k] * v[k-1]
+     * Multiplying both sides by P', we get
+     *   beta[k+1] * (P' * v)[k+1] = M^(-1) * (A - shift * I) * (P' * v)[k]
+     *                               - alpha[k] * (P' * v)[k]
+     *                               - beta[k] * (P' * v[k-1]),
+     * and
+     *   alpha[k+1] = v[k+1]' * Ahat * v[k+1]
+     *              = v[k+1]' * P * (A - shift * I) * P' * v[k+1]
+     *              = (P' * v)[k+1]' * (A - shift * I) * (P' * v)[k+1].
+     *
+     * In other words, the Lanczos iterations are unchanged, except for the fact
+     * that we really compute (P' * v) instead of v. It can easily be checked
+     * that all other formulas are unchanged. It must be noted that P is never
+     * explicitly used, only matrix-vector products involving M^(-1) are
+     * invoked.
+     *
+     * 2. Accounting for the shift parameter
+     *    ----------------------------------
+     * Is trivial: each time A.operate(x) is invoked, one must subtract shift * x
+     * to the result.
+     *
+     * 3. Accounting for the goodb flag
+     *    -----------------------------
+     * When goodb is set to true, the component of xL along b is computed
+     * separately. From Paige and Saunders (1975), equation (5.9), we have
+     *   wbar[k+1] = s[k] * wbar[k] - c[k] * v[k+1],
+     *   wbar[1] = v[1].
+     * Introducing wbar2[k] = wbar[k] - s[1] * ... * s[k-1] * v[1], it can
+     * easily be verified by induction that wbar2 follows the same recursive
+     * relation
+     *   wbar2[k+1] = s[k] * wbar2[k] - c[k] * v[k+1],
+     *   wbar2[1] = 0,
+     * and we then have
+     *   w[k] = c[k] * wbar2[k] + s[k] * v[k+1]
+     *          + s[1] * ... * s[k-1] * c[k] * v[1].
+     * Introducing w2[k] = w[k] - s[1] * ... * s[k-1] * c[k] * v[1], we find,
+     * from (5.10)
+     *   xL[k] = zeta[1] * w[1] + ... + zeta[k] * w[k]
+     *         = zeta[1] * w2[1] + ... + zeta[k] * w2[k]
+     *           + (s[1] * c[2] * zeta[2] + ...
+     *           + s[1] * ... * s[k-1] * c[k] * zeta[k]) * v[1]
+     *         = xL2[k] + bstep[k] * v[1],
+     * where xL2[k] is defined by
+     *   xL2[0] = 0,
+     *   xL2[k+1] = xL2[k] + zeta[k+1] * w2[k+1],
+     * and bstep is defined by
+     *   bstep[1] = 0,
+     *   bstep[k] = bstep[k-1] + s[1] * ... * s[k-1] * c[k] * zeta[k].
+     * We also have, from (5.11)
+     *   xC[k] = xL[k-1] + zbar[k] * wbar[k]
+     *         = xL2[k-1] + zbar[k] * wbar2[k]
+     *           + (bstep[k-1] + s[1] * ... * s[k-1] * zbar[k]) * v[1].
+     */
+
+    /**
+     * &lt;p&gt;
+     * A simple container holding the non-final variables used in the
+     * iterations. Making the current state of the solver visible from the
+     * outside is necessary, because during the iterations, {@code x} does not
+     * &lt;em&gt;exactly&lt;/em&gt; hold the current estimate of the solution. Indeed,
+     * {@code x} needs in general to be moved from the LQ point to the CG point.
+     * Besides, additional upudates must be carried out in case {@code goodb} is
+     * set to {@code true}.
+     * &lt;/p&gt;
+     * &lt;p&gt;
+     * In all subsequent comments, the description of the state variables refer
+     * to their value after a call to {@link #update()}. In these comments, k is
+     * the current number of evaluations of matrix-vector products.
+     * &lt;/p&gt;
+     */
+    private class State {
+
+        /** Reference to the linear operator. */
+        private final RealLinearOperator a;
+
+        /** Reference to the right-hand side vector. */
+        private final RealVector b;
+
+        /** The value of beta[k+1]. */
+        private double beta;
+
+        /** The value of beta[1]. */
+        private double beta1;
+
+        /** The value of bstep[k-1]. */
+        private double bstep;
+
+        /** The estimate of the norm of P * rC[k]. */
+        private double cgnorm;
+
+        /** The value of dbar[k+1] = -beta[k+1] * c[k-1]. */
+        private double dbar;
+
+        /**
+         * The value of gamma[k] * zeta[k]. Was called {@code rhs1} in the
+         * initial code.
+         */
+        private double gammaZeta;
+
+        /** The value of gbar[k]. */
+        private double gbar;
+
+        /** The value of max(|alpha[1]|, gamma[1], ..., gamma[k-1]). */
+        private double gmax;
+
+        /** The value of min(|alpha[1]|, gamma[1], ..., gamma[k-1]). */
+        private double gmin;
+
+        /** Copy of the {@code goodb} parameter. */
+        private final boolean goodb;
+
+        /** {@code true} if the default convergence criterion is verified. */
+        private boolean hasConverged;
+
+        /** The estimate of the norm of P * rL[k-1]. */
+        private double lqnorm;
+
+        /** Reference to the preconditioner. */
+        private final InvertibleRealLinearOperator m;
+
+        /**
+         * The value of (-eps[k+1] * zeta[k-1]). Was called {@code rhs2} in the
+         * initial code.
+         */
+        private double minusEpsZeta;
+
+        /** The value of M^(-1) * b. */
+        private final RealVector mSolveB;
+
+        /** The value of beta[k]. */
+        private double oldb;
+
+        /** The value of beta[k] * M * P' * v[k]. */
+        private RealVector r1;
+
+        /** The value of beta[k+1] * M * P' * v[k+1]. */
+        private RealVector r2;
+
+        /** Copy of the {@code shift} parameter. */
+        private final double shift;
+
+        /** The value of s[1] * ... * s[k-1]. */
+        private double snprod;
+
+        /**
+         * An estimate of the square of the norm of A * V[k], based on Paige and
+         * Saunders (1975), equation (3.3).
+         */
+        private double tnorm;
+
+        /**
+         * The value of P' * wbar[k] or P' * (wbar[k] - s[1] * ... * s[k-1] *
+         * v[1]) if {@code goodb} is {@code true}. Was called {@code w} in the
+         * initial code.
+         */
+        private RealVector wbar;
+
+        /**
+         * A reference to the vector to be updated with the solution. Contains
+         * the value of xL[k-1] if {@code goodb} is {@code false}, (xL[k-1] -
+         * bstep[k-1] * v[1]) otherwise.
+         */
+        private final RealVector x;
+
+        /** The value of beta[k+1] * P' * v[k+1]. */
+        private RealVector y;
+
+        /** The value of zeta[1]^2 + ... + zeta[k-1]^2. */
+        private double ynorm2;
+
+        /**
+         * Creates and inits to k = 1 a new instance of this class.
+         *
+         * @param a Linear operator A of the system.
+         * @param m Preconditioner (can be {@code null}).
+         * @param b Right-hand side vector.
+         * @param x Vector to be updated with the solution. {@code x} should not
+         * be considered as an initial guess (&lt;a href=&quot;#initguess&quot;&gt;more&lt;/a&gt;).
+         * @param goodb Usually {@code false}, except if {@code x} is expected
+         * to contain a large multiple of {@code b}.
+         * @param shift The amount to be subtracted to all diagonal elements of
+         * A.
+         */
+        public State(final RealLinearOperator a,
+                     final InvertibleRealLinearOperator m, final RealVector b,
+<span class="fc" id="L343">                     final RealVector x, final boolean goodb, final double shift) {</span>
+<span class="fc" id="L344">            this.a = a;</span>
+<span class="fc" id="L345">            this.m = m;</span>
+<span class="fc" id="L346">            this.b = b;</span>
+<span class="fc" id="L347">            this.x = x;</span>
+<span class="fc" id="L348">            this.goodb = goodb;</span>
+<span class="fc" id="L349">            this.shift = shift;</span>
+<span class="fc bfc" id="L350" title="All 2 branches covered.">            this.mSolveB = m == null ? b : m.solve(b);</span>
+<span class="fc" id="L351">            this.hasConverged = false;</span>
+<span class="fc" id="L352">            init();</span>
+<span class="fc" id="L353">        }</span>
+
+        /**
+         * Move to the CG point if it seems better. In this version of SYMMLQ,
+         * the convergence tests involve only cgnorm, so we're unlikely to stop
+         * at an LQ point, except if the iteration limit interferes.
+         *
+         * @param xRefined Vector to be updated with the refined value of x.
+         */
+        public void refine(final RealVector xRefined) {
+<span class="fc" id="L363">            final int n = this.x.getDimension();</span>
+<span class="pc bpc" id="L364" title="1 of 2 branches missed.">            if (lqnorm &lt; cgnorm) {</span>
+<span class="nc bnc" id="L365" title="All 2 branches missed.">                if (!goodb) {</span>
+<span class="nc" id="L366">                    xRefined.setSubVector(0, this.x);</span>
+                } else {
+<span class="nc" id="L368">                    final double step = bstep / beta1;</span>
+<span class="nc bnc" id="L369" title="All 2 branches missed.">                    for (int i = 0; i &lt; n; i++) {</span>
+<span class="nc" id="L370">                        final double bi = mSolveB.getEntry(i);</span>
+<span class="nc" id="L371">                        final double xi = this.x.getEntry(i);</span>
+<span class="nc" id="L372">                        xRefined.setEntry(i, xi + step * bi);</span>
+                    }
+<span class="nc" id="L374">                }</span>
+            } else {
+<span class="fc" id="L376">                final double anorm = FastMath.sqrt(tnorm);</span>
+<span class="pc bpc" id="L377" title="1 of 2 branches missed.">                final double diag = gbar == 0. ? anorm * MACH_PREC : gbar;</span>
+<span class="fc" id="L378">                final double zbar = gammaZeta / diag;</span>
+<span class="fc" id="L379">                final double step = (bstep + snprod * zbar) / beta1;</span>
+                // ynorm = FastMath.sqrt(ynorm2 + zbar * zbar);
+<span class="fc bfc" id="L381" title="All 2 branches covered.">                if (!goodb) {</span>
+<span class="fc bfc" id="L382" title="All 2 branches covered.">                    for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L383">                        final double xi = this.x.getEntry(i);</span>
+<span class="fc" id="L384">                        final double wi = wbar.getEntry(i);</span>
+<span class="fc" id="L385">                        xRefined.setEntry(i, xi + zbar * wi);</span>
+                    }
+                } else {
+<span class="fc bfc" id="L388" title="All 2 branches covered.">                    for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L389">                        final double xi = this.x.getEntry(i);</span>
+<span class="fc" id="L390">                        final double wi = wbar.getEntry(i);</span>
+<span class="fc" id="L391">                        final double bi = mSolveB.getEntry(i);</span>
+<span class="fc" id="L392">                        xRefined.setEntry(i, xi + zbar * wi + step * bi);</span>
+                    }
+                }
+            }
+<span class="fc" id="L396">        }</span>
+
+        /**
+         * Performs the initial phase of the SYMMLQ algorithm. On return, the
+         * value of the state variables of {@code this} object correspond to k =
+         * 1.
+         */
+        private void init() {
+<span class="fc" id="L404">            this.x.set(0.);</span>
+            /*
+             * Set up y for the first Lanczos vector. y and beta1 will be zero
+             * if b = 0.
+             */
+<span class="fc" id="L409">            this.r1 = this.b.copy();</span>
+<span class="fc bfc" id="L410" title="All 2 branches covered.">            this.y = this.m == null ? this.b.copy() : this.m.solve(this.r1);</span>
+<span class="pc bpc" id="L411" title="1 of 4 branches missed.">            if ((this.m != null) &amp;&amp; check) {</span>
+<span class="fc" id="L412">                checkSymmetry(this.m, this.r1, this.y, this.m.solve(this.y));</span>
+            }
+
+<span class="fc" id="L415">            this.beta1 = this.r1.dotProduct(this.y);</span>
+<span class="fc bfc" id="L416" title="All 2 branches covered.">            if (this.beta1 &lt; 0.) {</span>
+<span class="nc" id="L417">                throwNPDLOException(this.m, this.y);</span>
+            }
+<span class="pc bpc" id="L419" title="1 of 2 branches missed.">            if (this.beta1 == 0.) {</span>
+                /* If b = 0 exactly, stop with x = 0. */
+<span class="nc" id="L421">                return;</span>
+            }
+<span class="fc" id="L423">            this.beta1 = FastMath.sqrt(this.beta1);</span>
+            /* At this point
+             *   r1 = b,
+             *   y = M^(-1) * b,
+             *   beta1 = beta[1].
+             */
+<span class="fc" id="L429">            final RealVector v = this.y.mapMultiply(1. / this.beta1);</span>
+<span class="fc" id="L430">            this.y = this.a.operate(v);</span>
+<span class="pc bpc" id="L431" title="1 of 2 branches missed.">            if (check) {</span>
+<span class="fc" id="L432">                checkSymmetry(this.a, v, this.y, this.a.operate(this.y));</span>
+            }
+            /*
+             * Set up y for the second Lanczos vector. y and beta will be zero
+             * or very small if b is an eigenvector.
+             */
+<span class="fc" id="L438">            daxpy(-this.shift, v, this.y);</span>
+<span class="fc" id="L439">            final double alpha = v.dotProduct(this.y);</span>
+<span class="fc" id="L440">            daxpy(-alpha / this.beta1, this.r1, this.y);</span>
+            /*
+             * At this point
+             *   alpha = alpha[1]
+             *   y     = beta[2] * M * P' * v[2]
+             */
+            /* Make sure r2 will be orthogonal to the first v. */
+<span class="fc" id="L447">            final double vty = v.dotProduct(this.y);</span>
+<span class="fc" id="L448">            final double vtv = v.dotProduct(v);</span>
+<span class="fc" id="L449">            daxpy(-vty / vtv, v, this.y);</span>
+<span class="fc" id="L450">            this.r2 = this.y.copy();</span>
+<span class="fc bfc" id="L451" title="All 2 branches covered.">            if (this.m != null) {</span>
+<span class="fc" id="L452">                this.y = this.m.solve(this.r2);</span>
+            }
+<span class="fc" id="L454">            this.oldb = this.beta1;</span>
+<span class="fc" id="L455">            this.beta = this.r2.dotProduct(this.y);</span>
+<span class="pc bpc" id="L456" title="1 of 2 branches missed.">            if (this.beta &lt; 0.) {</span>
+<span class="nc" id="L457">                throwNPDLOException(this.m, this.y);</span>
+            }
+<span class="fc" id="L459">            this.beta = FastMath.sqrt(this.beta);</span>
+            /*
+             * At this point
+             *   oldb = beta[1]
+             *   beta = beta[2]
+             *   y  = beta[2] * P' * v[2]
+             *   r2 = beta[2] * M * P' * v[2]
+             */
+<span class="fc" id="L467">            this.cgnorm = this.beta1;</span>
+<span class="fc" id="L468">            this.gbar = alpha;</span>
+<span class="fc" id="L469">            this.dbar = this.beta;</span>
+<span class="fc" id="L470">            this.gammaZeta = this.beta1;</span>
+<span class="fc" id="L471">            this.minusEpsZeta = 0.;</span>
+<span class="fc" id="L472">            this.bstep = 0.;</span>
+<span class="fc" id="L473">            this.snprod = 1.;</span>
+<span class="fc" id="L474">            this.tnorm = alpha * alpha + this.beta * this.beta;</span>
+<span class="fc" id="L475">            this.ynorm2 = 0.;</span>
+<span class="fc" id="L476">            this.gmax = FastMath.abs(alpha) + MACH_PREC;</span>
+<span class="fc" id="L477">            this.gmin = this.gmax;</span>
+
+<span class="fc bfc" id="L479" title="All 2 branches covered.">            if (this.goodb) {</span>
+<span class="fc" id="L480">                this.wbar = new ArrayRealVector(this.a.getRowDimension());</span>
+<span class="fc" id="L481">                this.wbar.set(0.);</span>
+            } else {
+<span class="fc" id="L483">                this.wbar = v;</span>
+            }
+<span class="fc" id="L485">            updateNorms();</span>
+<span class="fc" id="L486">        }</span>
+
+        /**
+         * Performs the next iteration of the algorithm. The iteration count
+         * should be incremented prior to calling this method. On return, the
+         * value of the state variables of {@code this} object correspond to the
+         * current iteration count {@code k}.
+         */
+        private void update() {
+<span class="fc" id="L495">            final RealVector v = y.mapMultiply(1. / beta);</span>
+<span class="fc" id="L496">            y = a.operate(v);</span>
+<span class="fc" id="L497">            daxpbypz(-shift, v, -beta / oldb, r1, y);</span>
+<span class="fc" id="L498">            final double alpha = v.dotProduct(y);</span>
+            /*
+             * At this point
+             *   v     = P' * v[k],
+             *   y     = (A - shift * I) * P' * v[k] - beta[k] * M * P' * v[k-1],
+             *   alpha = v'[k] * P * (A - shift * I) * P' * v[k]
+             *           - beta[k] * v[k]' * P * M * P' * v[k-1]
+             *         = v'[k] * P * (A - shift * I) * P' * v[k]
+             *           - beta[k] * v[k]' * v[k-1]
+             *         = alpha[k].
+             */
+<span class="fc" id="L509">            daxpy(-alpha / beta, r2, y);</span>
+            /*
+             * At this point
+             *   y = (A - shift * I) * P' * v[k] - alpha[k] * M * P' * v[k]
+             *       - beta[k] * M * P' * v[k-1]
+             *     = M * P' * (P * (A - shift * I) * P' * v[k] -alpha[k] * v[k]
+             *       - beta[k] * v[k-1])
+             *     = beta[k+1] * M * P' * v[k+1],
+             * from Paige and Saunders (1975), equation (3.2).
+             *
+             * WATCH-IT: the two following line work only because y is no longer
+             * updated up to the end of the present iteration, and is
+             * reinitialized at the beginning of the next iteration.
+             */
+<span class="fc" id="L523">            r1 = r2;</span>
+<span class="fc" id="L524">            r2 = y;</span>
+<span class="fc bfc" id="L525" title="All 2 branches covered.">            if (m != null) {</span>
+<span class="fc" id="L526">                y = m.solve(r2);</span>
+            }
+<span class="fc" id="L528">            oldb = beta;</span>
+<span class="fc" id="L529">            beta = r2.dotProduct(y);</span>
+<span class="pc bpc" id="L530" title="1 of 2 branches missed.">            if (beta &lt; 0.) {</span>
+<span class="nc" id="L531">                throwNPDLOException(m, y);</span>
+            }
+<span class="fc" id="L533">            beta = FastMath.sqrt(beta);</span>
+            /*
+             * At this point
+             *   r1 = beta[k] * M * P' * v[k],
+             *   r2 = beta[k+1] * M * P' * v[k+1],
+             *   y  = beta[k+1] * P' * v[k+1],
+             *   oldb = beta[k],
+             *   beta = beta[k+1].
+             */
+<span class="fc" id="L542">            tnorm += alpha * alpha + oldb * oldb + beta * beta;</span>
+            /*
+             * Compute the next plane rotation for Q. See Paige and Saunders
+             * (1975), equation (5.6), with
+             *   gamma = gamma[k-1],
+             *   c     = c[k-1],
+             *   s     = s[k-1].
+             */
+<span class="fc" id="L550">            final double gamma = FastMath.sqrt(gbar * gbar + oldb * oldb);</span>
+<span class="fc" id="L551">            final double c = gbar / gamma;</span>
+<span class="fc" id="L552">            final double s = oldb / gamma;</span>
+            /*
+             * The relations
+             *   gbar[k] = s[k-1] * (-c[k-2] * beta[k]) - c[k-1] * alpha[k]
+             *           = s[k-1] * dbar[k] - c[k-1] * alpha[k],
+             *   delta[k] = c[k-1] * dbar[k] + s[k-1] * alpha[k],
+             * are not stated in Paige and Saunders (1975), but can be retrieved
+             * by expanding the (k, k-1) and (k, k) coefficients of the matrix in
+             * equation (5.5).
+             */
+<span class="fc" id="L562">            final double deltak = c * dbar + s * alpha;</span>
+<span class="fc" id="L563">            gbar = s * dbar - c * alpha;</span>
+<span class="fc" id="L564">            final double eps = s * beta;</span>
+<span class="fc" id="L565">            dbar = -c * beta;</span>
+<span class="fc" id="L566">            final double zeta = gammaZeta / gamma;</span>
+            /*
+             * At this point
+             *   gbar   = gbar[k]
+             *   deltak = delta[k]
+             *   eps    = eps[k+1]
+             *   dbar   = dbar[k+1]
+             *   zeta   = zeta[k-1]
+             */
+<span class="fc" id="L575">            final double zetaC = zeta * c;</span>
+<span class="fc" id="L576">            final double zetaS = zeta * s;</span>
+<span class="fc" id="L577">            final int n = x.getDimension();</span>
+<span class="fc bfc" id="L578" title="All 2 branches covered.">            for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L579">                final double xi = x.getEntry(i);</span>
+<span class="fc" id="L580">                final double vi = v.getEntry(i);</span>
+<span class="fc" id="L581">                final double wi = wbar.getEntry(i);</span>
+<span class="fc" id="L582">                x.setEntry(i, xi + wi * zetaC + vi * zetaS);</span>
+<span class="fc" id="L583">                wbar.setEntry(i, wi * s - vi * c);</span>
+            }
+            /*
+             * At this point
+             *   x = xL[k-1],
+             *   ptwbar = P' wbar[k],
+             * see Paige and Saunders (1975), equations (5.9) and (5.10).
+             */
+<span class="fc" id="L591">            bstep += snprod * c * zeta;</span>
+<span class="fc" id="L592">            snprod *= s;</span>
+<span class="fc" id="L593">            gmax = FastMath.max(gmax, gamma);</span>
+<span class="fc" id="L594">            gmin = FastMath.min(gmin, gamma);</span>
+<span class="fc" id="L595">            ynorm2 += zeta * zeta;</span>
+<span class="fc" id="L596">            gammaZeta = minusEpsZeta - deltak * zeta;</span>
+<span class="fc" id="L597">            minusEpsZeta = -eps * zeta;</span>
+            /*
+             * At this point
+             *   snprod       = s[1] * ... * s[k-1],
+             *   gmax         = max(|alpha[1]|, gamma[1], ..., gamma[k-1]),
+             *   gmin         = min(|alpha[1]|, gamma[1], ..., gamma[k-1]),
+             *   ynorm2       = zeta[1]^2 + ... + zeta[k-1]^2,
+             *   gammaZeta    = gamma[k] * zeta[k],
+             *   minusEpsZeta = -eps[k+1] * zeta[k-1].
+             * The relation for gammaZeta can be retrieved from Paige and
+             * Saunders (1975), equation (5.4a), last line of the vector
+             * gbar[k] * zbar[k] = -eps[k] * zeta[k-2] - delta[k] * zeta[k-1].
+             */
+<span class="fc" id="L610">            updateNorms();</span>
+<span class="fc" id="L611">        }</span>
+
+        /**
+         * Computes the norms of the residuals, and checks for convergence.
+         * Updates {@link #lqnorm} and {@link #cgnorm}.
+         */
+        private void updateNorms() {
+<span class="fc" id="L618">            final double anorm = FastMath.sqrt(tnorm);</span>
+<span class="fc" id="L619">            final double ynorm = FastMath.sqrt(ynorm2);</span>
+<span class="fc" id="L620">            final double epsa = anorm * MACH_PREC;</span>
+<span class="fc" id="L621">            final double epsx = anorm * ynorm * MACH_PREC;</span>
+<span class="fc" id="L622">            final double epsr = anorm * ynorm * delta;</span>
+<span class="pc bpc" id="L623" title="1 of 2 branches missed.">            final double diag = gbar == 0. ? epsa : gbar;</span>
+<span class="fc" id="L624">            lqnorm = FastMath.sqrt(gammaZeta * gammaZeta +</span>
+                                   minusEpsZeta * minusEpsZeta);
+<span class="fc" id="L626">            final double qrnorm = snprod * beta1;</span>
+<span class="fc" id="L627">            cgnorm = qrnorm * beta / FastMath.abs(diag);</span>
+
+            /*
+             * Estimate cond(A). In this version we look at the diagonals of L
+             * in the factorization of the tridiagonal matrix, T = L * Q.
+             * Sometimes, T[k] can be misleadingly ill-conditioned when T[k+1]
+             * is not, so we must be careful not to overestimate acond.
+             */
+            final double acond;
+<span class="fc bfc" id="L636" title="All 2 branches covered.">            if (lqnorm &lt;= cgnorm) {</span>
+<span class="fc" id="L637">                acond = gmax / gmin;</span>
+            } else {
+<span class="fc" id="L639">                acond = gmax / FastMath.min(gmin, FastMath.abs(diag));</span>
+            }
+<span class="pc bpc" id="L641" title="1 of 2 branches missed.">            if (acond * MACH_PREC &gt;= 0.1) {</span>
+<span class="nc" id="L642">                throw new IllConditionedOperatorException(acond);</span>
+            }
+<span class="pc bpc" id="L644" title="1 of 2 branches missed.">            if (beta1 &lt;= epsx) {</span>
+                /*
+                 * x has converged to an eigenvector of A corresponding to the
+                 * eigenvalue shift.
+                 */
+<span class="nc" id="L649">                throw new SingularOperatorException();</span>
+            }
+<span class="fc bfc" id="L651" title="All 4 branches covered.">            hasConverged = (cgnorm &lt;= epsx) || (cgnorm &lt;= epsr);</span>
+<span class="fc" id="L652">        }</span>
+    }
+
+    /** The cubic root of {@link #MACH_PREC}. */
+    private static final double CBRT_MACH_PREC;
+
+    /** The machine precision. */
+    private static final double MACH_PREC;
+
+    /** Key for the exception context. */
+    private static final String OPERATOR = &quot;operator&quot;;
+
+    /** Key for the exception context. */
+    private static final String THRESHOLD = &quot;threshold&quot;;
+
+    /** Key for the exception context. */
+    private static final String VECTOR = &quot;vector&quot;;
+
+    /** Key for the exception context. */
+    private static final String VECTOR1 = &quot;vector1&quot;;
+
+    /** Key for the exception context. */
+    private static final String VECTOR2 = &quot;vector2&quot;;
+
+    /** {@code true} if symmetry of matrix and conditioner must be checked. */
+    private final boolean check;
+
+    /**
+     * The value of the custom tolerance &amp;delta; for the default stopping
+     * criterion.
+     */
+    private final double delta;
+
+    /**
+     * Creates a new instance of this class, with &lt;a href=&quot;#stopcrit&quot;&gt;default
+     * stopping criterion&lt;/a&gt;.
+     *
+     * @param maxIterations Maximum number of iterations.
+     * @param delta &amp;delta; parameter for the default stopping criterion.
+     * @param check {@code true} if self-adjointedness of both matrix and
+     * preconditioner should be checked. This entails an extra matrix-vector
+     * product in the initial phase.
+     */
+    public SymmLQ(final int maxIterations, final double delta,
+                  final boolean check) {
+<span class="fc" id="L697">        super(maxIterations);</span>
+<span class="fc" id="L698">        this.delta = delta;</span>
+<span class="fc" id="L699">        this.check = check;</span>
+<span class="fc" id="L700">    }</span>
+
+    /**
+     * Creates a new instance of this class, with &lt;a href=&quot;#stopcrit&quot;&gt;default
+     * stopping criterion&lt;/a&gt; and custom iteration manager.
+     *
+     * @param manager Custom iteration manager.
+     * @param delta &amp;delta; parameter for the default stopping criterion.
+     * @param check {@code true} if self-adjointedness of both matrix and
+     * preconditioner should be checked. This entails an extra matrix-vector
+     * product in the initial phase.
+     */
+    public SymmLQ(final IterationManager manager, final double delta,
+                  final boolean check) {
+<span class="nc" id="L714">        super(manager);</span>
+<span class="nc" id="L715">        this.delta = delta;</span>
+<span class="nc" id="L716">        this.check = check;</span>
+<span class="nc" id="L717">    }</span>
+
+    static {
+<span class="fc" id="L720">        MACH_PREC = Math.ulp(1.);</span>
+<span class="fc" id="L721">        CBRT_MACH_PREC = Math.cbrt(MACH_PREC);</span>
+<span class="fc" id="L722">    }</span>
+
+    /**
+     * Performs a symmetry check on the specified linear operator, and throws an
+     * exception in case this check fails. Given a linear operator L, and a
+     * vector x, this method checks that x' L y = y' L x (within a given
+     * accuracy), where y = L x.
+     *
+     * @param l The linear operator L.
+     * @param x The candidate vector x.
+     * @param y The candidate vector y = L x.
+     * @param z The vector z = L y.
+     * @throws NonSelfAdjointOperatorException when the test fails.
+     */
+    private static void checkSymmetry(final RealLinearOperator l,
+                                      final RealVector x, final RealVector y,
+                                      final RealVector z)
+        throws NonSelfAdjointOperatorException {
+<span class="fc" id="L740">        final double s = y.dotProduct(y);</span>
+<span class="fc" id="L741">        final double t = x.dotProduct(z);</span>
+<span class="fc" id="L742">        final double epsa = (s + MACH_PREC) * CBRT_MACH_PREC;</span>
+<span class="fc bfc" id="L743" title="All 2 branches covered.">        if (FastMath.abs(s - t) &gt; epsa) {</span>
+            final NonSelfAdjointOperatorException e;
+<span class="fc" id="L745">            e = new NonSelfAdjointOperatorException();</span>
+<span class="fc" id="L746">            final ExceptionContext context = e.getContext();</span>
+<span class="fc" id="L747">            context.setValue(OPERATOR, l);</span>
+<span class="fc" id="L748">            context.setValue(VECTOR1, x);</span>
+<span class="fc" id="L749">            context.setValue(VECTOR2, y);</span>
+<span class="fc" id="L750">            context.setValue(THRESHOLD, Double.valueOf(epsa));</span>
+<span class="fc" id="L751">            throw e;</span>
+        }
+<span class="fc" id="L753">    }</span>
+
+    /**
+     * A BLAS-like function, for the operation z &amp;larr; a &amp;middot; x + b
+     * &amp;middot; y + z. This is for internal use only: no dimension checks are
+     * provided.
+     *
+     * @param a The scalar by which {@code x} is to be multiplied.
+     * @param x The first vector to be added to {@code z}.
+     * @param b The scalar by which {@code y} is to be multiplied.
+     * @param y The second vector to be added to {@code z}.
+     * @param z The vector to be incremented.
+     */
+    private static void daxpbypz(final double a, final RealVector x,
+                                 final double b, final RealVector y,
+                                 final RealVector z) {
+<span class="fc" id="L769">        final int n = z.getDimension();</span>
+<span class="fc bfc" id="L770" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+            final double zi;
+<span class="fc" id="L772">            zi = a * x.getEntry(i) + b * y.getEntry(i) + z.getEntry(i);</span>
+<span class="fc" id="L773">            z.setEntry(i, zi);</span>
+        }
+<span class="fc" id="L775">    }</span>
+
+    /**
+     * A clone of the BLAS {@code DAXPY} function, which carries out the
+     * operation y &amp;larr; a &amp;middot; x + y. This is for internal use only: no
+     * dimension checks are provided.
+     *
+     * @param a The scalar by which {@code x} is to be multiplied.
+     * @param x The vector to be added to {@code y}.
+     * @param y The vector to be incremented.
+     */
+    private static void daxpy(final double a, final RealVector x,
+                              final RealVector y) {
+<span class="fc" id="L788">        final int n = x.getDimension();</span>
+<span class="fc bfc" id="L789" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L790">            y.setEntry(i, a * x.getEntry(i) + y.getEntry(i));</span>
+        }
+<span class="fc" id="L792">    }</span>
+
+    /**
+     * Throws a new {@link NonPositiveDefiniteOperatorException} with
+     * appropriate context.
+     *
+     * @param l The offending linear operator.
+     * @param v The offending vector.
+     * @throws NonPositiveDefiniteOperatorException in any circumstances.
+     */
+    private static void throwNPDLOException(final RealLinearOperator l,
+                                            final RealVector v)
+        throws NonPositiveDefiniteOperatorException {
+        final NonPositiveDefiniteOperatorException e;
+<span class="fc" id="L806">        e = new NonPositiveDefiniteOperatorException();</span>
+<span class="fc" id="L807">        final ExceptionContext context = e.getContext();</span>
+<span class="fc" id="L808">        context.setValue(OPERATOR, l);</span>
+<span class="fc" id="L809">        context.setValue(VECTOR, v);</span>
+<span class="fc" id="L810">        throw e;</span>
+    }
+
+    /**
+     * Returns {@code true} if symmetry of the matrix, and symmetry as well as
+     * positive definiteness of the preconditioner should be checked.
+     *
+     * @return {@code true} if the tests are to be performed.
+     */
+    public final boolean getCheck() {
+<span class="nc" id="L820">        return check;</span>
+    }
+
+    /**
+     * Returns an estimate of the solution to the linear system A &amp;middot; x =
+     * b.
+     *
+     * @param a Linear operator A of the system.
+     * @param m Preconditioner (can be {@code null}).
+     * @param b Right-hand side vector.
+     * @return A new vector containing the solution.
+     * @throws NullArgumentException if one of the parameters is {@code null}.
+     * @throws NonSquareOperatorException if {@code a} or {@code m} is not
+     * square.
+     * @throws DimensionMismatchException if {@code m}, {@code b} or {@code x}
+     * have dimensions inconsistent with {@code a}.
+     * @throws NonSelfAdjointOperatorException if {@link #getCheck()} is
+     * {@code true}, and {@code a} or {@code m} is not self-adjoint.
+     * @throws NonPositiveDefiniteOperatorException if {@code m} is not positive
+     * definite.
+     * @throws IllConditionedOperatorException if {@code a} is ill-conditioned.
+     * @throws MaxCountExceededException at exhaustion of the iteration count,
+     * unless a custom {@link org.apache.commons.math.util.Incrementor.MaxCountExceededCallback callback} has been set at
+     * construction.
+     */
+    @Override
+    public RealVector solve(final RealLinearOperator a,
+                            final InvertibleRealLinearOperator m,
+                            final RealVector b)
+        throws NullArgumentException, NonSquareOperatorException,
+        DimensionMismatchException, NonSelfAdjointOperatorException,
+        NonPositiveDefiniteOperatorException, IllConditionedOperatorException,
+        MaxCountExceededException {
+<span class="fc" id="L853">        MathUtils.checkNotNull(a);</span>
+<span class="fc" id="L854">        final RealVector x = new ArrayRealVector(a.getColumnDimension());</span>
+<span class="fc" id="L855">        return solveInPlace(a, m, b, x, false, 0.);</span>
+    }
+
+    /**
+     * Returns an estimate of the solution to the linear system (A - shift
+     * &amp;middot; I) &amp;middot; x = b.
+     * &lt;p&gt;
+     * If the solution x is expected to contain a large multiple of {@code b}
+     * (as in Rayleigh-quotient iteration), then better precision may be
+     * achieved with {@code goodb} set to {@code true}; this however requires an
+     * extra call to the preconditioner.
+     * &lt;/p&gt;
+     * &lt;p&gt;
+     * {@code shift} should be zero if the system A &amp;middot; x = b is to be
+     * solved. Otherwise, it could be an approximation to an eigenvalue of A,
+     * such as the Rayleigh quotient b&lt;sup&gt;T&lt;/sup&gt; &amp;middot; A &amp;middot; b /
+     * (b&lt;sup&gt;T&lt;/sup&gt; &amp;middot; b) corresponding to the vector b. If b is
+     * sufficiently like an eigenvector corresponding to an eigenvalue near
+     * shift, then the computed x may have very large components. When
+     * normalized, x may be closer to an eigenvector than b.
+     * &lt;/p&gt;
+     *
+     * @param a Linear operator A of the system.
+     * @param m Preconditioner (can be {@code null}).
+     * @param b Right-hand side vector.
+     * @param goodb Usually {@code false}, except if {@code x} is expected to
+     * contain a large multiple of {@code b}.
+     * @param shift The amount to be subtracted to all diagonal elements of A.
+     * @return A reference to {@code x} (shallow copy).
+     * @throws NullArgumentException if one of the parameters is {@code null}.
+     * @throws NonSquareOperatorException if {@code a} or {@code m} is not
+     * square.
+     * @throws DimensionMismatchException if {@code m} or {@code b} have
+     * dimensions inconsistent with {@code a}.
+     * @throws NonSelfAdjointOperatorException if {@link #getCheck()} is
+     * {@code true}, and {@code a} or {@code m} is not self-adjoint.
+     * @throws NonPositiveDefiniteOperatorException if {@code m} is not positive
+     * definite.
+     * @throws IllConditionedOperatorException if {@code a} is ill-conditioned.
+     * @throws MaxCountExceededException at exhaustion of the iteration count,
+     * unless a custom {@link org.apache.commons.math.util.Incrementor.MaxCountExceededCallback callback} has been set at
+     * construction.
+     */
+    public RealVector solve(final RealLinearOperator a,
+                            final InvertibleRealLinearOperator m,
+                            final RealVector b, final boolean goodb,
+                            final double shift)
+        throws NullArgumentException, NonSquareOperatorException,
+        DimensionMismatchException, NonSelfAdjointOperatorException,
+        NonPositiveDefiniteOperatorException, IllConditionedOperatorException,
+        MaxCountExceededException {
+<span class="fc" id="L906">        MathUtils.checkNotNull(a);</span>
+<span class="fc" id="L907">        final RealVector x = new ArrayRealVector(a.getColumnDimension());</span>
+<span class="fc" id="L908">        return solveInPlace(a, m, b, x, goodb, shift);</span>
+    }
+
+    /**
+     * Returns an estimate of the solution to the linear system A &amp;middot; x =
+     * b.
+     *
+     * @param a Linear operator A of the system.
+     * @param m Preconditioner (can be {@code null}).
+     * @param b Right-hand side vector.
+     * @param x Not meaningful in this implementation. Should not be considered
+     * as an initial guess (&lt;a href=&quot;#initguess&quot;&gt;more&lt;/a&gt;).
+     * @return A new vector containing the solution.
+     * @throws NullArgumentException if one of the parameters is {@code null}.
+     * @throws NonSquareOperatorException if {@code a} or {@code m} is not
+     * square.
+     * @throws DimensionMismatchException if {@code m}, {@code b} or {@code x}
+     * have dimensions inconsistent with {@code a}.
+     * @throws NonSelfAdjointOperatorException if {@link #getCheck()} is
+     * {@code true}, and {@code a} or {@code m} is not self-adjoint.
+     * @throws NonPositiveDefiniteOperatorException if {@code m} is not positive
+     * definite.
+     * @throws IllConditionedOperatorException if {@code a} is ill-conditioned.
+     * @throws MaxCountExceededException at exhaustion of the iteration count,
+     * unless a custom {@link org.apache.commons.math.util.Incrementor.MaxCountExceededCallback callback} has been set at
+     * construction.
+     */
+    @Override
+    public RealVector solve(final RealLinearOperator a,
+                            final InvertibleRealLinearOperator m,
+                            final RealVector b, final RealVector x)
+        throws NullArgumentException, NonSquareOperatorException,
+        DimensionMismatchException, NonSelfAdjointOperatorException,
+        NonPositiveDefiniteOperatorException, IllConditionedOperatorException,
+        MaxCountExceededException {
+<span class="nc" id="L943">        MathUtils.checkNotNull(x);</span>
+<span class="nc" id="L944">        return solveInPlace(a, m, b, x.copy(), false, 0.);</span>
+    }
+
+    /**
+     * Returns an estimate of the solution to the linear system A &amp;middot; x =
+     * b.
+     *
+     * @param a Linear operator A of the system.
+     * @param b Right-hand side vector.
+     * @return A new vector containing the solution.
+     * @throws NullArgumentException if one of the parameters is {@code null}.
+     * @throws NonSquareOperatorException if {@code a} is not square.
+     * @throws DimensionMismatchException if {@code b} has dimensions
+     * inconsistent with {@code a}.
+     * @throws NonSelfAdjointOperatorException if {@link #getCheck()} is
+     * {@code true}, and {@code a} is not self-adjoint.
+     * @throws IllConditionedOperatorException if {@code a} is ill-conditioned.
+     * @throws MaxCountExceededException at exhaustion of the iteration count,
+     * unless a custom {@link org.apache.commons.math.util.Incrementor.MaxCountExceededCallback callback} has been set at
+     * construction.
+     */
+    @Override
+    public RealVector solve(final RealLinearOperator a, final RealVector b)
+        throws NullArgumentException, NonSquareOperatorException,
+        DimensionMismatchException, NonSelfAdjointOperatorException,
+        IllConditionedOperatorException, MaxCountExceededException {
+<span class="fc" id="L970">        MathUtils.checkNotNull(a);</span>
+<span class="fc" id="L971">        final RealVector x = new ArrayRealVector(a.getColumnDimension());</span>
+<span class="fc" id="L972">        x.set(0.);</span>
+<span class="fc" id="L973">        return solveInPlace(a, null, b, x, false, 0.);</span>
+    }
+
+    /**
+     * Returns the solution to the system (A - shift &amp;middot; I) &amp;middot; x = b.
+     * &lt;p&gt;
+     * If the solution x is expected to contain a large multiple of {@code b}
+     * (as in Rayleigh-quotient iteration), then better precision may be
+     * achieved with {@code goodb} set to {@code true}.
+     * &lt;/p&gt;
+     * &lt;p&gt;
+     * {@code shift} should be zero if the system A &amp;middot; x = b is to be
+     * solved. Otherwise, it could be an approximation to an eigenvalue of A,
+     * such as the Rayleigh quotient b&lt;sup&gt;T&lt;/sup&gt; &amp;middot; A &amp;middot; b /
+     * (b&lt;sup&gt;T&lt;/sup&gt; &amp;middot; b) corresponding to the vector b. If b is
+     * sufficiently like an eigenvector corresponding to an eigenvalue near
+     * shift, then the computed x may have very large components. When
+     * normalized, x may be closer to an eigenvector than b.
+     * &lt;/p&gt;
+     *
+     * @param a Linear operator A of the system.
+     * @param b Right-hand side vector.
+     * @param goodb Usually {@code false}, except if {@code x} is expected to
+     * contain a large multiple of {@code b}.
+     * @param shift The amount to be subtracted to all diagonal elements of A.
+     * @return a reference to {@code x}.
+     * @throws NullArgumentException if one of the parameters is {@code null}.
+     * @throws NonSquareOperatorException if {@code a} is not square.
+     * @throws DimensionMismatchException if {@code b} has dimensions
+     * inconsistent with {@code a}.
+     * @throws NonSelfAdjointOperatorException if {@link #getCheck()} is
+     * {@code true}, and {@code a} is not self-adjoint.
+     * @throws IllConditionedOperatorException if {@code a} is ill-conditioned.
+     * @throws MaxCountExceededException at exhaustion of the iteration count,
+     * unless a custom {@link org.apache.commons.math.util.Incrementor.MaxCountExceededCallback callback} has been set at
+     * construction.
+     */
+    public RealVector solve(final RealLinearOperator a, final RealVector b,
+                            final boolean goodb, final double shift)
+        throws NullArgumentException, NonSquareOperatorException,
+        DimensionMismatchException, NonSelfAdjointOperatorException,
+        IllConditionedOperatorException, MaxCountExceededException {
+<span class="nc" id="L1015">        MathUtils.checkNotNull(a);</span>
+<span class="nc" id="L1016">        final RealVector x = new ArrayRealVector(a.getColumnDimension());</span>
+<span class="nc" id="L1017">        return solveInPlace(a, null, b, x, goodb, shift);</span>
+    }
+
+    /**
+     * Returns an estimate of the solution to the linear system A &amp;middot; x =
+     * b.
+     *
+     * @param a Linear operator A of the system.
+     * @param b Right-hand side vector.
+     * @param x Not meaningful in this implementation. Should not be considered
+     * as an initial guess (&lt;a href=&quot;#initguess&quot;&gt;more&lt;/a&gt;).
+     * @return A new vector containing the solution.
+     * @throws NullArgumentException if one of the parameters is {@code null}.
+     * @throws NonSquareOperatorException if {@code a} is not square.
+     * @throws DimensionMismatchException if {@code b} or {@code x} have
+     * dimensions inconsistent with {@code a}.
+     * @throws NonSelfAdjointOperatorException if {@link #getCheck()} is
+     * {@code true}, and {@code a} is not self-adjoint.
+     * @throws IllConditionedOperatorException if {@code a} is ill-conditioned.
+     * @throws MaxCountExceededException at exhaustion of the iteration count,
+     * unless a custom {@link org.apache.commons.math.util.Incrementor.MaxCountExceededCallback callback} has been set at
+     * construction.
+     */
+    @Override
+    public RealVector solve(final RealLinearOperator a, final RealVector b,
+                            final RealVector x)
+        throws NullArgumentException, NonSquareOperatorException,
+        DimensionMismatchException, NonSelfAdjointOperatorException,
+        IllConditionedOperatorException, MaxCountExceededException {
+<span class="fc" id="L1046">        MathUtils.checkNotNull(x);</span>
+<span class="fc" id="L1047">        return solveInPlace(a, null, b, x.copy(), false, 0.);</span>
+    }
+
+    /**
+     * Returns an estimate of the solution to the linear system A &amp;middot; x =
+     * b. The solution is computed in-place.
+     *
+     * @param a Linear operator A of the system.
+     * @param m Preconditioner (can be {@code null}).
+     * @param b Right-hand side vector.
+     * @param x Vector to be updated with the solution. {@code x} should not be
+     * considered as an initial guess (&lt;a href=&quot;#initguess&quot;&gt;more&lt;/a&gt;).
+     * @return A reference to {@code x} (shallow copy) updated with the
+     * solution.
+     * @throws NullArgumentException if one of the parameters is {@code null}.
+     * @throws NonSquareOperatorException if {@code a} or {@code m} is not
+     * square.
+     * @throws DimensionMismatchException if {@code m}, {@code b} or {@code x}
+     * have dimensions inconsistent with {@code a}.
+     * @throws NonSelfAdjointOperatorException if {@link #getCheck()} is
+     * {@code true}, and {@code a} or {@code m} is not self-adjoint.
+     * @throws NonPositiveDefiniteOperatorException if {@code m} is not positive
+     * definite.
+     * @throws IllConditionedOperatorException if {@code a} is ill-conditioned.
+     * @throws MaxCountExceededException at exhaustion of the iteration count,
+     * unless a custom {@link org.apache.commons.math.util.Incrementor.MaxCountExceededCallback callback} has been set at
+     * construction.
+     */
+    @Override
+    public RealVector solveInPlace(final RealLinearOperator a,
+                                   final InvertibleRealLinearOperator m,
+                                   final RealVector b, final RealVector x)
+        throws NullArgumentException, NonSquareOperatorException,
+        DimensionMismatchException, NonSelfAdjointOperatorException,
+        NonPositiveDefiniteOperatorException, IllConditionedOperatorException,
+        MaxCountExceededException {
+<span class="nc" id="L1083">        return solveInPlace(a, m, b, x, false, 0.);</span>
+    }
+
+    /**
+     * Returns an estimate of the solution to the linear system (A - shift
+     * &amp;middot; I) &amp;middot; x = b. The solution is computed in-place.
+     * &lt;p&gt;
+     * If the solution x is expected to contain a large multiple of {@code b}
+     * (as in Rayleigh-quotient iteration), then better precision may be
+     * achieved with {@code goodb} set to {@code true}; this however requires an
+     * extra call to the preconditioner.
+     * &lt;/p&gt;
+     * &lt;p&gt;
+     * {@code shift} should be zero if the system A &amp;middot; x = b is to be
+     * solved. Otherwise, it could be an approximation to an eigenvalue of A,
+     * such as the Rayleigh quotient b&lt;sup&gt;T&lt;/sup&gt; &amp;middot; A &amp;middot; b /
+     * (b&lt;sup&gt;T&lt;/sup&gt; &amp;middot; b) corresponding to the vector b. If b is
+     * sufficiently like an eigenvector corresponding to an eigenvalue near
+     * shift, then the computed x may have very large components. When
+     * normalized, x may be closer to an eigenvector than b.
+     * &lt;/p&gt;
+     *
+     * @param a Linear operator A of the system.
+     * @param m Preconditioner (can be {@code null}).
+     * @param b Right-hand side vector.
+     * @param x Vector to be updated with the solution. {@code x} should not be
+     * considered as an initial guess (&lt;a href=&quot;#initguess&quot;&gt;more&lt;/a&gt;).
+     * @param goodb Usually {@code false}, except if {@code x} is expected to
+     * contain a large multiple of {@code b}.
+     * @param shift The amount to be subtracted to all diagonal elements of A.
+     * @return A reference to {@code x} (shallow copy).
+     * @throws NullArgumentException if one of the parameters is {@code null}.
+     * @throws NonSquareOperatorException if {@code a} or {@code m} is not
+     * square.
+     * @throws DimensionMismatchException if {@code m}, {@code b} or {@code x}
+     * have dimensions inconsistent with {@code a}.
+     * @throws NonSelfAdjointOperatorException if {@link #getCheck()} is
+     * {@code true}, and {@code a} or {@code m} is not self-adjoint.
+     * @throws NonPositiveDefiniteOperatorException if {@code m} is not positive
+     * definite.
+     * @throws IllConditionedOperatorException if {@code a} is ill-conditioned.
+     * @throws MaxCountExceededException at exhaustion of the iteration count,
+     * unless a custom {@link org.apache.commons.math.util.Incrementor.MaxCountExceededCallback callback} has been set at
+     * construction.
+     */
+    public RealVector solveInPlace(final RealLinearOperator a,
+                                   final InvertibleRealLinearOperator m,
+                                   final RealVector b, final RealVector x,
+                                   final boolean goodb, final double shift)
+        throws NullArgumentException, NonSquareOperatorException,
+        DimensionMismatchException, NonSelfAdjointOperatorException,
+        NonPositiveDefiniteOperatorException, IllConditionedOperatorException,
+        MaxCountExceededException {
+<span class="fc" id="L1136">        checkParameters(a, m, b, x);</span>
+
+<span class="fc" id="L1138">        final IterationManager manager = getIterationManager();</span>
+        /* Initialization counts as an iteration. */
+<span class="fc" id="L1140">        manager.resetIterationCount();</span>
+<span class="fc" id="L1141">        manager.incrementIterationCount();</span>
+
+<span class="fc" id="L1143">        final State state = new State(a, m, b, x, goodb, shift);</span>
+<span class="fc" id="L1144">        final IterativeLinearSolverEvent event = createEvent(state);</span>
+<span class="pc bpc" id="L1145" title="1 of 2 branches missed.">        if (state.beta1 == 0.) {</span>
+            /* If b = 0 exactly, stop with x = 0. */
+<span class="nc" id="L1147">            manager.fireTerminationEvent(event);</span>
+<span class="nc" id="L1148">            return x;</span>
+        }
+        /* Cause termination if beta is essentially zero. */
+        final boolean earlyStop;
+<span class="pc bpc" id="L1152" title="1 of 4 branches missed.">        earlyStop = (state.beta &lt; MACH_PREC) || (state.hasConverged);</span>
+<span class="fc" id="L1153">        manager.fireInitializationEvent(event);</span>
+<span class="fc bfc" id="L1154" title="All 2 branches covered.">        if (!earlyStop) {</span>
+            do {
+<span class="fc" id="L1156">                manager.incrementIterationCount();</span>
+<span class="fc" id="L1157">                manager.fireIterationStartedEvent(event);</span>
+<span class="fc" id="L1158">                state.update();</span>
+<span class="fc" id="L1159">                manager.fireIterationPerformedEvent(event);</span>
+<span class="fc bfc" id="L1160" title="All 2 branches covered.">            } while (!state.hasConverged);</span>
+        }
+<span class="fc" id="L1162">        state.refine(x);</span>
+        /*
+         * The following two lines are a hack because state.x is now refined,
+         * so further calls to state.refine() (via event.getSolution()) should
+         * *not* return an altered value of state.x.
+         */
+<span class="fc" id="L1168">        state.bstep = 0.;</span>
+<span class="fc" id="L1169">        state.gammaZeta = 0.;</span>
+<span class="fc" id="L1170">        manager.fireTerminationEvent(event);</span>
+<span class="fc" id="L1171">        return x;</span>
+    }
+
+    /**
+     * Returns an estimate of the solution to the linear system A &amp;middot; x =
+     * b. The solution is computed in-place.
+     *
+     * @param a Linear operator A of the system.
+     * @param b Right-hand side vector.
+     * @param x Vector to be updated with the solution. {@code x} should not be
+     * considered as an initial guess (&lt;a href=&quot;#initguess&quot;&gt;more&lt;/a&gt;).
+     * @return A reference to {@code x} (shallow copy) updated with the
+     * solution.
+     * @throws NullArgumentException if one of the parameters is {@code null}.
+     * @throws NonSquareOperatorException if {@code a} or {@code m} is not
+     * square.
+     * @throws DimensionMismatchException if {@code m}, {@code b} or {@code x}
+     * have dimensions inconsistent with {@code a}.
+     * @throws NonSelfAdjointOperatorException if {@link #getCheck()} is
+     * {@code true}, and {@code a} or {@code m} is not self-adjoint.
+     * @throws IllConditionedOperatorException if {@code a} is ill-conditioned.
+     * @throws MaxCountExceededException at exhaustion of the iteration count,
+     * unless a custom {@link org.apache.commons.math.util.Incrementor.MaxCountExceededCallback callback} has been set at
+     * construction.
+     */
+    @Override
+    public RealVector solveInPlace(final RealLinearOperator a,
+                                   final RealVector b, final RealVector x)
+        throws NullArgumentException, NonSquareOperatorException,
+        DimensionMismatchException, NonSelfAdjointOperatorException,
+        IllConditionedOperatorException, MaxCountExceededException {
+<span class="fc" id="L1202">        return solveInPlace(a, null, b, x, false, 0.);</span>
+    }
+
+    /**
+     * Creates the event to be fired during the solution process. Unmodifiable
+     * views of the RHS vector, and the current estimate of the solution are
+     * returned by the created event.
+     *
+     * @param state Reference to the current state of this algorithm.
+     * @return The newly created event.
+     */
+    private IterativeLinearSolverEvent createEvent(final State state) {
+<span class="fc" id="L1214">        final RealVector bb = RealVector.unmodifiableRealVector(state.b);</span>
+
+        final IterativeLinearSolverEvent event;
+<span class="fc" id="L1217">        event = new IterativeLinearSolverEvent(this) {</span>
+
+           private static final long serialVersionUID = 3656926699603081076L;
+
+            @Override
+            public RealVector getRightHandSideVector() {
+<span class="nc" id="L1223">                return bb;</span>
+            }
+
+            @Override
+            public RealVector getSolution() {
+<span class="nc" id="L1228">                final int n = state.x.getDimension();</span>
+<span class="nc" id="L1229">                final RealVector x = new ArrayRealVector(n);</span>
+<span class="nc" id="L1230">                state.refine(x);</span>
+<span class="nc" id="L1231">                return x;</span>
+            }
+        };
+<span class="fc" id="L1234">        return event;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

@@ -1,0 +1,270 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AbstractLeastSquaresOptimizer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Commons Math</a> &gt; <a href="index.source.html" class="el_package">org.apache.commons.math.optimization.general</a> &gt; <span class="el_source">AbstractLeastSquaresOptimizer.java</span></div><h1>AbstractLeastSquaresOptimizer.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.commons.math.optimization.general;
+
+import org.apache.commons.math.exception.NumberIsTooSmallException;
+import org.apache.commons.math.exception.DimensionMismatchException;
+import org.apache.commons.math.analysis.DifferentiableMultivariateVectorFunction;
+import org.apache.commons.math.analysis.MultivariateMatrixFunction;
+import org.apache.commons.math.exception.util.LocalizedFormats;
+import org.apache.commons.math.linear.LUDecomposition;
+import org.apache.commons.math.linear.DecompositionSolver;
+import org.apache.commons.math.linear.MatrixUtils;
+import org.apache.commons.math.optimization.ConvergenceChecker;
+import org.apache.commons.math.optimization.DifferentiableMultivariateVectorialOptimizer;
+import org.apache.commons.math.optimization.VectorialPointValuePair;
+import org.apache.commons.math.optimization.direct.BaseAbstractVectorialOptimizer;
+import org.apache.commons.math.util.FastMath;
+
+/**
+ * Base class for implementing least squares optimizers.
+ * It handles the boilerplate methods associated to thresholds settings,
+ * jacobian and error estimation.
+ * &lt;br/&gt;
+ * This class uses the {@link DifferentiableMultivariateVectorFunction#jacobian()}
+ * of the function argument in method
+ * {@link #optimize(int,DifferentiableMultivariateVectorFunction,double[],double[],double[])
+ * optimize} and assumes that, in the matrix returned by the
+ * {@link MultivariateMatrixFunction#value(double[]) value} method, the rows
+ * iterate on the model functions while the columns iterate on the parameters; thus,
+ * the numbers of rows is equal to the length of the {@code target} array while the
+ * number of columns is equal to the length of the {@code startPoint} array.
+ *
+ * @version $Id$
+ * @since 1.2
+ */
+public abstract class AbstractLeastSquaresOptimizer
+    extends BaseAbstractVectorialOptimizer&lt;DifferentiableMultivariateVectorFunction&gt;
+    implements DifferentiableMultivariateVectorialOptimizer {
+    /** Singularity threshold (cf. {@link #getCovariances(double)}). */
+    private static final double DEFAULT_SINGULARITY_THRESHOLD = 1e-14;
+    /**
+     * Jacobian matrix of the weighted residuals.
+     * This matrix is in canonical form just after the calls to
+     * {@link #updateJacobian()}, but may be modified by the solver
+     * in the derived class (the {@link LevenbergMarquardtOptimizer
+     * Levenberg-Marquardt optimizer} does this).
+     */
+    protected double[][] weightedResidualJacobian;
+    /** Number of columns of the jacobian matrix. */
+    protected int cols;
+    /** Number of rows of the jacobian matrix. */
+    protected int rows;
+    /** Current point. */
+    protected double[] point;
+    /** Current objective function value. */
+    protected double[] objective;
+    /** Current residuals. */
+    protected double[] residuals;
+    /** Weighted residuals */
+    protected double[] weightedResiduals;
+    /** Cost value (square root of the sum of the residuals). */
+    protected double cost;
+    /** Objective function derivatives. */
+    private MultivariateMatrixFunction jF;
+    /** Number of evaluations of the Jacobian. */
+    private int jacobianEvaluations;
+
+    /**
+     * Simple constructor with default settings.
+     * The convergence check is set to a {@link
+     * org.apache.commons.math.optimization.SimpleVectorialValueChecker}.
+     */
+<span class="fc" id="L88">    protected AbstractLeastSquaresOptimizer() {}</span>
+    /**
+     * @param checker Convergence checker.
+     */
+    protected AbstractLeastSquaresOptimizer(ConvergenceChecker&lt;VectorialPointValuePair&gt; checker) {
+<span class="fc" id="L93">        super(checker);</span>
+<span class="fc" id="L94">    }</span>
+
+    /**
+     * @return the number of evaluations of the Jacobian function.
+     */
+    public int getJacobianEvaluations() {
+<span class="fc" id="L100">        return jacobianEvaluations;</span>
+    }
+
+    /**
+     * Update the jacobian matrix.
+     *
+     * @throws DimensionMismatchException if the Jacobian dimension does not
+     * match problem dimension.
+     */
+    protected void updateJacobian() {
+<span class="fc" id="L110">        ++jacobianEvaluations;</span>
+<span class="fc" id="L111">        weightedResidualJacobian = jF.value(point);</span>
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">        if (weightedResidualJacobian.length != rows) {</span>
+<span class="nc" id="L113">            throw new DimensionMismatchException(weightedResidualJacobian.length, rows);</span>
+        }
+
+<span class="fc" id="L116">        final double[] residualsWeights = getWeightRef();</span>
+
+<span class="fc bfc" id="L118" title="All 2 branches covered.">        for (int i = 0; i &lt; rows; i++) {</span>
+<span class="fc" id="L119">            final double[] ji = weightedResidualJacobian[i];</span>
+<span class="fc" id="L120">            double wi = FastMath.sqrt(residualsWeights[i]);</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">            for (int j = 0; j &lt; cols; ++j) {</span>
+                //ji[j] *=  -1.0;
+<span class="fc" id="L123">                weightedResidualJacobian[i][j] = -ji[j]*wi;</span>
+            }
+        }
+<span class="fc" id="L126">    }</span>
+
+    /**
+     * Update the residuals array and cost function value.
+     * @throws DimensionMismatchException if the dimension does not match the
+     * problem dimension.
+     * @throws org.apache.commons.math.exception.TooManyEvaluationsException
+     * if the maximal number of evaluations is exceeded.
+     */
+    protected void updateResidualsAndCost() {
+<span class="fc" id="L136">        objective = computeObjectiveValue(point);</span>
+<span class="fc bfc" id="L137" title="All 2 branches covered.">        if (objective.length != rows) {</span>
+<span class="fc" id="L138">            throw new DimensionMismatchException(objective.length, rows);</span>
+        }
+
+<span class="fc" id="L141">        final double[] targetValues = getTargetRef();</span>
+<span class="fc" id="L142">        final double[] residualsWeights = getWeightRef();</span>
+
+<span class="fc" id="L144">        cost = 0;</span>
+<span class="fc bfc" id="L145" title="All 2 branches covered.">        for (int i = 0; i &lt; rows; i++) {</span>
+<span class="fc" id="L146">            final double residual = targetValues[i] - objective[i];</span>
+<span class="fc" id="L147">            weightedResiduals[i]= residual*FastMath.sqrt(residualsWeights[i]);</span>
+<span class="fc" id="L148">            cost += residualsWeights[i] * residual * residual;</span>
+        }
+<span class="fc" id="L150">        cost = FastMath.sqrt(cost);</span>
+<span class="fc" id="L151">    }</span>
+
+    /**
+     * Get the Root Mean Square value.
+     * Get the Root Mean Square value, i.e. the root of the arithmetic
+     * mean of the square of all weighted residuals. This is related to the
+     * criterion that is minimized by the optimizer as follows: if
+     * &lt;em&gt;c&lt;/em&gt; if the criterion, and &lt;em&gt;n&lt;/em&gt; is the number of
+     * measurements, then the RMS is &lt;em&gt;sqrt (c/n)&lt;/em&gt;.
+     *
+     * @return RMS value
+     */
+    public double getRMS() {
+<span class="fc" id="L164">        return FastMath.sqrt(getChiSquare() / rows);</span>
+    }
+
+    /**
+     * Get a Chi-Square-like value assuming the N residuals follow N
+     * distinct normal distributions centered on 0 and whose variances are
+     * the reciprocal of the weights.
+     * @return chi-square value
+     */
+    public double getChiSquare() {
+<span class="fc" id="L174">        return cost * cost;</span>
+    }
+
+    /**
+     * Get the covariance matrix of the optimized parameters.
+     *
+     * @return the covariance matrix.
+     * @throws org.apache.commons.math.linear.SingularMatrixException
+     * if the covariance matrix cannot be computed (singular problem).
+     */
+    public double[][] getCovariances() {
+<span class="fc" id="L185">        return getCovariances(DEFAULT_SINGULARITY_THRESHOLD);</span>
+    }
+
+    /**
+     * Get the covariance matrix of the optimized parameters.
+     *
+     * @param threshold Singularity threshold.
+     * @return the covariance matrix.
+     * @throws org.apache.commons.math.linear.SingularMatrixException
+     * if the covariance matrix cannot be computed (singular problem).
+     */
+    public double[][] getCovariances(double threshold) {
+        // Set up the jacobian.
+<span class="fc" id="L198">        updateJacobian();</span>
+
+        // Compute transpose(J)J, without building intermediate matrices.
+<span class="fc" id="L201">        double[][] jTj = new double[cols][cols];</span>
+<span class="fc bfc" id="L202" title="All 2 branches covered.">        for (int i = 0; i &lt; cols; ++i) {</span>
+<span class="fc bfc" id="L203" title="All 2 branches covered.">            for (int j = i; j &lt; cols; ++j) {</span>
+<span class="fc" id="L204">                double sum = 0;</span>
+<span class="fc bfc" id="L205" title="All 2 branches covered.">                for (int k = 0; k &lt; rows; ++k) {</span>
+<span class="fc" id="L206">                    sum += weightedResidualJacobian[k][i] * weightedResidualJacobian[k][j];</span>
+                }
+<span class="fc" id="L208">                jTj[i][j] = sum;</span>
+<span class="fc" id="L209">                jTj[j][i] = sum;</span>
+            }
+        }
+
+        // Compute the covariances matrix.
+<span class="fc" id="L214">        final DecompositionSolver solver</span>
+<span class="fc" id="L215">            = new LUDecomposition(MatrixUtils.createRealMatrix(jTj), threshold).getSolver();</span>
+<span class="fc" id="L216">        return solver.getInverse().getData();</span>
+    }
+
+    /**
+     * Guess the errors in optimized parameters.
+     * Guessing is covariance-based: It only gives a rough order of magnitude.
+     *
+     * @return errors in optimized parameters
+     * @throws org.apache.commons.math.linear.SingularMatrixException
+     * if the covariances matrix cannot be computed.
+     * @throws NumberIsTooSmallException if the number of degrees of freedom is not
+     * positive, i.e. the number of measurements is less or equal to the number of
+     * parameters.
+     */
+    public double[] guessParametersErrors() {
+<span class="fc bfc" id="L231" title="All 2 branches covered.">        if (rows &lt;= cols) {</span>
+<span class="fc" id="L232">            throw new NumberIsTooSmallException(LocalizedFormats.NO_DEGREES_OF_FREEDOM,</span>
+<span class="fc" id="L233">                                                rows, cols, false);</span>
+        }
+<span class="fc" id="L235">        double[] errors = new double[cols];</span>
+<span class="fc" id="L236">        final double c = FastMath.sqrt(getChiSquare() / (rows - cols));</span>
+<span class="fc" id="L237">        double[][] covar = getCovariances();</span>
+<span class="fc bfc" id="L238" title="All 2 branches covered.">        for (int i = 0; i &lt; errors.length; ++i) {</span>
+<span class="fc" id="L239">            errors[i] = FastMath.sqrt(covar[i][i]) * c;</span>
+        }
+<span class="fc" id="L241">        return errors;</span>
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public VectorialPointValuePair optimize(int maxEval,
+                                            final DifferentiableMultivariateVectorFunction f,
+                                            final double[] target, final double[] weights,
+                                            final double[] startPoint) {
+        // Reset counter.
+<span class="fc" id="L251">        jacobianEvaluations = 0;</span>
+
+        // Store least squares problem characteristics.
+<span class="fc" id="L254">        jF = f.jacobian();</span>
+<span class="fc" id="L255">        this.residuals = new double[target.length];</span>
+
+        // Arrays shared with the other private methods.
+<span class="fc" id="L258">        point = startPoint.clone();</span>
+<span class="fc" id="L259">        rows = target.length;</span>
+<span class="fc" id="L260">        cols = point.length;</span>
+
+<span class="fc" id="L262">        weightedResidualJacobian = new double[rows][cols];</span>
+<span class="fc" id="L263">        this.weightedResiduals = new double[rows];</span>
+
+<span class="fc" id="L265">        cost = Double.POSITIVE_INFINITY;</span>
+
+<span class="fc" id="L267">        return super.optimize(maxEval, f, target, weights, startPoint);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

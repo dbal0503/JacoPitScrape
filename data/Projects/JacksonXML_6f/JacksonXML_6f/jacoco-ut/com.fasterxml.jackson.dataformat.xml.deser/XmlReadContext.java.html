@@ -1,0 +1,225 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>XmlReadContext.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Jackson-dataformat-XML</a> &gt; <a href="index.source.html" class="el_package">com.fasterxml.jackson.dataformat.xml.deser</a> &gt; <span class="el_source">XmlReadContext.java</span></div><h1>XmlReadContext.java</h1><pre class="source lang-java linenums">package com.fasterxml.jackson.dataformat.xml.deser;
+
+import java.util.Set;
+
+import com.fasterxml.jackson.core.*;
+import com.fasterxml.jackson.core.io.CharTypes;
+
+/**
+ * Extension of {@link JsonStreamContext}, which implements
+ * core methods needed, and adds small amount of additional
+ * state data we need.
+ *&lt;p&gt;
+ * Almost same as standard &lt;code&gt;JsonReaderContext&lt;/code&gt;, but
+ * custom version needed to be able to keep track of names
+ * of properties that need wrapping; this is needed to
+ * support wrapped/unwrapped Collection/array values.
+ */
+public final class XmlReadContext
+    extends JsonStreamContext
+{
+    // // // Configuration
+
+    protected final XmlReadContext _parent;
+
+    // // // Location information (minus source reference)
+
+    protected int _lineNr;
+    protected int _columnNr;
+
+    protected String _currentName;
+
+    /**
+     * @since 2.9
+     */
+    protected Object _currentValue;
+
+    protected Set&lt;String&gt; _namesToWrap;
+
+    /**
+     * Name of property that requires wrapping
+     */
+    protected String _wrappedName;
+
+    /*
+    /**********************************************************
+    /* Simple instance reuse slots; speeds up things
+    /* a bit (10-15%) for docs with lots of small
+    /* arrays/objects (for which allocation was
+    /* visible in profile stack frames)
+    /**********************************************************
+     */
+
+<span class="fc" id="L53">    protected XmlReadContext _child = null;</span>
+
+    /*
+    /**********************************************************
+    /* Instance construction, reuse
+    /**********************************************************
+     */
+
+    public XmlReadContext(XmlReadContext parent, int type, int lineNr, int colNr)
+    {
+<span class="fc" id="L63">        super();</span>
+<span class="fc" id="L64">        _type = type;</span>
+<span class="fc" id="L65">        _parent = parent;</span>
+<span class="fc" id="L66">        _lineNr = lineNr;</span>
+<span class="fc" id="L67">        _columnNr = colNr;</span>
+<span class="fc" id="L68">        _index = -1;</span>
+<span class="fc" id="L69">    }</span>
+
+    protected final void reset(int type, int lineNr, int colNr)
+    {
+<span class="fc" id="L73">        _type = type;</span>
+<span class="fc" id="L74">        _index = -1;</span>
+<span class="fc" id="L75">        _lineNr = lineNr;</span>
+<span class="fc" id="L76">        _columnNr = colNr;</span>
+<span class="fc" id="L77">        _currentName = null;</span>
+<span class="fc" id="L78">        _currentValue = null;</span>
+<span class="fc" id="L79">        _namesToWrap = null;</span>
+<span class="fc" id="L80">    }</span>
+
+    @Override
+    public Object getCurrentValue() {
+<span class="fc" id="L84">        return _currentValue;</span>
+    }
+
+    @Override
+    public void setCurrentValue(Object v) {
+<span class="fc" id="L89">        _currentValue = v;</span>
+<span class="fc" id="L90">    }</span>
+
+    /*
+    /**********************************************************
+    /* Factory methods
+    /**********************************************************
+     */
+
+    public static XmlReadContext createRootContext(int lineNr, int colNr) {
+<span class="fc" id="L99">        return new XmlReadContext(null, TYPE_ROOT, lineNr, colNr);</span>
+    }
+
+    public static XmlReadContext createRootContext() {
+<span class="nc" id="L103">        return new XmlReadContext(null, TYPE_ROOT, 1, 0);</span>
+    }
+    
+    public final XmlReadContext createChildArrayContext(int lineNr, int colNr)
+    {
+<span class="nc" id="L108">        XmlReadContext ctxt = _child;</span>
+<span class="nc bnc" id="L109" title="All 2 branches missed.">        if (ctxt == null) {</span>
+<span class="nc" id="L110">            _child = ctxt = new XmlReadContext(this, TYPE_ARRAY, lineNr, colNr);</span>
+<span class="nc" id="L111">            return ctxt;</span>
+        }
+<span class="nc" id="L113">        ctxt.reset(TYPE_ARRAY, lineNr, colNr);</span>
+<span class="nc" id="L114">        return ctxt;</span>
+    }
+
+    public final XmlReadContext createChildObjectContext(int lineNr, int colNr)
+    {
+<span class="fc" id="L119">        XmlReadContext ctxt = _child;</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">        if (ctxt == null) {</span>
+<span class="fc" id="L121">            _child = ctxt = new XmlReadContext(this, TYPE_OBJECT, lineNr, colNr);</span>
+<span class="fc" id="L122">            return ctxt;</span>
+        }
+<span class="fc" id="L124">        ctxt.reset(TYPE_OBJECT, lineNr, colNr);</span>
+<span class="fc" id="L125">        return ctxt;</span>
+    }
+
+    /*
+    /**********************************************************
+    /* Abstract method implementation
+    /**********************************************************
+     */
+
+    @Override
+<span class="fc" id="L135">    public final String getCurrentName() { return _currentName; }</span>
+
+    // @since 2.9
+<span class="nc bnc" id="L138" title="All 2 branches missed.">    @Override public boolean hasCurrentName() { return _currentName != null; }</span>
+
+    @Override
+<span class="fc" id="L141">    public final XmlReadContext getParent() { return _parent; }</span>
+
+    /*
+    /**********************************************************
+    /* State changes
+    /**********************************************************
+     */
+
+    public final boolean expectComma() {
+<span class="nc" id="L150">        throw new UnsupportedOperationException();</span>
+    }
+
+    public void setCurrentName(String name) {
+<span class="fc" id="L154">        _currentName = name;</span>
+<span class="fc" id="L155">    }</span>
+
+    /*
+    /**********************************************************
+    /* Extended API
+    /**********************************************************
+     */
+
+    /**
+     * @return Location pointing to the point where the context
+     *   start marker was found
+     */
+    @Override
+    public final JsonLocation getStartLocation(Object srcRef) {
+        // We don't keep track of offsets at this level (only reader does)
+<span class="nc" id="L170">        long totalChars = -1L;</span>
+
+<span class="nc" id="L172">        return new JsonLocation(srcRef, totalChars, _lineNr, _columnNr);</span>
+    }
+
+    public void setNamesToWrap(Set&lt;String&gt; namesToWrap) {
+<span class="fc" id="L176">        _namesToWrap = namesToWrap;</span>
+<span class="fc" id="L177">    }</span>
+
+    public Set&lt;String&gt; getNamesToWrap() { 
+<span class="fc" id="L180">        return _namesToWrap;</span>
+    }
+
+    protected void convertToArray() {
+<span class="fc" id="L184">        _type = TYPE_ARRAY;</span>
+<span class="fc" id="L185">    }</span>
+    
+    /*
+    /**********************************************************
+    /* Overridden standard methods
+    /**********************************************************
+     */
+
+    /**
+     * Overridden to provide developer readable &quot;JsonPath&quot; representation
+     * of the context.
+     */
+    @Override
+    public final String toString()
+    {
+<span class="nc" id="L200">        StringBuilder sb = new StringBuilder(64);</span>
+<span class="nc bnc" id="L201" title="All 4 branches missed.">        switch (_type) {</span>
+        case TYPE_ROOT:
+<span class="nc" id="L203">            sb.append(&quot;/&quot;);</span>
+<span class="nc" id="L204">            break;</span>
+        case TYPE_ARRAY:
+<span class="nc" id="L206">            sb.append('[');</span>
+<span class="nc" id="L207">            sb.append(getCurrentIndex());</span>
+<span class="nc" id="L208">            sb.append(']');</span>
+<span class="nc" id="L209">            break;</span>
+        case TYPE_OBJECT:
+<span class="nc" id="L211">            sb.append('{');</span>
+<span class="nc bnc" id="L212" title="All 2 branches missed.">            if (_currentName != null) {</span>
+<span class="nc" id="L213">                sb.append('&quot;');</span>
+<span class="nc" id="L214">                CharTypes.appendQuoted(sb, _currentName);</span>
+<span class="nc" id="L215">                sb.append('&quot;');</span>
+            } else {
+<span class="nc" id="L217">                sb.append('?');</span>
+            }
+<span class="nc" id="L219">            sb.append('}');</span>
+            break;
+        }
+<span class="nc" id="L222">        return sb.toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

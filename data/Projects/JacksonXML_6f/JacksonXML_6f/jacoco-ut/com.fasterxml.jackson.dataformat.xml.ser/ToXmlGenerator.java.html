@@ -1,0 +1,1312 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ToXmlGenerator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Jackson-dataformat-XML</a> &gt; <a href="index.source.html" class="el_package">com.fasterxml.jackson.dataformat.xml.ser</a> &gt; <span class="el_source">ToXmlGenerator.java</span></div><h1>ToXmlGenerator.java</h1><pre class="source lang-java linenums">package com.fasterxml.jackson.dataformat.xml.ser;
+
+import java.io.*;
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.util.*;
+
+import javax.xml.namespace.QName;
+import javax.xml.stream.XMLStreamException;
+import javax.xml.stream.XMLStreamWriter;
+
+import org.codehaus.stax2.XMLStreamWriter2;
+import org.codehaus.stax2.ri.Stax2WriterAdapter;
+
+import com.fasterxml.jackson.core.*;
+import com.fasterxml.jackson.core.base.GeneratorBase;
+import com.fasterxml.jackson.core.io.IOContext;
+import com.fasterxml.jackson.core.json.JsonWriteContext;
+import com.fasterxml.jackson.dataformat.xml.XmlPrettyPrinter;
+import com.fasterxml.jackson.dataformat.xml.util.DefaultXmlPrettyPrinter;
+import com.fasterxml.jackson.dataformat.xml.util.StaxUtil;
+
+/**
+ * {@link JsonGenerator} that outputs JAXB-style XML output instead of JSON content.
+ * Operation requires calling code (usually either standard Jackson serializers,
+ * or in some cases (like &lt;code&gt;BeanSerializer&lt;/code&gt;) customised ones) to do
+ * additional configuration calls beyond regular {@link JsonGenerator} API,
+ * mostly to pass namespace information.
+ */
+public final class ToXmlGenerator
+    extends GeneratorBase
+{
+    /**
+     * If we support optional definition of element names, this is the element
+     * name to use...
+     */
+    protected final static String DEFAULT_UNKNOWN_ELEMENT = &quot;unknown&quot;;
+    
+    /**
+     * Enumeration that defines all togglable extra XML-specific features
+     */
+<span class="fc" id="L42">    public enum Feature implements FormatFeature</span>
+    {
+        /**
+         * Feature that controls whether XML declaration should be written before
+         * when generator is initialized (true) or not (false)
+         */
+<span class="fc" id="L48">        WRITE_XML_DECLARATION(false),</span>
+
+        /**
+         * Feature that controls whether output should be done as XML 1.1; if so,
+         * certain aspects may differ from default (1.0) processing: for example,
+         * XML declaration will be automatically added (regardless of setting
+         * &lt;code&gt;WRITE_XML_DECLARATION&lt;/code&gt;) as this is required for reader to
+         * know to use 1.1 compliant handling. XML 1.1 can be used to allow quoted
+         * control characters (Ascii codes 0 through 31) as well as additional linefeeds
+         * and name characters.
+         */
+<span class="fc" id="L59">        WRITE_XML_1_1(false)</span>
+        ;
+
+        final boolean _defaultState;
+        final int _mask;
+
+        /**
+         * Method that calculates bit set (flags) of all features that
+         * are enabled by default.
+         */
+        public static int collectDefaults()
+        {
+<span class="fc" id="L71">            int flags = 0;</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">            for (Feature f : values()) {</span>
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">                if (f.enabledByDefault()) {</span>
+<span class="nc" id="L74">                    flags |= f.getMask();</span>
+                }
+            }
+<span class="fc" id="L77">            return flags;</span>
+        }
+
+<span class="fc" id="L80">        private Feature(boolean defaultState) {</span>
+<span class="fc" id="L81">            _defaultState = defaultState;</span>
+<span class="fc" id="L82">            _mask = (1 &lt;&lt; ordinal());</span>
+<span class="fc" id="L83">        }</span>
+
+<span class="fc" id="L85">        @Override public boolean enabledByDefault() { return _defaultState; }</span>
+<span class="fc" id="L86">        @Override public int getMask() { return _mask; }</span>
+<span class="fc bfc" id="L87" title="All 2 branches covered.">        @Override public boolean enabledIn(int flags) { return (flags &amp; getMask()) != 0; }</span>
+    }
+
+    /*
+    /**********************************************************
+    /* Configuration
+    /**********************************************************
+     */
+
+    final protected XMLStreamWriter2 _xmlWriter;
+
+    final protected XMLStreamWriter _originalXmlWriter;
+    
+    /**
+     * Marker flag set if the underlying stream writer has to emulate
+     * Stax2 API: this is problematic if trying to use {@link #writeRaw} calls.
+     */
+    final protected boolean _stax2Emulation;
+    
+    final protected IOContext _ioContext;
+
+    /**
+     * Bit flag composed of bits that indicate which
+     * {@link ToXmlGenerator.Feature}s
+     * are enabled.
+     */
+    protected int _formatFeatures;
+
+    /**
+     * We may need to use XML-specific indentation as well
+     */
+    protected XmlPrettyPrinter _xmlPrettyPrinter;
+    
+    /*
+    /**********************************************************
+    /* XML Output state
+    /**********************************************************
+     */
+
+    /**
+     * Marker set when {@link #initGenerator()} has been called or not.
+     * 
+     * @since 2.2
+     */
+    protected boolean _initialized;
+    
+    /**
+     * Element or attribute name to use for next output call.
+     * Assigned by either code that initiates serialization
+     * or bean serializer.
+     */
+<span class="fc" id="L138">    protected QName _nextName = null;</span>
+
+    /**
+     * Marker flag that indicates whether next name to write
+     * implies an attribute (true) or element (false)
+     */
+<span class="fc" id="L144">    protected boolean _nextIsAttribute = false;</span>
+
+    /**
+     * Marker flag used to indicate that the next write of a (property)
+     * value should be done without using surrounding start/end
+     * elements. Flag is to be cleared once unwrapping has been triggered
+     * once.
+     */
+<span class="fc" id="L152">    protected boolean _nextIsUnwrapped = false;</span>
+
+    /**
+     * Marker flag used to indicate that the next write of a (property)
+     * value should be as CData
+     */
+<span class="fc" id="L158">    protected boolean _nextIsCData = false;</span>
+    
+    /**
+     * To support proper serialization of arrays it is necessary to keep
+     * stack of element names, so that we can &quot;revert&quot; to earlier 
+     */
+<span class="fc" id="L164">    protected LinkedList&lt;QName&gt; _elementNameStack = new LinkedList&lt;QName&gt;();</span>
+    
+    /*
+    /**********************************************************
+    /* Life-cycle
+    /**********************************************************
+     */
+
+    public ToXmlGenerator(IOContext ctxt, int stdFeatures, int xmlFeatures,
+            ObjectCodec codec, XMLStreamWriter sw)
+    {
+<span class="fc" id="L175">        super(stdFeatures, codec);</span>
+<span class="fc" id="L176">        _formatFeatures = xmlFeatures;</span>
+<span class="fc" id="L177">        _ioContext = ctxt;</span>
+<span class="fc" id="L178">        _originalXmlWriter = sw;</span>
+<span class="fc" id="L179">        _xmlWriter = Stax2WriterAdapter.wrapIfNecessary(sw);</span>
+<span class="pc bpc" id="L180" title="1 of 2 branches missed.">        _stax2Emulation = (_xmlWriter != sw);</span>
+<span class="pc bpc" id="L181" title="1 of 2 branches missed.">        _xmlPrettyPrinter = (_cfgPrettyPrinter instanceof XmlPrettyPrinter) ?</span>
+<span class="pc" id="L182">        		(XmlPrettyPrinter) _cfgPrettyPrinter : null;</span>
+<span class="fc" id="L183">    }</span>
+
+    /**
+     * Method called before writing any other output, to optionally
+     * output XML declaration.
+     */
+    public void initGenerator()  throws IOException
+    {
+<span class="fc bfc" id="L191" title="All 2 branches covered.">        if (_initialized) {</span>
+<span class="fc" id="L192">            return;</span>
+        }
+<span class="fc" id="L194">        _initialized = true;</span>
+        try {
+<span class="fc bfc" id="L196" title="All 2 branches covered.">            if (Feature.WRITE_XML_1_1.enabledIn(_formatFeatures)) {</span>
+<span class="fc" id="L197">                _xmlWriter.writeStartDocument(&quot;UTF-8&quot;, &quot;1.1&quot;);</span>
+<span class="fc bfc" id="L198" title="All 2 branches covered.">            } else if (Feature.WRITE_XML_DECLARATION.enabledIn(_formatFeatures)) {</span>
+<span class="fc" id="L199">                _xmlWriter.writeStartDocument(&quot;UTF-8&quot;, &quot;1.0&quot;);</span>
+            } else {
+<span class="fc" id="L201">                return;</span>
+            }
+            // as per [dataformat-xml#172], try adding indentation
+<span class="pc bpc" id="L204" title="1 of 2 branches missed.">            if (_xmlPrettyPrinter != null) {</span>
+                // ... but only if it is likely to succeed:
+<span class="nc bnc" id="L206" title="All 2 branches missed.">                if (!_stax2Emulation) {</span>
+<span class="nc" id="L207">                    _xmlPrettyPrinter.writePrologLinefeed(_xmlWriter);</span>
+                }
+            }
+<span class="nc" id="L210">        } catch (XMLStreamException e) {</span>
+<span class="nc" id="L211">            StaxUtil.throwAsGenerationException(e, this);</span>
+<span class="fc" id="L212">        }</span>
+<span class="fc" id="L213">    }</span>
+
+    /*
+    /**********************************************************
+    /* Overridden methods, configuration
+    /**********************************************************
+     */
+
+    @Override
+    protected PrettyPrinter _constructDefaultPrettyPrinter() {
+<span class="nc" id="L223">        return new DefaultXmlPrettyPrinter();</span>
+    }
+
+    @Override
+    public JsonGenerator setPrettyPrinter(PrettyPrinter pp) {
+<span class="fc" id="L228">        _cfgPrettyPrinter = pp;</span>
+<span class="pc bpc" id="L229" title="1 of 2 branches missed.">        _xmlPrettyPrinter = (pp instanceof XmlPrettyPrinter) ?</span>
+<span class="pc" id="L230">               (XmlPrettyPrinter) pp : null;</span>
+<span class="fc" id="L231">        return this;</span>
+    }
+
+    @Override
+    public Object getOutputTarget() {
+        // Stax2 does not expose underlying target, so best we can do is to return
+        // the Stax XMLStreamWriter instance:
+<span class="nc" id="L238">        return _originalXmlWriter;</span>
+    }
+
+    /**
+     * Stax2 does not expose buffered content amount, so we can only return
+     * &lt;code&gt;-1&lt;/code&gt; from here
+     */
+    @Override
+    public int getOutputBuffered() {
+<span class="nc" id="L247">        return -1;</span>
+    }
+
+    @Override
+    public int getFormatFeatures() {
+<span class="nc" id="L252">        return _formatFeatures;</span>
+    }
+
+    @Override // since 2.7
+    public JsonGenerator overrideFormatFeatures(int values, int mask)
+    {
+<span class="nc" id="L258">        int oldF = _formatFeatures;</span>
+<span class="nc" id="L259">        int newF = (_formatFeatures &amp; ~mask) | (values &amp; mask);</span>
+
+<span class="nc bnc" id="L261" title="All 2 branches missed.">        if (oldF != newF) {</span>
+<span class="nc" id="L262">            _formatFeatures = newF;</span>
+        }
+<span class="nc" id="L264">        return this;</span>
+    }
+
+    /*
+    /**********************************************************
+    /* Extended API, configuration
+    /**********************************************************
+     */
+
+    public ToXmlGenerator enable(Feature f) {
+<span class="nc" id="L274">        _formatFeatures |= f.getMask();</span>
+<span class="nc" id="L275">        return this;</span>
+    }
+
+    public ToXmlGenerator disable(Feature f) {
+<span class="nc" id="L279">        _formatFeatures &amp;= ~f.getMask();</span>
+<span class="nc" id="L280">        return this;</span>
+    }
+
+    public final boolean isEnabled(Feature f) {
+<span class="nc bnc" id="L284" title="All 2 branches missed.">        return (_formatFeatures &amp; f.getMask()) != 0;</span>
+    }
+
+    public ToXmlGenerator configure(Feature f, boolean state) {
+<span class="nc bnc" id="L288" title="All 2 branches missed.">        if (state) {</span>
+<span class="nc" id="L289">            enable(f);</span>
+        } else {
+<span class="nc" id="L291">            disable(f);</span>
+        }
+<span class="nc" id="L293">        return this;</span>
+    }
+
+    @Override
+<span class="nc" id="L297">    public boolean canWriteFormattedNumbers() { return true; }</span>
+
+    // @since 2.7.5
+    public boolean inRoot() {
+<span class="fc" id="L301">        return _writeContext.inRoot();</span>
+    }
+
+    /*
+    /**********************************************************
+    /* Extended API, access to some internal components
+    /**********************************************************
+     */
+
+    /**
+     * Method that allows application direct access to underlying
+     * Stax {@link XMLStreamWriter}. Note that use of writer is
+     * discouraged, and may interfere with processing of this writer;
+     * however, occasionally it may be necessary.
+     *&lt;p&gt;
+     * Note: writer instance will always be of type
+     * {@link org.codehaus.stax2.XMLStreamWriter2} (including
+     * Typed Access API) so upcasts are safe.
+     */
+    public XMLStreamWriter getStaxWriter() {
+<span class="fc" id="L321">        return _xmlWriter;</span>
+    }
+    
+    /*
+    /**********************************************************
+    /* Extended API, passing XML specific settings
+    /**********************************************************
+     */
+
+    public void setNextIsAttribute(boolean isAttribute)
+    {
+<span class="fc" id="L332">        _nextIsAttribute = isAttribute;</span>
+<span class="fc" id="L333">    }</span>
+
+    public void setNextIsUnwrapped(boolean isUnwrapped)
+    {
+<span class="fc" id="L337">        _nextIsUnwrapped = isUnwrapped;</span>
+<span class="fc" id="L338">    }</span>
+
+    public void setNextIsCData(boolean isCData)
+    {
+<span class="fc" id="L342">        _nextIsCData = isCData;</span>
+<span class="fc" id="L343">    }</span>
+    
+    public final void setNextName(QName name)
+    {
+<span class="fc" id="L347">        _nextName = name;</span>
+<span class="fc" id="L348">    }</span>
+
+    /**
+     * Method that does same as {@link #setNextName}, unless
+     * a name has already been set.
+     * 
+     * @since 2.1.2
+     */
+    public final boolean setNextNameIfMissing(QName name)
+    {
+<span class="fc bfc" id="L358" title="All 2 branches covered.">        if (_nextName == null) {</span>
+<span class="fc" id="L359">            _nextName = name;</span>
+<span class="fc" id="L360">            return true;</span>
+        }
+<span class="fc" id="L362">        return false;</span>
+    }
+    
+    /**
+     * Methdod called when a structured (collection, array, map) is being
+     * output.
+     * 
+     * @param wrapperName Element used as wrapper around elements, if any (null if none)
+     * @param wrappedName Element used around individual content items (can not
+     *   be null)
+     */
+    public void startWrappedValue(QName wrapperName, QName wrappedName) throws IOException
+    {
+<span class="pc bpc" id="L375" title="1 of 2 branches missed.">        if (wrapperName != null) {</span>
+            try {
+<span class="fc bfc" id="L377" title="All 2 branches covered.">                if (_xmlPrettyPrinter != null) {</span>
+<span class="fc" id="L378">                    _xmlPrettyPrinter.writeStartElement(_xmlWriter,</span>
+<span class="fc" id="L379">                            wrapperName.getNamespaceURI(), wrapperName.getLocalPart());</span>
+                } else {
+<span class="fc" id="L381">                    _xmlWriter.writeStartElement(wrapperName.getNamespaceURI(), wrapperName.getLocalPart());</span>
+                }
+<span class="nc" id="L383">            } catch (XMLStreamException e) {</span>
+<span class="nc" id="L384">                StaxUtil.throwAsGenerationException(e, this);</span>
+<span class="fc" id="L385">            }</span>
+        }
+<span class="fc" id="L387">        this.setNextName(wrappedName);</span>
+<span class="fc" id="L388">    }</span>
+
+    /**
+     * Method called after a structured collection output has completed
+     */
+    public void finishWrappedValue(QName wrapperName, QName wrappedName) throws IOException
+    {
+        // First: wrapper to close?
+<span class="pc bpc" id="L396" title="1 of 2 branches missed.">        if (wrapperName != null) {</span>
+            try {
+<span class="fc bfc" id="L398" title="All 2 branches covered.">                if (_xmlPrettyPrinter != null) {</span>
+<span class="fc" id="L399">                    _xmlPrettyPrinter.writeEndElement(_xmlWriter, _writeContext.getEntryCount());</span>
+                } else {
+<span class="fc" id="L401">                    _xmlWriter.writeEndElement();</span>
+                }
+<span class="nc" id="L403">            } catch (XMLStreamException e) {</span>
+<span class="nc" id="L404">                StaxUtil.throwAsGenerationException(e, this);</span>
+<span class="fc" id="L405">            }</span>
+        }
+<span class="fc" id="L407">    }</span>
+
+    /**
+     * Trivial helper method called when to add a replicated wrapper name
+     * 
+     * @since 2.2
+     */
+    public void writeRepeatedFieldName() throws IOException
+    {
+<span class="nc bnc" id="L416" title="All 2 branches missed.">        if (_writeContext.writeFieldName(_nextName.getLocalPart()) == JsonWriteContext.STATUS_EXPECT_VALUE) {</span>
+<span class="nc" id="L417">            _reportError(&quot;Can not write a field name, expecting a value&quot;);</span>
+        }
+<span class="nc" id="L419">    }</span>
+    
+    /*
+    /**********************************************************
+    /* JsonGenerator method overrides
+    /**********************************************************
+     */
+    
+    /* Most overrides in this section are just to make methods final,
+     * to allow better inlining...
+     */
+
+    @Override
+    public final void writeFieldName(String name) throws IOException
+    {
+<span class="pc bpc" id="L434" title="1 of 2 branches missed.">        if (_writeContext.writeFieldName(name) == JsonWriteContext.STATUS_EXPECT_VALUE) {</span>
+<span class="nc" id="L435">            _reportError(&quot;Can not write a field name, expecting a value&quot;);</span>
+        }
+        // Should this ever get called?
+<span class="pc bpc" id="L438" title="1 of 2 branches missed.">        String ns = (_nextName == null) ? &quot;&quot; : _nextName.getNamespaceURI();</span>
+<span class="fc" id="L439">        setNextName(new QName(ns, name));</span>
+<span class="fc" id="L440">    }</span>
+    
+    @Override
+    public final void writeStringField(String fieldName, String value) throws IOException
+    {
+<span class="fc" id="L445">        writeFieldName(fieldName);</span>
+<span class="fc" id="L446">        writeString(value);</span>
+<span class="fc" id="L447">    }</span>
+
+    // 03-Aug-2017, tatu: We could use this as mentioned in comment below BUT
+    //    since there is no counterpart for deserialization this will not
+    //    help us. Approaches that could/would help probably require different
+    //    handling...
+    //
+    //    See [dataformat-xml#4] for more context.
+    
+    /*
+    // @since 2.9
+    public WritableTypeId writeTypePrefix(WritableTypeId typeIdDef) throws IOException
+    {
+        // 03-Aug-2017, tatu: Due to XML oddities, we do need to massage things
+        //     a bit: specifically, change WRAPPER_ARRAY into WRAPPER_OBJECT, always
+        if (typeIdDef.include == WritableTypeId.Inclusion.WRAPPER_ARRAY) {
+            typeIdDef.include = WritableTypeId.Inclusion.WRAPPER_OBJECT;
+        }
+        return super.writeTypePrefix(typeIdDef);
+    }
+    */
+
+    /*
+    /**********************************************************
+    /* JsonGenerator output method implementations, structural
+    /**********************************************************
+     */
+
+    @Override
+    public final void writeStartArray() throws IOException
+    {
+<span class="fc" id="L478">        _verifyValueWrite(&quot;start an array&quot;);</span>
+<span class="fc" id="L479">        _writeContext = _writeContext.createChildArrayContext();</span>
+<span class="fc bfc" id="L480" title="All 2 branches covered.">        if (_cfgPrettyPrinter != null) {</span>
+<span class="fc" id="L481">            _cfgPrettyPrinter.writeStartArray(this);</span>
+        } else {
+            // nothing to do here; no-operation
+        }
+<span class="fc" id="L485">    }</span>
+    
+    @Override
+    public final void writeEndArray() throws IOException
+    {
+<span class="pc bpc" id="L490" title="1 of 2 branches missed.">        if (!_writeContext.inArray()) {</span>
+<span class="nc" id="L491">            _reportError(&quot;Current context not Array but &quot;+_writeContext.typeDesc());</span>
+        }
+<span class="fc bfc" id="L493" title="All 2 branches covered.">        if (_cfgPrettyPrinter != null) {</span>
+<span class="fc" id="L494">            _cfgPrettyPrinter.writeEndArray(this, _writeContext.getEntryCount());</span>
+        } else {
+            // nothing to do here; no-operation
+        }
+<span class="fc" id="L498">        _writeContext = _writeContext.getParent();</span>
+<span class="fc" id="L499">    }</span>
+
+    @Override
+    public final void writeStartObject() throws IOException
+    {
+<span class="fc" id="L504">        _verifyValueWrite(&quot;start an object&quot;);</span>
+<span class="fc" id="L505">        _writeContext = _writeContext.createChildObjectContext();</span>
+<span class="fc bfc" id="L506" title="All 2 branches covered.">        if (_cfgPrettyPrinter != null) {</span>
+<span class="fc" id="L507">            _cfgPrettyPrinter.writeStartObject(this);</span>
+        } else {
+<span class="fc" id="L509">            _handleStartObject();</span>
+        }
+<span class="fc" id="L511">    }</span>
+
+    @Override
+    public final void writeEndObject() throws IOException
+    {
+<span class="pc bpc" id="L516" title="1 of 2 branches missed.">        if (!_writeContext.inObject()) {</span>
+<span class="nc" id="L517">            _reportError(&quot;Current context not Object but &quot;+_writeContext.typeDesc());</span>
+        }
+<span class="fc" id="L519">        _writeContext = _writeContext.getParent();</span>
+<span class="fc bfc" id="L520" title="All 2 branches covered.">        if (_cfgPrettyPrinter != null) {</span>
+            // as per [Issue#45], need to suppress indentation if only attributes written:
+<span class="pc bpc" id="L522" title="1 of 2 branches missed.">            int count = _nextIsAttribute ? 0 : _writeContext.getEntryCount();</span>
+<span class="fc" id="L523">            _cfgPrettyPrinter.writeEndObject(this, count);</span>
+<span class="fc" id="L524">        } else {</span>
+<span class="fc" id="L525">            _handleEndObject();</span>
+        }
+<span class="fc" id="L527">    }</span>
+
+    // note: public just because pretty printer needs to make a callback
+    public final void _handleStartObject() throws IOException
+    {
+<span class="pc bpc" id="L532" title="1 of 2 branches missed.">        if (_nextName == null) {</span>
+<span class="nc" id="L533">            handleMissingName();</span>
+        }
+        // Need to keep track of names to make Lists work correctly
+<span class="fc" id="L536">        _elementNameStack.addLast(_nextName);</span>
+        try {
+<span class="fc" id="L538">            _xmlWriter.writeStartElement(_nextName.getNamespaceURI(), _nextName.getLocalPart());</span>
+<span class="nc" id="L539">        } catch (XMLStreamException e) {</span>
+<span class="nc" id="L540">            StaxUtil.throwAsGenerationException(e, this);</span>
+<span class="fc" id="L541">        }</span>
+<span class="fc" id="L542">    }</span>
+    
+    // note: public just because pretty printer needs to make a callback
+    public final void _handleEndObject() throws IOException
+    {
+        // We may want to repeat same element, so:
+<span class="pc bpc" id="L548" title="1 of 2 branches missed.">        if (_elementNameStack.isEmpty()) {</span>
+<span class="nc" id="L549">            throw new JsonGenerationException(&quot;Can not write END_ELEMENT without open START_ELEMENT&quot;, this);</span>
+        }
+<span class="fc" id="L551">        _nextName = _elementNameStack.removeLast();</span>
+        try {
+            // note: since attributes don't nest, can only have one attribute active, so:
+<span class="fc" id="L554">            _nextIsAttribute = false;</span>
+<span class="fc" id="L555">            _xmlWriter.writeEndElement();</span>
+            // [databind-xml#172]: possibly also need indentation
+<span class="fc bfc" id="L557" title="All 4 branches covered.">            if (_elementNameStack.isEmpty() &amp;&amp; (_xmlPrettyPrinter != null)) {</span>
+                // ... but only if it is likely to succeed:
+<span class="pc bpc" id="L559" title="1 of 2 branches missed.">                if (!_stax2Emulation) {</span>
+<span class="fc" id="L560">                    _xmlPrettyPrinter.writePrologLinefeed(_xmlWriter);</span>
+                }
+            }
+<span class="nc" id="L563">        } catch (XMLStreamException e) {</span>
+<span class="nc" id="L564">            StaxUtil.throwAsGenerationException(e, this);</span>
+<span class="fc" id="L565">        }</span>
+<span class="fc" id="L566">    }</span>
+    
+    /*
+    /**********************************************************
+    /* Output method implementations, textual
+    /**********************************************************
+     */
+
+    @Override
+    public void writeFieldName(SerializableString name) throws IOException
+    {
+<span class="fc" id="L577">        writeFieldName(name.getValue());</span>
+<span class="fc" id="L578">    }</span>
+    
+    @Override
+    public void writeString(String text) throws IOException
+    {
+<span class="fc" id="L583">        _verifyValueWrite(&quot;write String value&quot;);</span>
+<span class="pc bpc" id="L584" title="1 of 2 branches missed.">        if (_nextName == null) {</span>
+<span class="nc" id="L585">            handleMissingName();</span>
+        }
+        try {
+<span class="fc bfc" id="L588" title="All 2 branches covered.">            if (_nextIsAttribute) { // must write attribute name and value with one call</span>
+<span class="fc" id="L589">                _xmlWriter.writeAttribute(_nextName.getNamespaceURI(), _nextName.getLocalPart(), text);</span>
+<span class="fc bfc" id="L590" title="All 2 branches covered.">            } else if (checkNextIsUnwrapped()) {</span>
+                // [Issue#56] Should figure out how to prevent indentation for end element
+                //   but for now, let's just make sure structure is correct
+                //if (_xmlPrettyPrinter != null) { ... }
+<span class="pc bpc" id="L594" title="1 of 2 branches missed.">                if(_nextIsCData) {</span>
+<span class="nc" id="L595">                    _xmlWriter.writeCData(text);</span>
+                } else {
+<span class="fc" id="L597">                    _xmlWriter.writeCharacters(text);</span>
+                }
+<span class="fc bfc" id="L599" title="All 2 branches covered.">            } else if (_xmlPrettyPrinter != null) {</span>
+<span class="fc" id="L600">                _xmlPrettyPrinter.writeLeafElement(_xmlWriter,</span>
+<span class="fc" id="L601">                        _nextName.getNamespaceURI(), _nextName.getLocalPart(),</span>
+                        text, _nextIsCData);
+            } else {
+<span class="fc" id="L604">                _xmlWriter.writeStartElement(_nextName.getNamespaceURI(), _nextName.getLocalPart());</span>
+<span class="fc bfc" id="L605" title="All 2 branches covered.">                if(_nextIsCData) {</span>
+<span class="fc" id="L606">                    _xmlWriter.writeCData(text);</span>
+                } else {
+<span class="fc" id="L608">                    _xmlWriter.writeCharacters(text);</span>
+                }
+<span class="fc" id="L610">                _xmlWriter.writeEndElement();</span>
+            } 
+<span class="nc" id="L612">        } catch (XMLStreamException e) {</span>
+<span class="nc" id="L613">            StaxUtil.throwAsGenerationException(e, this);</span>
+<span class="fc" id="L614">        }</span>
+<span class="fc" id="L615">    }    </span>
+    
+    @Override
+    public void writeString(char[] text, int offset, int len) throws IOException
+    {
+<span class="nc" id="L620">        _verifyValueWrite(&quot;write String value&quot;);</span>
+<span class="nc bnc" id="L621" title="All 2 branches missed.">        if (_nextName == null) {</span>
+<span class="nc" id="L622">            handleMissingName();</span>
+        }
+        try {
+<span class="nc bnc" id="L625" title="All 2 branches missed.">            if (_nextIsAttribute) {</span>
+<span class="nc" id="L626">                _xmlWriter.writeAttribute(_nextName.getNamespaceURI(), _nextName.getLocalPart(), new String(text, offset, len));</span>
+<span class="nc bnc" id="L627" title="All 2 branches missed.">            } else if (checkNextIsUnwrapped()) {</span>
+            	// should we consider pretty-printing or not?
+<span class="nc bnc" id="L629" title="All 2 branches missed.">                if(_nextIsCData) {</span>
+<span class="nc" id="L630">                    _xmlWriter.writeCData(text, offset, len);</span>
+                } else {
+<span class="nc" id="L632">                    _xmlWriter.writeCharacters(text, offset, len);</span>
+                }
+<span class="nc bnc" id="L634" title="All 2 branches missed.">            } else if (_xmlPrettyPrinter != null) {</span>
+<span class="nc" id="L635">                _xmlPrettyPrinter.writeLeafElement(_xmlWriter,</span>
+<span class="nc" id="L636">                        _nextName.getNamespaceURI(), _nextName.getLocalPart(),</span>
+                        text, offset, len, _nextIsCData);
+            } else {
+<span class="nc" id="L639">                _xmlWriter.writeStartElement(_nextName.getNamespaceURI(), _nextName.getLocalPart());</span>
+<span class="nc bnc" id="L640" title="All 2 branches missed.">                if(_nextIsCData) {</span>
+<span class="nc" id="L641">                    _xmlWriter.writeCData(text, offset, len);</span>
+                } else {
+<span class="nc" id="L643">                    _xmlWriter.writeCharacters(text, offset, len);</span>
+                }
+<span class="nc" id="L645">                _xmlWriter.writeEndElement();</span>
+            }
+<span class="nc" id="L647">        } catch (XMLStreamException e) {</span>
+<span class="nc" id="L648">            StaxUtil.throwAsGenerationException(e, this);</span>
+<span class="nc" id="L649">        }</span>
+<span class="nc" id="L650">    }</span>
+
+    @Override
+    public void writeString(SerializableString text) throws IOException {
+<span class="fc" id="L654">        writeString(text.getValue());</span>
+<span class="fc" id="L655">    }</span>
+    
+    @Override
+    public void writeRawUTF8String(byte[] text, int offset, int length) throws IOException
+    {
+        // could add support for this case if we really want it (and can make Stax2 support it)
+<span class="nc" id="L661">        _reportUnsupportedOperation();</span>
+<span class="nc" id="L662">    }</span>
+
+    @Override
+    public void writeUTF8String(byte[] text, int offset, int length) throws IOException
+    {
+        // could add support for this case if we really want it (and can make Stax2 support it)
+<span class="nc" id="L668">        _reportUnsupportedOperation();</span>
+<span class="nc" id="L669">    }</span>
+
+    /*
+    /**********************************************************
+    /* Output method implementations, unprocessed (&quot;raw&quot;)
+    /**********************************************************
+     */
+
+    @Override
+    public void writeRawValue(String text) throws IOException {
+        // [dataformat-xml#39]
+<span class="pc bpc" id="L680" title="1 of 2 branches missed.">        if (_stax2Emulation) {</span>
+<span class="nc" id="L681">            _reportUnimplementedStax2(&quot;writeRawValue&quot;);</span>
+        }
+        try {
+<span class="fc" id="L684">            _verifyValueWrite(&quot;write raw value&quot;);</span>
+<span class="pc bpc" id="L685" title="1 of 2 branches missed.">            if (_nextName == null) {</span>
+<span class="nc" id="L686">                handleMissingName();</span>
+            }
+
+<span class="fc bfc" id="L689" title="All 2 branches covered.">            if (_nextIsAttribute) {</span>
+<span class="fc" id="L690">                _xmlWriter.writeAttribute(_nextName.getNamespaceURI(), _nextName.getLocalPart(), text);</span>
+            } else {
+<span class="fc" id="L692">                _xmlWriter.writeStartElement(_nextName.getNamespaceURI(), _nextName.getLocalPart());</span>
+<span class="fc" id="L693">                _xmlWriter.writeRaw(text);</span>
+<span class="fc" id="L694">                _xmlWriter.writeEndElement();</span>
+            }
+<span class="nc" id="L696">        } catch (XMLStreamException e) {</span>
+<span class="nc" id="L697">            StaxUtil.throwAsGenerationException(e, this);</span>
+<span class="fc" id="L698">        }</span>
+<span class="fc" id="L699">    }</span>
+
+    @Override
+    public void writeRawValue(String text, int offset, int len) throws IOException {
+        // [dataformat-xml#39]
+<span class="pc bpc" id="L704" title="1 of 2 branches missed.">        if (_stax2Emulation) {</span>
+<span class="nc" id="L705">            _reportUnimplementedStax2(&quot;writeRawValue&quot;);</span>
+        }
+        try {
+<span class="fc" id="L708">            _verifyValueWrite(&quot;write raw value&quot;);</span>
+<span class="pc bpc" id="L709" title="1 of 2 branches missed.">            if (_nextName == null) {</span>
+<span class="nc" id="L710">                handleMissingName();</span>
+            }
+
+<span class="fc bfc" id="L713" title="All 2 branches covered.">            if (_nextIsAttribute) {</span>
+<span class="fc" id="L714">                _xmlWriter.writeAttribute(_nextName.getNamespaceURI(), _nextName.getLocalPart(), text.substring(offset, offset + len));</span>
+            } else {
+<span class="fc" id="L716">                _xmlWriter.writeStartElement(_nextName.getNamespaceURI(), _nextName.getLocalPart());</span>
+<span class="fc" id="L717">                _xmlWriter.writeRaw(text, offset, len);</span>
+<span class="fc" id="L718">                _xmlWriter.writeEndElement();</span>
+            }
+<span class="nc" id="L720">        } catch (XMLStreamException e) {</span>
+<span class="nc" id="L721">            StaxUtil.throwAsGenerationException(e, this);</span>
+<span class="fc" id="L722">        }</span>
+<span class="fc" id="L723">    }</span>
+
+    @Override
+    public void writeRawValue(char[] text, int offset, int len) throws IOException {
+        // [dataformat-xml#39]
+<span class="pc bpc" id="L728" title="1 of 2 branches missed.">        if (_stax2Emulation) {</span>
+<span class="nc" id="L729">            _reportUnimplementedStax2(&quot;writeRawValue&quot;);</span>
+        }
+<span class="fc" id="L731">        _verifyValueWrite(&quot;write raw value&quot;);</span>
+<span class="pc bpc" id="L732" title="1 of 2 branches missed.">        if (_nextName == null) {</span>
+<span class="nc" id="L733">            handleMissingName();</span>
+        }
+        try {
+<span class="fc bfc" id="L736" title="All 2 branches covered.">            if (_nextIsAttribute) {</span>
+<span class="fc" id="L737">                _xmlWriter.writeAttribute(_nextName.getNamespaceURI(), _nextName.getLocalPart(), new String(text, offset, len));</span>
+            } else {
+<span class="fc" id="L739">                _xmlWriter.writeStartElement(_nextName.getNamespaceURI(), _nextName.getLocalPart());</span>
+<span class="fc" id="L740">                _xmlWriter.writeRaw(text, offset, len);</span>
+<span class="fc" id="L741">                _xmlWriter.writeEndElement();</span>
+            }
+<span class="nc" id="L743">        } catch (XMLStreamException e) {</span>
+<span class="nc" id="L744">            StaxUtil.throwAsGenerationException(e, this);</span>
+<span class="fc" id="L745">        }</span>
+<span class="fc" id="L746">    }</span>
+
+    @Override
+    public void writeRawValue(SerializableString text) throws IOException {
+<span class="nc" id="L750">        _reportUnsupportedOperation();</span>
+<span class="nc" id="L751">    }</span>
+
+    @Override
+    public void writeRaw(String text) throws IOException
+    {
+        // [dataformat-xml#39]
+<span class="pc bpc" id="L757" title="1 of 2 branches missed.">        if (_stax2Emulation) {</span>
+<span class="nc" id="L758">            _reportUnimplementedStax2(&quot;writeRaw&quot;);</span>
+        }
+        try {
+<span class="fc" id="L761">            _xmlWriter.writeRaw(text);</span>
+<span class="nc" id="L762">        } catch (XMLStreamException e) {</span>
+<span class="nc" id="L763">            StaxUtil.throwAsGenerationException(e, this);</span>
+<span class="fc" id="L764">        }</span>
+<span class="fc" id="L765">    }</span>
+
+    @Override
+    public void writeRaw(String text, int offset, int len) throws IOException
+    {
+        // [dataformat-xml#39]
+<span class="nc bnc" id="L771" title="All 2 branches missed.">        if (_stax2Emulation) {</span>
+<span class="nc" id="L772">            _reportUnimplementedStax2(&quot;writeRaw&quot;);</span>
+        }
+        try {
+<span class="nc" id="L775">            _xmlWriter.writeRaw(text, offset, len);</span>
+<span class="nc" id="L776">        } catch (XMLStreamException e) {</span>
+<span class="nc" id="L777">            StaxUtil.throwAsGenerationException(e, this);</span>
+<span class="nc" id="L778">        }</span>
+<span class="nc" id="L779">    }</span>
+
+    @Override
+    public void writeRaw(char[] text, int offset, int len) throws IOException
+    {
+        // [dataformat-xml#39]
+<span class="pc bpc" id="L785" title="1 of 2 branches missed.">        if (_stax2Emulation) {</span>
+<span class="nc" id="L786">            _reportUnimplementedStax2(&quot;writeRaw&quot;);</span>
+        }
+        try {
+<span class="fc" id="L789">            _xmlWriter.writeRaw(text, offset, len);</span>
+<span class="nc" id="L790">        } catch (XMLStreamException e) {</span>
+<span class="nc" id="L791">            StaxUtil.throwAsGenerationException(e, this);</span>
+<span class="fc" id="L792">        }</span>
+<span class="fc" id="L793">    }</span>
+
+    @Override
+    public void writeRaw(char c) throws IOException
+    {
+<span class="nc" id="L798">        writeRaw(String.valueOf(c));</span>
+<span class="nc" id="L799">    }</span>
+    
+    /*
+    /**********************************************************
+    /* Output method implementations, base64-encoded binary
+    /**********************************************************
+     */
+
+    @Override
+    public void writeBinary(Base64Variant b64variant,
+    		byte[] data, int offset, int len) throws IOException
+    {
+<span class="pc bpc" id="L811" title="1 of 2 branches missed.">        if (data == null) {</span>
+<span class="nc" id="L812">            writeNull();</span>
+<span class="nc" id="L813">            return;</span>
+        }
+<span class="fc" id="L815">        _verifyValueWrite(&quot;write Binary value&quot;);</span>
+<span class="pc bpc" id="L816" title="1 of 2 branches missed.">        if (_nextName == null) {</span>
+<span class="nc" id="L817">            handleMissingName();</span>
+        }
+        try {
+<span class="pc bpc" id="L820" title="1 of 2 branches missed.">            if (_nextIsAttribute) {</span>
+                // Stax2 API only has 'full buffer' write method:
+<span class="nc" id="L822">                byte[] fullBuffer = toFullBuffer(data, offset, len);</span>
+<span class="nc" id="L823">                _xmlWriter.writeBinaryAttribute(&quot;&quot;, _nextName.getNamespaceURI(), _nextName.getLocalPart(), fullBuffer);</span>
+<span class="pc bpc" id="L824" title="1 of 2 branches missed.">            } else if (checkNextIsUnwrapped()) {</span>
+            	// should we consider pretty-printing or not?
+<span class="nc" id="L826">                _xmlWriter.writeBinary(data, offset, len);</span>
+            } else {
+<span class="pc bpc" id="L828" title="1 of 2 branches missed.">                if (_xmlPrettyPrinter != null) {</span>
+<span class="nc" id="L829">                    _xmlPrettyPrinter.writeLeafElement(_xmlWriter,</span>
+<span class="nc" id="L830">                            _nextName.getNamespaceURI(), _nextName.getLocalPart(),</span>
+                            data, offset, len);
+                } else {
+<span class="fc" id="L833">                    _xmlWriter.writeStartElement(_nextName.getNamespaceURI(), _nextName.getLocalPart());</span>
+<span class="fc" id="L834">                    _xmlWriter.writeBinary(data, offset, len);</span>
+<span class="fc" id="L835">                    _xmlWriter.writeEndElement();</span>
+                }
+            }
+<span class="nc" id="L838">        } catch (XMLStreamException e) {</span>
+<span class="nc" id="L839">            StaxUtil.throwAsGenerationException(e, this);</span>
+<span class="fc" id="L840">        }</span>
+<span class="fc" id="L841">    }</span>
+
+    @Override
+    public int writeBinary(Base64Variant b64variant, InputStream data, int dataLength) throws IOException
+    {
+<span class="pc bpc" id="L846" title="1 of 2 branches missed.">        if (data == null) {</span>
+<span class="nc" id="L847">            writeNull();</span>
+<span class="nc" id="L848">            return 0;</span>
+        }
+<span class="fc" id="L850">        _verifyValueWrite(&quot;write Binary value&quot;);</span>
+<span class="pc bpc" id="L851" title="1 of 2 branches missed.">        if (_nextName == null) {</span>
+<span class="nc" id="L852">            handleMissingName();</span>
+        }
+        try {
+<span class="pc bpc" id="L855" title="1 of 2 branches missed.">            if (_nextIsAttribute) {</span>
+                // Stax2 API only has 'full buffer' write method:
+<span class="nc" id="L857">                byte[] fullBuffer = toFullBuffer(data, dataLength);</span>
+<span class="nc" id="L858">                _xmlWriter.writeBinaryAttribute(&quot;&quot;, _nextName.getNamespaceURI(), _nextName.getLocalPart(), fullBuffer);</span>
+<span class="pc bpc" id="L859" title="1 of 2 branches missed.">            } else if (checkNextIsUnwrapped()) {</span>
+              // should we consider pretty-printing or not?
+<span class="nc" id="L861">                writeStreamAsBinary(data, dataLength);</span>
+
+            } else {
+<span class="pc bpc" id="L864" title="1 of 2 branches missed.">                if (_xmlPrettyPrinter != null) {</span>
+<span class="nc" id="L865">                    _xmlPrettyPrinter.writeLeafElement(_xmlWriter,</span>
+<span class="nc" id="L866">                            _nextName.getNamespaceURI(), _nextName.getLocalPart(),</span>
+<span class="nc" id="L867">                            toFullBuffer(data, dataLength), 0, dataLength);</span>
+                } else {
+<span class="fc" id="L869">                    _xmlWriter.writeStartElement(_nextName.getNamespaceURI(), _nextName.getLocalPart());</span>
+<span class="fc" id="L870">                    writeStreamAsBinary(data, dataLength);</span>
+<span class="fc" id="L871">                    _xmlWriter.writeEndElement();</span>
+                }
+            }
+<span class="nc" id="L874">        } catch (XMLStreamException e) {</span>
+<span class="nc" id="L875">            StaxUtil.throwAsGenerationException(e, this);</span>
+<span class="fc" id="L876">        }</span>
+
+<span class="fc" id="L878">        return dataLength;</span>
+    }
+
+    private void writeStreamAsBinary(InputStream data, int len) throws IOException, XMLStreamException 
+    {
+        // base64 encodes up to 3 bytes into a 4 bytes string
+<span class="fc" id="L884">        byte[] tmp = new byte[3];</span>
+<span class="fc" id="L885">        int offset = 0;</span>
+        int read;
+<span class="fc bfc" id="L887" title="All 2 branches covered.">        while((read = data.read(tmp, offset, Math.min(3 - offset, len))) != -1) {</span>
+<span class="fc" id="L888">            offset += read;</span>
+<span class="fc" id="L889">            len -= read;</span>
+<span class="fc bfc" id="L890" title="All 2 branches covered.">            if(offset == 3) {</span>
+<span class="fc" id="L891">                offset = 0;</span>
+<span class="fc" id="L892">                _xmlWriter.writeBinary(tmp, 0, 3);</span>
+            }
+<span class="fc bfc" id="L894" title="All 2 branches covered.">            if (len == 0) {</span>
+<span class="fc" id="L895">                break;</span>
+            }
+        }
+
+        // we still have &lt; 3 bytes in the buffer
+<span class="fc bfc" id="L900" title="All 2 branches covered.">        if(offset &gt; 0) {</span>
+<span class="fc" id="L901">            _xmlWriter.writeBinary(tmp, 0, offset);</span>
+        }
+<span class="fc" id="L903">    }</span>
+
+    
+    private byte[] toFullBuffer(byte[] data, int offset, int len)
+    {
+        // might already be ok:
+<span class="nc bnc" id="L909" title="All 4 branches missed.">        if (offset == 0 &amp;&amp; len == data.length) {</span>
+<span class="nc" id="L910">            return data;</span>
+        }
+<span class="nc" id="L912">        byte[] result = new byte[len];</span>
+<span class="nc bnc" id="L913" title="All 2 branches missed.">        if (len &gt; 0) {</span>
+<span class="nc" id="L914">            System.arraycopy(data, offset, result, 0, len);</span>
+        }
+<span class="nc" id="L916">        return result;</span>
+    }
+
+    private byte[] toFullBuffer(InputStream data, final int len) throws IOException 
+    {
+<span class="nc" id="L921">        byte[] result = new byte[len];</span>
+<span class="nc" id="L922">        int offset = 0;</span>
+
+<span class="nc bnc" id="L924" title="All 2 branches missed.">        for (; offset &lt; len; ) {</span>
+<span class="nc" id="L925">            int count = data.read(result, offset, len - offset);</span>
+<span class="nc bnc" id="L926" title="All 2 branches missed.">            if (count &lt; 0) {</span>
+<span class="nc" id="L927">                _reportError(&quot;Too few bytes available: missing &quot;+(len - offset)+&quot; bytes (out of &quot;+len+&quot;)&quot;);</span>
+            }
+<span class="nc" id="L929">            offset += count;</span>
+<span class="nc" id="L930">        }</span>
+<span class="nc" id="L931">        return result;</span>
+    }
+
+    /*
+    /**********************************************************
+    /* Output method implementations, primitive
+    /**********************************************************
+     */
+
+    @Override
+    public void writeBoolean(boolean value) throws IOException
+    {
+<span class="fc" id="L943">        _verifyValueWrite(&quot;write boolean value&quot;);</span>
+<span class="pc bpc" id="L944" title="1 of 2 branches missed.">        if (_nextName == null) {</span>
+<span class="nc" id="L945">            handleMissingName();</span>
+        }
+        try {
+<span class="pc bpc" id="L948" title="1 of 2 branches missed.">            if (_nextIsAttribute) {</span>
+<span class="nc" id="L949">                _xmlWriter.writeBooleanAttribute(null, _nextName.getNamespaceURI(), _nextName.getLocalPart(), value);</span>
+<span class="pc bpc" id="L950" title="1 of 2 branches missed.">            } else if (checkNextIsUnwrapped()) {</span>
+            	// should we consider pretty-printing or not?
+<span class="nc" id="L952">                _xmlWriter.writeBoolean(value);</span>
+            } else {
+<span class="pc bpc" id="L954" title="1 of 2 branches missed.">                if (_xmlPrettyPrinter != null) {</span>
+<span class="nc" id="L955">                	_xmlPrettyPrinter.writeLeafElement(_xmlWriter,</span>
+<span class="nc" id="L956">                			_nextName.getNamespaceURI(), _nextName.getLocalPart(),</span>
+                			value);
+                } else {
+<span class="fc" id="L959">	                _xmlWriter.writeStartElement(_nextName.getNamespaceURI(), _nextName.getLocalPart());</span>
+<span class="fc" id="L960">	                _xmlWriter.writeBoolean(value);</span>
+<span class="fc" id="L961">	                _xmlWriter.writeEndElement();</span>
+                }
+            }
+<span class="nc" id="L964">        } catch (XMLStreamException e) {</span>
+<span class="nc" id="L965">            StaxUtil.throwAsGenerationException(e, this);</span>
+<span class="fc" id="L966">        }</span>
+<span class="fc" id="L967">    }</span>
+
+    @Override
+    public void writeNull() throws IOException
+    {
+<span class="fc" id="L972">        _verifyValueWrite(&quot;write null value&quot;);</span>
+<span class="pc bpc" id="L973" title="1 of 2 branches missed.">        if (_nextName == null) {</span>
+<span class="nc" id="L974">            handleMissingName();</span>
+        }
+        // !!! TODO: proper use of 'xsd:isNil' ?
+        try {
+<span class="fc bfc" id="L978" title="All 2 branches covered.">            if (_nextIsAttribute) {</span>
+                /* With attributes, best just leave it out, right? (since there's no way
+                 * to use 'xsi:nil')
+                 */
+<span class="pc bpc" id="L982" title="1 of 2 branches missed.">            } else if (checkNextIsUnwrapped()) {</span>
+            	// as with above, best left unwritten?
+            } else {
+<span class="fc bfc" id="L985" title="All 2 branches covered.">                if (_xmlPrettyPrinter != null) {</span>
+<span class="fc" id="L986">                	_xmlPrettyPrinter.writeLeafNullElement(_xmlWriter,</span>
+<span class="fc" id="L987">                			_nextName.getNamespaceURI(), _nextName.getLocalPart());</span>
+                } else {
+<span class="fc" id="L989">	            	_xmlWriter.writeEmptyElement(_nextName.getNamespaceURI(), _nextName.getLocalPart());</span>
+                }
+            }
+<span class="nc" id="L992">        } catch (XMLStreamException e) {</span>
+<span class="nc" id="L993">            StaxUtil.throwAsGenerationException(e, this);</span>
+<span class="fc" id="L994">        }</span>
+<span class="fc" id="L995">    }</span>
+
+    @Override
+    public void writeNumber(int i) throws IOException
+    {
+<span class="fc" id="L1000">        _verifyValueWrite(&quot;write number&quot;);</span>
+<span class="pc bpc" id="L1001" title="1 of 2 branches missed.">        if (_nextName == null) {</span>
+<span class="nc" id="L1002">            handleMissingName();</span>
+        }
+        try {
+<span class="fc bfc" id="L1005" title="All 2 branches covered.">            if (_nextIsAttribute) {</span>
+<span class="fc" id="L1006">                _xmlWriter.writeIntAttribute(null, _nextName.getNamespaceURI(), _nextName.getLocalPart(), i);</span>
+<span class="pc bpc" id="L1007" title="1 of 2 branches missed.">            } else if (checkNextIsUnwrapped()) {</span>
+            	// should we consider pretty-printing or not?
+<span class="nc" id="L1009">                _xmlWriter.writeInt(i);</span>
+            } else {
+<span class="fc bfc" id="L1011" title="All 2 branches covered.">                if (_xmlPrettyPrinter != null) {</span>
+<span class="fc" id="L1012">                	_xmlPrettyPrinter.writeLeafElement(_xmlWriter,</span>
+<span class="fc" id="L1013">                			_nextName.getNamespaceURI(), _nextName.getLocalPart(),</span>
+                			i);
+                } else {
+<span class="fc" id="L1016">	                _xmlWriter.writeStartElement(_nextName.getNamespaceURI(), _nextName.getLocalPart());</span>
+<span class="fc" id="L1017">	                _xmlWriter.writeInt(i);</span>
+<span class="fc" id="L1018">	                _xmlWriter.writeEndElement();</span>
+                }
+            }
+<span class="nc" id="L1021">        } catch (XMLStreamException e) {</span>
+<span class="nc" id="L1022">            StaxUtil.throwAsGenerationException(e, this);</span>
+<span class="fc" id="L1023">        }</span>
+<span class="fc" id="L1024">    }</span>
+
+    @Override
+    public void writeNumber(long l) throws IOException
+    {
+<span class="fc" id="L1029">        _verifyValueWrite(&quot;write number&quot;);</span>
+<span class="pc bpc" id="L1030" title="1 of 2 branches missed.">        if (_nextName == null) {</span>
+<span class="nc" id="L1031">            handleMissingName();</span>
+        }
+        try {
+<span class="fc bfc" id="L1034" title="All 2 branches covered.">            if (_nextIsAttribute) {</span>
+<span class="fc" id="L1035">                _xmlWriter.writeLongAttribute(null, _nextName.getNamespaceURI(), _nextName.getLocalPart(), l);</span>
+<span class="pc bpc" id="L1036" title="1 of 2 branches missed.">            } else if (checkNextIsUnwrapped()) {</span>
+<span class="nc" id="L1037">                _xmlWriter.writeLong(l);</span>
+            } else {
+<span class="fc bfc" id="L1039" title="All 2 branches covered.">                if (_xmlPrettyPrinter != null) {</span>
+<span class="fc" id="L1040">                	_xmlPrettyPrinter.writeLeafElement(_xmlWriter,</span>
+<span class="fc" id="L1041">                			_nextName.getNamespaceURI(), _nextName.getLocalPart(),</span>
+                			l);
+                } else {
+<span class="fc" id="L1044">	                _xmlWriter.writeStartElement(_nextName.getNamespaceURI(), _nextName.getLocalPart());</span>
+<span class="fc" id="L1045">	                _xmlWriter.writeLong(l);</span>
+<span class="fc" id="L1046">	                _xmlWriter.writeEndElement();</span>
+                }
+            }
+<span class="nc" id="L1049">        } catch (XMLStreamException e) {</span>
+<span class="nc" id="L1050">            StaxUtil.throwAsGenerationException(e, this);</span>
+<span class="fc" id="L1051">        }</span>
+<span class="fc" id="L1052">    }</span>
+
+    @Override
+    public void writeNumber(double d) throws IOException
+    {
+<span class="nc" id="L1057">        _verifyValueWrite(&quot;write number&quot;);</span>
+<span class="nc bnc" id="L1058" title="All 2 branches missed.">        if (_nextName == null) {</span>
+<span class="nc" id="L1059">            handleMissingName();</span>
+        }
+        try {
+<span class="nc bnc" id="L1062" title="All 2 branches missed.">            if (_nextIsAttribute) {</span>
+<span class="nc" id="L1063">                _xmlWriter.writeDoubleAttribute(null, _nextName.getNamespaceURI(), _nextName.getLocalPart(), d);</span>
+<span class="nc bnc" id="L1064" title="All 2 branches missed.">            } else if (checkNextIsUnwrapped()) {</span>
+<span class="nc" id="L1065">                _xmlWriter.writeDouble(d);</span>
+            } else {
+<span class="nc bnc" id="L1067" title="All 2 branches missed.">                if (_xmlPrettyPrinter != null) {</span>
+<span class="nc" id="L1068">                	_xmlPrettyPrinter.writeLeafElement(_xmlWriter,</span>
+<span class="nc" id="L1069">                			_nextName.getNamespaceURI(), _nextName.getLocalPart(),</span>
+                			d);
+                } else {
+<span class="nc" id="L1072">	                _xmlWriter.writeStartElement(_nextName.getNamespaceURI(), _nextName.getLocalPart());</span>
+<span class="nc" id="L1073">	                _xmlWriter.writeDouble(d);</span>
+<span class="nc" id="L1074">	                _xmlWriter.writeEndElement();</span>
+                }
+            }
+<span class="nc" id="L1077">        } catch (XMLStreamException e) {</span>
+<span class="nc" id="L1078">            StaxUtil.throwAsGenerationException(e, this);</span>
+<span class="nc" id="L1079">        }</span>
+<span class="nc" id="L1080">    }</span>
+
+    @Override
+    public void writeNumber(float f) throws IOException
+    {
+<span class="nc" id="L1085">        _verifyValueWrite(&quot;write number&quot;);</span>
+<span class="nc bnc" id="L1086" title="All 2 branches missed.">        if (_nextName == null) {</span>
+<span class="nc" id="L1087">            handleMissingName();</span>
+        }
+        try {
+<span class="nc bnc" id="L1090" title="All 2 branches missed.">            if (_nextIsAttribute) {</span>
+<span class="nc" id="L1091">                _xmlWriter.writeFloatAttribute(null, _nextName.getNamespaceURI(), _nextName.getLocalPart(), f);</span>
+<span class="nc bnc" id="L1092" title="All 2 branches missed.">            } else if (checkNextIsUnwrapped()) {</span>
+<span class="nc" id="L1093">                _xmlWriter.writeFloat(f);</span>
+            } else {
+<span class="nc bnc" id="L1095" title="All 2 branches missed.">                if (_xmlPrettyPrinter != null) {</span>
+<span class="nc" id="L1096">                	_xmlPrettyPrinter.writeLeafElement(_xmlWriter,</span>
+<span class="nc" id="L1097">                			_nextName.getNamespaceURI(), _nextName.getLocalPart(),</span>
+                			f);
+                } else {
+<span class="nc" id="L1100">	                _xmlWriter.writeStartElement(_nextName.getNamespaceURI(), _nextName.getLocalPart());</span>
+<span class="nc" id="L1101">	                _xmlWriter.writeFloat(f);</span>
+<span class="nc" id="L1102">	                _xmlWriter.writeEndElement();</span>
+                }
+            }
+<span class="nc" id="L1105">        } catch (XMLStreamException e) {</span>
+<span class="nc" id="L1106">            StaxUtil.throwAsGenerationException(e, this);</span>
+<span class="nc" id="L1107">        }</span>
+<span class="nc" id="L1108">    }</span>
+
+    @Override
+    public void writeNumber(BigDecimal dec) throws IOException
+    {
+<span class="nc bnc" id="L1113" title="All 2 branches missed.">        if (dec == null) {</span>
+<span class="nc" id="L1114">            writeNull();</span>
+<span class="nc" id="L1115">            return;</span>
+        }
+<span class="nc" id="L1117">        _verifyValueWrite(&quot;write number&quot;);</span>
+<span class="nc bnc" id="L1118" title="All 2 branches missed.">        if (_nextName == null) {</span>
+<span class="nc" id="L1119">            handleMissingName();</span>
+        }
+<span class="nc" id="L1121">        boolean usePlain = isEnabled(JsonGenerator.Feature.WRITE_BIGDECIMAL_AS_PLAIN);</span>
+        try {
+<span class="nc bnc" id="L1123" title="All 2 branches missed.">            if (_nextIsAttribute) {</span>
+<span class="nc bnc" id="L1124" title="All 2 branches missed.">                if (usePlain) {</span>
+<span class="nc" id="L1125">                    _xmlWriter.writeAttribute(&quot;&quot;, _nextName.getNamespaceURI(), _nextName.getLocalPart(),</span>
+<span class="nc" id="L1126">                            dec.toPlainString());</span>
+                } else {
+<span class="nc" id="L1128">                    _xmlWriter.writeDecimalAttribute(&quot;&quot;, _nextName.getNamespaceURI(), _nextName.getLocalPart(), dec);</span>
+                }
+<span class="nc bnc" id="L1130" title="All 2 branches missed.">            } else if (checkNextIsUnwrapped()) {</span>
+<span class="nc bnc" id="L1131" title="All 2 branches missed.">                if (usePlain) {</span>
+<span class="nc" id="L1132">                    _xmlWriter.writeCharacters(dec.toPlainString());</span>
+                } else {
+<span class="nc" id="L1134">                    _xmlWriter.writeDecimal(dec);</span>
+                }
+            } else {
+<span class="nc bnc" id="L1137" title="All 2 branches missed.">                if (_xmlPrettyPrinter != null) {</span>
+<span class="nc" id="L1138">                	_xmlPrettyPrinter.writeLeafElement(_xmlWriter,</span>
+<span class="nc" id="L1139">                			_nextName.getNamespaceURI(), _nextName.getLocalPart(),</span>
+                			dec);
+                } else {
+<span class="nc" id="L1142">	                _xmlWriter.writeStartElement(_nextName.getNamespaceURI(), _nextName.getLocalPart());</span>
+<span class="nc bnc" id="L1143" title="All 2 branches missed.">	                if (usePlain) {</span>
+<span class="nc" id="L1144">                         _xmlWriter.writeCharacters(dec.toPlainString());</span>
+	                } else {
+<span class="nc" id="L1146">                         _xmlWriter.writeDecimal(dec);</span>
+	                }
+<span class="nc" id="L1148">	                _xmlWriter.writeEndElement();</span>
+                }
+            }
+<span class="nc" id="L1151">        } catch (XMLStreamException e) {</span>
+<span class="nc" id="L1152">            StaxUtil.throwAsGenerationException(e, this);</span>
+<span class="nc" id="L1153">        }</span>
+<span class="nc" id="L1154">    }</span>
+
+    @Override
+    public void writeNumber(BigInteger value) throws IOException
+    {
+<span class="nc bnc" id="L1159" title="All 2 branches missed.">        if (value == null) {</span>
+<span class="nc" id="L1160">            writeNull();</span>
+<span class="nc" id="L1161">            return;</span>
+        }
+<span class="nc" id="L1163">        _verifyValueWrite(&quot;write number&quot;);</span>
+<span class="nc bnc" id="L1164" title="All 2 branches missed.">        if (_nextName == null) {</span>
+<span class="nc" id="L1165">            handleMissingName();</span>
+        }
+        try {
+<span class="nc bnc" id="L1168" title="All 2 branches missed.">            if (_nextIsAttribute) {</span>
+<span class="nc" id="L1169">                _xmlWriter.writeIntegerAttribute(&quot;&quot;,</span>
+<span class="nc" id="L1170">                		_nextName.getNamespaceURI(), _nextName.getLocalPart(), value);</span>
+<span class="nc bnc" id="L1171" title="All 2 branches missed.">            } else if (checkNextIsUnwrapped()) {</span>
+<span class="nc" id="L1172">                _xmlWriter.writeInteger(value);</span>
+            } else {
+<span class="nc bnc" id="L1174" title="All 2 branches missed.">                if (_xmlPrettyPrinter != null) {</span>
+<span class="nc" id="L1175">                	_xmlPrettyPrinter.writeLeafElement(_xmlWriter,</span>
+<span class="nc" id="L1176">                			_nextName.getNamespaceURI(), _nextName.getLocalPart(),</span>
+                			value);
+                } else {
+<span class="nc" id="L1179">	                _xmlWriter.writeStartElement(_nextName.getNamespaceURI(), _nextName.getLocalPart());</span>
+<span class="nc" id="L1180">	                _xmlWriter.writeInteger(value);</span>
+<span class="nc" id="L1181">	                _xmlWriter.writeEndElement();</span>
+                }
+            }
+<span class="nc" id="L1184">        } catch (XMLStreamException e) {</span>
+<span class="nc" id="L1185">            StaxUtil.throwAsGenerationException(e, this);</span>
+<span class="nc" id="L1186">        }</span>
+<span class="nc" id="L1187">    }</span>
+
+    @Override
+    public void writeNumber(String encodedValue) throws IOException, UnsupportedOperationException
+    {
+<span class="nc" id="L1192">        writeString(encodedValue);</span>
+<span class="nc" id="L1193">    }</span>
+
+    /*
+    /**********************************************************
+    /* Implementations, overrides for other methods
+    /**********************************************************
+     */
+
+    @Override
+    protected final void _verifyValueWrite(String typeMsg) throws IOException
+    {
+<span class="fc" id="L1204">        int status = _writeContext.writeValue();</span>
+<span class="pc bpc" id="L1205" title="1 of 2 branches missed.">        if (status == JsonWriteContext.STATUS_EXPECT_NAME) {</span>
+<span class="nc" id="L1206">            _reportError(&quot;Can not &quot;+typeMsg+&quot;, expecting field name&quot;);</span>
+        }
+<span class="fc" id="L1208">    }</span>
+
+    /*
+    /**********************************************************
+    /* Low-level output handling
+    /**********************************************************
+     */
+
+    @Override
+    public void flush() throws IOException
+    {
+<span class="pc bpc" id="L1219" title="1 of 2 branches missed.">        if (isEnabled(JsonGenerator.Feature.FLUSH_PASSED_TO_STREAM)) {</span>
+            try {
+<span class="fc" id="L1221">                _xmlWriter.flush();</span>
+<span class="nc" id="L1222">            } catch (XMLStreamException e) {</span>
+<span class="nc" id="L1223">                StaxUtil.throwAsGenerationException(e, this);</span>
+<span class="fc" id="L1224">            }</span>
+        }
+<span class="fc" id="L1226">    }</span>
+
+    @Override
+    public void close() throws IOException
+    {
+//        boolean wasClosed = _closed;
+<span class="fc" id="L1232">        super.close();</span>
+
+        // First: let's see that we still have buffers...
+<span class="pc bpc" id="L1235" title="1 of 2 branches missed.">        if (isEnabled(JsonGenerator.Feature.AUTO_CLOSE_JSON_CONTENT)) {</span>
+            try {
+                while (true) {
+		    /* 28-May-2016, tatu: To work around incompatibility introduced by
+		     *     `jackson-core` 2.8 where return type of `getOutputContext()`
+		     *     changed, let's do direct access here.
+		     */
+//                    JsonStreamContext ctxt = getOutputContext();
+<span class="fc" id="L1243">		    JsonStreamContext ctxt = _writeContext;</span>
+<span class="pc bpc" id="L1244" title="1 of 2 branches missed.">                    if (ctxt.inArray()) {</span>
+<span class="nc" id="L1245">                        writeEndArray();</span>
+<span class="pc bpc" id="L1246" title="1 of 2 branches missed.">                    } else if (ctxt.inObject()) {</span>
+<span class="nc" id="L1247">                        writeEndObject();</span>
+                    } else {
+                        break;
+                    }
+<span class="nc" id="L1251">                }</span>
+<span class="nc" id="L1252">            } catch (ArrayIndexOutOfBoundsException e) {</span>
+                /* 29-Nov-2010, tatu: Stupid, stupid SJSXP doesn't do array checks, so we get
+                 *   hit by this as a collateral problem in some cases. Yuck.
+                 */
+<span class="nc" id="L1256">                throw new JsonGenerationException(e, this);</span>
+<span class="fc" id="L1257">            }</span>
+        }
+        try {
+<span class="pc bpc" id="L1260" title="1 of 4 branches missed.">            if (_ioContext.isResourceManaged() || isEnabled(JsonGenerator.Feature.AUTO_CLOSE_TARGET)) {</span>
+<span class="fc" id="L1261">                _xmlWriter.closeCompletely();</span>
+            } else {
+<span class="nc" id="L1263">                _xmlWriter.close();</span>
+            }
+<span class="nc" id="L1265">        } catch (XMLStreamException e) {</span>
+<span class="nc" id="L1266">            StaxUtil.throwAsGenerationException(e, this);</span>
+<span class="fc" id="L1267">        }</span>
+<span class="fc" id="L1268">    }</span>
+
+    @Override
+    protected void _releaseBuffers() {
+        // Nothing to do here, as we have no buffers
+<span class="nc" id="L1273">    }</span>
+
+    /*
+    /**********************************************************
+    /* Internal methods
+    /**********************************************************
+     */
+
+    /**
+     * Method called to see if unwrapping is required; and if so,
+     * clear the flag (so further calls will return 'false' unless
+     * state is re-set)
+     */
+    protected boolean checkNextIsUnwrapped()
+    {
+<span class="fc bfc" id="L1288" title="All 2 branches covered.">        if (_nextIsUnwrapped) {</span>
+<span class="fc" id="L1289">    		    _nextIsUnwrapped = false;</span>
+<span class="fc" id="L1290">    		    return true;</span>
+        }
+<span class="fc" id="L1292">        return false;</span>
+    }
+    
+    protected void handleMissingName() {
+<span class="nc" id="L1296">        throw new IllegalStateException(&quot;No element/attribute name specified when trying to output element&quot;);</span>
+    }
+
+    /**
+     * Method called in case access to native Stax2 API implementation is required.
+     */
+    protected void  _reportUnimplementedStax2(String missingMethod) throws IOException
+    {
+<span class="nc" id="L1304">        throw new JsonGenerationException(&quot;Underlying Stax XMLStreamWriter (of type &quot;</span>
+<span class="nc" id="L1305">                +_originalXmlWriter.getClass().getName()</span>
+                +&quot;) does not implement Stax2 API natively and is missing method '&quot;
+                +missingMethod+&quot;': this breaks functionality such as indentation that relies on it. &quot;
+                +&quot;You need to upgrade to using compliant Stax implementation like Woodstox or Aalto&quot;,
+                this);
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

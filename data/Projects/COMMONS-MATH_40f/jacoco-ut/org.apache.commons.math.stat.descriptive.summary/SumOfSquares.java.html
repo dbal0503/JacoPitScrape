@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SumOfSquares.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Commons Math</a> &gt; <a href="index.source.html" class="el_package">org.apache.commons.math.stat.descriptive.summary</a> &gt; <span class="el_source">SumOfSquares.java</span></div><h1>SumOfSquares.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.commons.math.stat.descriptive.summary;
+
+import java.io.Serializable;
+
+import org.apache.commons.math.exception.NullArgumentException;
+import org.apache.commons.math.stat.descriptive.AbstractStorelessUnivariateStatistic;
+import org.apache.commons.math.util.MathUtils;
+
+/**
+ * Returns the sum of the squares of the available values.
+ * &lt;p&gt;
+ * If there are no values in the dataset, then 0 is returned.
+ * If any of the values are
+ * &lt;code&gt;NaN&lt;/code&gt;, then &lt;code&gt;NaN&lt;/code&gt; is returned.&lt;/p&gt;
+ * &lt;p&gt;
+ * &lt;strong&gt;Note that this implementation is not synchronized.&lt;/strong&gt; If
+ * multiple threads access an instance of this class concurrently, and at least
+ * one of the threads invokes the &lt;code&gt;increment()&lt;/code&gt; or
+ * &lt;code&gt;clear()&lt;/code&gt; method, it must be synchronized externally.&lt;/p&gt;
+ *
+ * @version $Id$
+ */
+public class SumOfSquares extends AbstractStorelessUnivariateStatistic implements Serializable {
+
+    /** Serializable version identifier */
+    private static final long serialVersionUID = 1460986908574398008L;
+
+    /** */
+    private long n;
+
+    /**
+     * The currently running sumSq
+     */
+    private double value;
+
+    /**
+     * Create a SumOfSquares instance
+     */
+<span class="fc" id="L55">    public SumOfSquares() {</span>
+<span class="fc" id="L56">        n = 0;</span>
+<span class="fc" id="L57">        value = 0;</span>
+<span class="fc" id="L58">    }</span>
+
+    /**
+     * Copy constructor, creates a new {@code SumOfSquares} identical
+     * to the {@code original}
+     *
+     * @param original the {@code SumOfSquares} instance to copy
+     */
+<span class="nc" id="L66">    public SumOfSquares(SumOfSquares original) {</span>
+<span class="nc" id="L67">        copy(original, this);</span>
+<span class="nc" id="L68">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void increment(final double d) {
+<span class="fc" id="L75">        value += d * d;</span>
+<span class="fc" id="L76">        n++;</span>
+<span class="fc" id="L77">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public double getResult() {
+<span class="fc" id="L84">        return value;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public long getN() {
+<span class="fc" id="L91">        return n;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void clear() {
+<span class="fc" id="L99">        value = 0;</span>
+<span class="fc" id="L100">        n = 0;</span>
+<span class="fc" id="L101">    }</span>
+
+    /**
+     * Returns the sum of the squares of the entries in the specified portion of
+     * the input array, or &lt;code&gt;Double.NaN&lt;/code&gt; if the designated subarray
+     * is empty.
+     * &lt;p&gt;
+     * Throws &lt;code&gt;IllegalArgumentException&lt;/code&gt; if the array is null.&lt;/p&gt;
+     *
+     * @param values the input array
+     * @param begin index of the first array element to include
+     * @param length the number of elements to include
+     * @return the sum of the squares of the values or 0 if length = 0
+     * @throws IllegalArgumentException if the array is null or the array index
+     *  parameters are not valid
+     */
+    @Override
+    public double evaluate(final double[] values,final int begin, final int length) {
+<span class="fc" id="L119">        double sumSq = Double.NaN;</span>
+<span class="pc bpc" id="L120" title="1 of 2 branches missed.">        if (test(values, begin, length, true)) {</span>
+<span class="fc" id="L121">            sumSq = 0.0;</span>
+<span class="fc bfc" id="L122" title="All 2 branches covered.">            for (int i = begin; i &lt; begin + length; i++) {</span>
+<span class="fc" id="L123">                sumSq += values[i] * values[i];</span>
+            }
+        }
+<span class="fc" id="L126">        return sumSq;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public SumOfSquares copy() {
+<span class="fc" id="L134">        SumOfSquares result = new SumOfSquares();</span>
+<span class="fc" id="L135">        copy(this, result);</span>
+<span class="fc" id="L136">        return result;</span>
+    }
+
+    /**
+     * Copies source to dest.
+     * &lt;p&gt;Neither source nor dest can be null.&lt;/p&gt;
+     *
+     * @param source SumOfSquares to copy
+     * @param dest SumOfSquares to copy to
+     * @throws NullArgumentException if either source or dest is null
+     */
+    public static void copy(SumOfSquares source, SumOfSquares dest)
+        throws NullArgumentException {
+<span class="fc" id="L149">        MathUtils.checkNotNull(source);</span>
+<span class="fc" id="L150">        MathUtils.checkNotNull(dest);</span>
+<span class="fc" id="L151">        dest.setData(source.getDataRef());</span>
+<span class="fc" id="L152">        dest.n = source.n;</span>
+<span class="fc" id="L153">        dest.value = source.value;</span>
+<span class="fc" id="L154">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>XmlBeanSerializerModifier.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Jackson-dataformat-XML</a> &gt; <a href="index.source.html" class="el_package">com.fasterxml.jackson.dataformat.xml.ser</a> &gt; <span class="el_source">XmlBeanSerializerModifier.java</span></div><h1>XmlBeanSerializerModifier.java</h1><pre class="source lang-java linenums">package com.fasterxml.jackson.dataformat.xml.ser;
+
+import java.util.*;
+
+import com.fasterxml.jackson.databind.*;
+import com.fasterxml.jackson.databind.introspect.AnnotatedMember;
+import com.fasterxml.jackson.databind.ser.*;
+import com.fasterxml.jackson.databind.ser.std.BeanSerializerBase;
+import com.fasterxml.jackson.dataformat.xml.util.AnnotationUtil;
+import com.fasterxml.jackson.dataformat.xml.util.TypeUtil;
+import com.fasterxml.jackson.dataformat.xml.util.XmlInfo;
+
+/**
+ * We need a {@link BeanSerializerModifier} to replace default &lt;code&gt;BeanSerializer&lt;/code&gt;
+ * with XML-specific one; mostly to ensure that attribute properties are output
+ * before element properties.
+ */
+public class XmlBeanSerializerModifier
+    extends BeanSerializerModifier
+    implements java.io.Serializable
+{
+    private static final long serialVersionUID = 1L;
+
+<span class="fc" id="L24">    public XmlBeanSerializerModifier() { }</span>
+
+    /*
+    /**********************************************************
+    /* Overridden methods
+    /**********************************************************
+     */
+
+    /**
+     * First thing to do is to find annotations regarding XML serialization,
+     * and wrap collection serializers.
+     */
+    @Override
+    public List&lt;BeanPropertyWriter&gt; changeProperties(SerializationConfig config,
+            BeanDescription beanDesc, List&lt;BeanPropertyWriter&gt; beanProperties)
+    {
+<span class="fc" id="L40">        final AnnotationIntrospector intr = config.getAnnotationIntrospector();</span>
+<span class="fc bfc" id="L41" title="All 2 branches covered.">        for (int i = 0, len = beanProperties.size(); i &lt; len; ++i) {</span>
+<span class="fc" id="L42">            BeanPropertyWriter bpw = beanProperties.get(i);</span>
+<span class="fc" id="L43">            final AnnotatedMember member = bpw.getMember();</span>
+<span class="fc" id="L44">            String ns = AnnotationUtil.findNamespaceAnnotation(intr, member);</span>
+<span class="fc" id="L45">            Boolean isAttribute = AnnotationUtil.findIsAttributeAnnotation(intr, member);</span>
+<span class="fc" id="L46">            Boolean isText = AnnotationUtil.findIsTextAnnotation(intr, member);</span>
+<span class="fc" id="L47">            Boolean isCData = AnnotationUtil.findIsCDataAnnotation(intr, member);</span>
+<span class="fc" id="L48">            bpw.setInternalSetting(XmlBeanSerializerBase.KEY_XML_INFO,</span>
+            		new XmlInfo(isAttribute, ns, isText, isCData));
+
+            // Actually: if we have a Collection type, easiest place to add wrapping would be here...
+            //  or: let's also allow wrapping of &quot;untyped&quot; (Object): assuming it is a dynamically
+            //   typed Collection...
+<span class="fc bfc" id="L54" title="All 2 branches covered.">            if (!TypeUtil.isIndexedType(bpw.getType())) {</span>
+<span class="fc" id="L55">                continue;</span>
+            }
+<span class="fc" id="L57">            PropertyName wrappedName = PropertyName.construct(bpw.getName(), ns);</span>
+<span class="fc" id="L58">            PropertyName wrapperName = bpw.getWrapperName();</span>
+
+            // first things first: no wrapping?
+<span class="fc bfc" id="L61" title="All 4 branches covered.">            if (wrapperName == null || wrapperName == PropertyName.NO_NAME) {</span>
+<span class="fc" id="L62">                continue;</span>
+            }
+            // no local name? Just double the wrapped name for wrapper
+<span class="fc" id="L65">            String localName = wrapperName.getSimpleName();</span>
+<span class="pc bpc" id="L66" title="1 of 4 branches missed.">            if (localName == null || localName.length() == 0) {</span>
+<span class="fc" id="L67">                wrapperName = wrappedName;</span>
+            }
+<span class="fc" id="L69">            beanProperties.set(i, new XmlBeanPropertyWriter(bpw, wrapperName, wrappedName));</span>
+        }
+<span class="fc" id="L71">        return beanProperties;</span>
+    }
+    
+    @Override
+    public JsonSerializer&lt;?&gt; modifySerializer(SerializationConfig config,
+            BeanDescription beanDesc, JsonSerializer&lt;?&gt; serializer)
+    {
+        /* First things first: we can only handle real BeanSerializers; question
+         * is, what to do if it's not one: throw exception or bail out?
+         * For now let's do latter.
+         */
+<span class="fc bfc" id="L82" title="All 2 branches covered.">        if (!(serializer instanceof BeanSerializerBase)) {</span>
+<span class="fc" id="L83">            return serializer;</span>
+        }
+<span class="fc" id="L85">        return new XmlBeanSerializer((BeanSerializerBase) serializer);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

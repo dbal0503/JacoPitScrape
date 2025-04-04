@@ -1,0 +1,430 @@
+<?xml version="1.0" encoding="utf-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Parser.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Apache Commons CLI</a> &gt; <a href="index.source.html" class="el_package">org.apache.commons.cli</a> &gt; <span class="el_source">Parser.java</span></div><h1>Parser.java</h1><pre class="source lang-java linenums">/**
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.commons.cli;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Enumeration;
+import java.util.List;
+import java.util.ListIterator;
+import java.util.Properties;
+
+/**
+ * &lt;code&gt;Parser&lt;/code&gt; creates {@link CommandLine}s.
+ *
+ * @deprecated since 1.3, the two-pass parsing with the flatten method is not enough flexible to handle complex cases
+ */
+@Deprecated
+<span class="fc" id="L33">public abstract class Parser implements CommandLineParser</span>
+{
+    /** commandline instance */
+    protected CommandLine cmd;
+
+    /** current Options */
+    private Options options;
+
+    /** list of required options strings */
+    private List requiredOptions;
+
+    protected void setOptions(final Options options)
+    {
+<span class="fc" id="L46">        this.options = options;</span>
+<span class="fc" id="L47">        this.requiredOptions = new ArrayList(options.getRequiredOptions());</span>
+<span class="fc" id="L48">    }</span>
+
+    protected Options getOptions()
+    {
+<span class="fc" id="L52">        return options;</span>
+    }
+
+    protected List getRequiredOptions()
+    {
+<span class="fc" id="L57">        return requiredOptions;</span>
+    }
+
+    /**
+     * Subclasses must implement this method to reduce
+     * the &lt;code&gt;arguments&lt;/code&gt; that have been passed to the parse method.
+     *
+     * @param opts The Options to parse the arguments by.
+     * @param arguments The arguments that have to be flattened.
+     * @param stopAtNonOption specifies whether to stop
+     * flattening when a non option has been encountered
+     * @return a String array of the flattened arguments
+     * @throws ParseException if there are any problems encountered
+     *                        while parsing the command line tokens.
+     */
+    protected abstract String[] flatten(Options opts, String[] arguments, boolean stopAtNonOption)
+            throws ParseException;
+
+    /**
+     * Parses the specified &lt;code&gt;arguments&lt;/code&gt; based
+     * on the specified {@link Options}.
+     *
+     * @param options the &lt;code&gt;Options&lt;/code&gt;
+     * @param arguments the &lt;code&gt;arguments&lt;/code&gt;
+     * @return the &lt;code&gt;CommandLine&lt;/code&gt;
+     * @throws ParseException if there are any problems encountered
+     *                        while parsing the command line tokens.
+     */
+    public CommandLine parse(final Options options, final String[] arguments) throws ParseException
+    {
+<span class="fc" id="L87">        return parse(options, arguments, null, false);</span>
+    }
+
+    /**
+     * Parse the arguments according to the specified options and properties.
+     *
+     * @param options    the specified Options
+     * @param arguments  the command line arguments
+     * @param properties command line option name-value pairs
+     * @return the list of atomic option and value tokens
+     * @throws ParseException if there are any problems encountered
+     *                        while parsing the command line tokens.
+     *
+     * @since 1.1
+     */
+    public CommandLine parse(final Options options, final String[] arguments, final Properties properties) throws ParseException
+    {
+<span class="fc" id="L104">        return parse(options, arguments, properties, false);</span>
+    }
+
+    /**
+     * Parses the specified &lt;code&gt;arguments&lt;/code&gt;
+     * based on the specified {@link Options}.
+     *
+     * @param options         the &lt;code&gt;Options&lt;/code&gt;
+     * @param arguments       the &lt;code&gt;arguments&lt;/code&gt;
+     * @param stopAtNonOption if &lt;tt&gt;true&lt;/tt&gt; an unrecognized argument stops
+     *     the parsing and the remaining arguments are added to the 
+     *     {@link CommandLine}s args list. If &lt;tt&gt;false&lt;/tt&gt; an unrecognized
+     *     argument triggers a ParseException.
+     * @return the &lt;code&gt;CommandLine&lt;/code&gt;
+     * @throws ParseException if an error occurs when parsing the arguments.
+     */
+    public CommandLine parse(final Options options, final String[] arguments, final boolean stopAtNonOption) throws ParseException
+    {
+<span class="fc" id="L122">        return parse(options, arguments, null, stopAtNonOption);</span>
+    }
+
+    /**
+     * Parse the arguments according to the specified options and
+     * properties.
+     *
+     * @param options the specified Options
+     * @param arguments the command line arguments
+     * @param properties command line option name-value pairs
+     * @param stopAtNonOption if &lt;tt&gt;true&lt;/tt&gt; an unrecognized argument stops
+     *     the parsing and the remaining arguments are added to the 
+     *     {@link CommandLine}s args list. If &lt;tt&gt;false&lt;/tt&gt; an unrecognized
+     *     argument triggers a ParseException.
+     *
+     * @return the list of atomic option and value tokens
+     *
+     * @throws ParseException if there are any problems encountered
+     * while parsing the command line tokens.
+     *
+     * @since 1.1
+     */
+    public CommandLine parse(final Options options, String[] arguments, final Properties properties, final boolean stopAtNonOption)
+            throws ParseException
+    {
+        // clear out the data in options in case it's been used before (CLI-71)
+<span class="fc bfc" id="L148" title="All 2 branches covered.">        for (final Option opt : options.helpOptions())</span>
+        {
+<span class="fc" id="L150">            opt.clearValues();</span>
+<span class="fc" id="L151">        }</span>
+        
+        // clear the data from the groups
+<span class="fc bfc" id="L154" title="All 2 branches covered.">        for (final OptionGroup group : options.getOptionGroups())</span>
+        {
+<span class="fc" id="L156">            group.setSelected(null);</span>
+<span class="fc" id="L157">        }        </span>
+
+        // initialise members
+<span class="fc" id="L160">        setOptions(options);</span>
+
+<span class="fc" id="L162">        cmd = new CommandLine();</span>
+
+<span class="fc" id="L164">        boolean eatTheRest = false;</span>
+
+<span class="fc bfc" id="L166" title="All 2 branches covered.">        if (arguments == null)</span>
+        {
+<span class="fc" id="L168">            arguments = new String[0];</span>
+        }
+
+<span class="fc" id="L171">        final List&lt;String&gt; tokenList = Arrays.asList(flatten(getOptions(), arguments, stopAtNonOption));</span>
+
+<span class="fc" id="L173">        final ListIterator&lt;String&gt; iterator = tokenList.listIterator();</span>
+
+        // process each flattened token
+<span class="fc bfc" id="L176" title="All 2 branches covered.">        while (iterator.hasNext())</span>
+        {
+<span class="fc" id="L178">            final String t = iterator.next();</span>
+
+            // the value is the double-dash
+<span class="fc bfc" id="L181" title="All 2 branches covered.">            if (&quot;--&quot;.equals(t))</span>
+            {
+<span class="fc" id="L183">                eatTheRest = true;</span>
+            }
+
+            // the value is a single dash
+<span class="fc bfc" id="L187" title="All 2 branches covered.">            else if (&quot;-&quot;.equals(t))</span>
+            {
+<span class="pc bpc" id="L189" title="1 of 2 branches missed.">                if (stopAtNonOption)</span>
+                {
+<span class="nc" id="L191">                    eatTheRest = true;</span>
+                }
+                else
+                {
+<span class="fc" id="L195">                    cmd.addArg(t);</span>
+                }
+            }
+
+            // the value is an option
+<span class="fc bfc" id="L200" title="All 2 branches covered.">            else if (t.startsWith(&quot;-&quot;))</span>
+            {
+<span class="fc bfc" id="L202" title="All 4 branches covered.">                if (stopAtNonOption &amp;&amp; !getOptions().hasOption(t))</span>
+                {
+<span class="fc" id="L204">                    eatTheRest = true;</span>
+<span class="fc" id="L205">                    cmd.addArg(t);</span>
+                }
+                else
+                {
+<span class="fc" id="L209">                    processOption(t, iterator);</span>
+                }
+            }
+
+            // the value is an argument
+            else
+            {
+<span class="fc" id="L216">                cmd.addArg(t);</span>
+
+<span class="fc bfc" id="L218" title="All 2 branches covered.">                if (stopAtNonOption)</span>
+                {
+<span class="fc" id="L220">                    eatTheRest = true;</span>
+                }
+            }
+
+            // eat the remaining tokens
+<span class="fc bfc" id="L225" title="All 2 branches covered.">            if (eatTheRest)</span>
+            {
+<span class="fc bfc" id="L227" title="All 2 branches covered.">                while (iterator.hasNext())</span>
+                {
+<span class="fc" id="L229">                    final String str = iterator.next();</span>
+
+                    // ensure only one double-dash is added
+<span class="pc bpc" id="L232" title="1 of 2 branches missed.">                    if (!&quot;--&quot;.equals(str))</span>
+                    {
+<span class="fc" id="L234">                        cmd.addArg(str);</span>
+                    }
+<span class="fc" id="L236">                }</span>
+            }
+<span class="fc" id="L238">        }</span>
+
+<span class="fc" id="L240">        processProperties(properties);</span>
+<span class="fc" id="L241">        checkRequiredOptions();</span>
+
+<span class="fc" id="L243">        return cmd;</span>
+    }
+
+    /**
+     * Sets the values of Options using the values in &lt;code&gt;properties&lt;/code&gt;.
+     *
+     * @param properties The value properties to be processed.
+     * @throws ParseException if there are any problems encountered
+     *                        while processing the properties.
+     */
+    protected void processProperties(final Properties properties) throws ParseException
+    {
+<span class="fc bfc" id="L255" title="All 2 branches covered.">        if (properties == null)</span>
+        {
+<span class="fc" id="L257">            return;</span>
+        }
+
+<span class="fc bfc" id="L260" title="All 2 branches covered.">        for (final Enumeration&lt;?&gt; e = properties.propertyNames(); e.hasMoreElements();)</span>
+        {
+<span class="fc" id="L262">            final String option = e.nextElement().toString();</span>
+            
+<span class="fc" id="L264">            final Option opt = options.getOption(option);</span>
+<span class="fc bfc" id="L265" title="All 2 branches covered.">            if (opt == null)</span>
+            {
+<span class="fc" id="L267">                throw new UnrecognizedOptionException(&quot;Default option wasn't defined&quot;, option);</span>
+            }
+            
+            // if the option is part of a group, check if another option of the group has been selected
+<span class="fc" id="L271">            final OptionGroup group = options.getOptionGroup(opt);</span>
+<span class="fc bfc" id="L272" title="All 4 branches covered.">            final boolean selected = group != null &amp;&amp; group.getSelected() != null;</span>
+            
+<span class="fc bfc" id="L274" title="All 4 branches covered.">            if (!cmd.hasOption(option) &amp;&amp; !selected)</span>
+            {
+                // get the value from the properties instance
+<span class="fc" id="L277">                final String value = properties.getProperty(option);</span>
+
+<span class="fc bfc" id="L279" title="All 2 branches covered.">                if (opt.hasArg())</span>
+                {
+<span class="pc bpc" id="L281" title="3 of 4 branches missed.">                    if (opt.getValues() == null || opt.getValues().length == 0)</span>
+                    {
+                        try
+                        {
+<span class="fc" id="L285">                            opt.addValueForProcessing(value);</span>
+                        }
+<span class="nc" id="L287">                        catch (final RuntimeException exp) //NOPMD</span>
+                        {
+                            // if we cannot add the value don't worry about it
+<span class="pc" id="L290">                        }</span>
+                    }
+                }
+<span class="fc bfc" id="L293" title="All 2 branches covered.">                else if (!(&quot;yes&quot;.equalsIgnoreCase(value)</span>
+<span class="fc bfc" id="L294" title="All 2 branches covered.">                        || &quot;true&quot;.equalsIgnoreCase(value)</span>
+<span class="fc bfc" id="L295" title="All 2 branches covered.">                        || &quot;1&quot;.equalsIgnoreCase(value)))</span>
+                {
+                    // if the value is not yes, true or 1 then don't add the
+                    // option to the CommandLine
+<span class="fc" id="L299">                    continue;</span>
+                }
+
+<span class="fc" id="L302">                cmd.addOption(opt);</span>
+<span class="fc" id="L303">                updateRequiredOptions(opt);</span>
+            }
+<span class="fc" id="L305">        }</span>
+<span class="fc" id="L306">    }</span>
+
+    /**
+     * Throws a {@link MissingOptionException} if all of the required options
+     * are not present.
+     *
+     * @throws MissingOptionException if any of the required Options are not present.
+     */
+    protected void checkRequiredOptions() throws MissingOptionException
+    {
+        // if there are required options that have not been processed
+<span class="fc bfc" id="L317" title="All 2 branches covered.">        if (!getRequiredOptions().isEmpty())</span>
+        {
+<span class="fc" id="L319">            throw new MissingOptionException(getRequiredOptions());</span>
+        }
+<span class="fc" id="L321">    }</span>
+
+    /**
+     * Process the argument values for the specified Option
+     * &lt;code&gt;opt&lt;/code&gt; using the values retrieved from the
+     * specified iterator &lt;code&gt;iter&lt;/code&gt;.
+     *
+     * @param opt The current Option
+     * @param iter The iterator over the flattened command line Options.
+     *
+     * @throws ParseException if an argument value is required
+     * and it is has not been found.
+     */
+    public void processArgs(final Option opt, final ListIterator&lt;String&gt; iter) throws ParseException
+    {
+        // loop until an option is found
+<span class="fc bfc" id="L337" title="All 2 branches covered.">        while (iter.hasNext())</span>
+        {
+<span class="fc" id="L339">            final String str = iter.next();</span>
+            
+            // found an Option, not an argument
+<span class="fc bfc" id="L342" title="All 4 branches covered.">            if (getOptions().hasOption(str) &amp;&amp; str.startsWith(&quot;-&quot;))</span>
+            {
+<span class="fc" id="L344">                iter.previous();</span>
+<span class="fc" id="L345">                break;</span>
+            }
+
+            // found a value
+            try
+            {
+<span class="fc" id="L351">                opt.addValueForProcessing(Util.stripLeadingAndTrailingQuotes(str));</span>
+            }
+<span class="fc" id="L353">            catch (final RuntimeException exp)</span>
+            {
+<span class="fc" id="L355">                iter.previous();</span>
+<span class="fc" id="L356">                break;</span>
+<span class="fc" id="L357">            }</span>
+<span class="fc" id="L358">        }</span>
+
+<span class="fc bfc" id="L360" title="All 4 branches covered.">        if (opt.getValues() == null &amp;&amp; !opt.hasOptionalArg())</span>
+        {
+<span class="fc" id="L362">            throw new MissingArgumentException(opt);</span>
+        }
+<span class="fc" id="L364">    }</span>
+
+    /**
+     * Process the Option specified by &lt;code&gt;arg&lt;/code&gt; using the values
+     * retrieved from the specified iterator &lt;code&gt;iter&lt;/code&gt;.
+     *
+     * @param arg The String value representing an Option
+     * @param iter The iterator over the flattened command line arguments.
+     *
+     * @throws ParseException if &lt;code&gt;arg&lt;/code&gt; does not represent an Option
+     */
+    protected void processOption(final String arg, final ListIterator&lt;String&gt; iter) throws ParseException
+    {
+<span class="fc" id="L377">        final boolean hasOption = getOptions().hasOption(arg);</span>
+
+        // if there is no option throw an UnrecognizedOptionException
+<span class="fc bfc" id="L380" title="All 2 branches covered.">        if (!hasOption)</span>
+        {
+<span class="fc" id="L382">            throw new UnrecognizedOptionException(&quot;Unrecognized option: &quot; + arg, arg);</span>
+        }
+
+        // get the option represented by arg
+<span class="fc" id="L386">        final Option opt = (Option) getOptions().getOption(arg).clone();</span>
+        
+        // update the required options and groups
+<span class="fc" id="L389">        updateRequiredOptions(opt);</span>
+        
+        // if the option takes an argument value
+<span class="fc bfc" id="L392" title="All 2 branches covered.">        if (opt.hasArg())</span>
+        {
+<span class="fc" id="L394">            processArgs(opt, iter);</span>
+        }
+        
+        // set the option on the command line
+<span class="fc" id="L398">        cmd.addOption(opt);</span>
+<span class="fc" id="L399">    }</span>
+
+    /**
+     * Removes the option or its group from the list of expected elements.
+     * 
+     * @param opt
+     */
+    private void updateRequiredOptions(final Option opt) throws ParseException
+    {
+        // if the option is a required option remove the option from
+        // the requiredOptions list
+<span class="fc bfc" id="L410" title="All 2 branches covered.">        if (opt.isRequired())</span>
+        {
+<span class="fc" id="L412">            getRequiredOptions().remove(opt.getKey());</span>
+        }
+
+        // if the option is in an OptionGroup make that option the selected
+        // option of the group
+<span class="fc bfc" id="L417" title="All 2 branches covered.">        if (getOptions().getOptionGroup(opt) != null)</span>
+        {
+<span class="fc" id="L419">            final OptionGroup group = getOptions().getOptionGroup(opt);</span>
+
+<span class="fc bfc" id="L421" title="All 2 branches covered.">            if (group.isRequired())</span>
+            {
+<span class="fc" id="L423">                getRequiredOptions().remove(group);</span>
+            }
+
+<span class="fc" id="L426">            group.setSelected(opt);</span>
+        }
+<span class="fc" id="L428">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

@@ -1,0 +1,296 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RandomKey.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Commons Math</a> &gt; <a href="index.source.html" class="el_package">org.apache.commons.math.genetics</a> &gt; <span class="el_source">RandomKey.java</span></div><h1>RandomKey.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.commons.math.genetics;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+import org.apache.commons.math.exception.util.LocalizedFormats;
+
+/**
+ * &lt;p&gt;
+ * Random Key chromosome is used for permutation representation. It is a vector
+ * of a fixed length of real numbers in [0,1] interval. The index of the i-th
+ * smallest value in the vector represents an i-th member of the permutation.
+ * &lt;/p&gt;
+ *
+ * &lt;p&gt;
+ * For example, the random key [0.2, 0.3, 0.8, 0.1] corresponds to the
+ * permutation of indices (3,0,1,2). If the original (unpermuted) sequence would
+ * be (a,b,c,d), this would mean the sequence (d,a,b,c).
+ * &lt;/p&gt;
+ *
+ * &lt;p&gt;
+ * With this representation, common operators like n-point crossover can be
+ * used, because any such chromosome represents a valid permutation.
+ * &lt;/p&gt;
+ *
+ * &lt;p&gt;
+ * Since the chromosome (and thus its arrayRepresentation) is immutable, the
+ * array representation is sorted only once in the constructor.
+ * &lt;/p&gt;
+ *
+ * &lt;p&gt;
+ * For details, see:
+ * &lt;ul&gt;
+ * &lt;li&gt;Bean, J.C.: Genetic algorithms and random keys for sequencing and
+ * optimization. ORSA Journal on Computing 6 (1994) 154-160&lt;/li&gt;
+ * &lt;li&gt;Rothlauf, F.: Representations for Genetic and Evolutionary Algorithms.
+ * Volume 104 of Studies in Fuzziness and Soft Computing. Physica-Verlag,
+ * Heidelberg (2002)&lt;/li&gt;
+ * &lt;/ul&gt;
+ * &lt;/p&gt;
+ *
+ * @param &lt;T&gt;
+ *            type of the permuted objects
+ * @since 2.0
+ * @version $Id$
+ */
+public abstract class RandomKey&lt;T&gt; extends AbstractListChromosome&lt;Double&gt; implements PermutationChromosome&lt;T&gt; {
+
+    /**
+     * Cache of sorted representation (unmodifiable).
+     */
+    private final List&lt;Double&gt; sortedRepresentation;
+
+    /**
+     * Base sequence [0,1,...,n-1], permuted accorting to the representation (unmodifiable).
+     */
+    private final List&lt;Integer&gt; baseSeqPermutation;
+
+    /**
+     * Constructor.
+     *
+     * @param representation list of [0,1] values representing the permutation
+     */
+    public RandomKey(List&lt;Double&gt; representation) {
+<span class="fc" id="L83">        super(representation);</span>
+        // store the sorted representation
+<span class="fc" id="L85">        List&lt;Double&gt; sortedRepr = new ArrayList&lt;Double&gt; (getRepresentation());</span>
+<span class="fc" id="L86">        Collections.sort(sortedRepr);</span>
+<span class="fc" id="L87">        sortedRepresentation = Collections.unmodifiableList(sortedRepr);</span>
+        // store the permutation of [0,1,...,n-1] list for toString() and isSame() methods
+<span class="fc" id="L89">        baseSeqPermutation = Collections.unmodifiableList(</span>
+<span class="fc" id="L90">            decodeGeneric(baseSequence(getLength()), getRepresentation(), sortedRepresentation)</span>
+        );
+<span class="fc" id="L92">    }</span>
+
+    /**
+     * Constructor.
+     *
+     * @param representation array of [0,1] values representing the permutation
+     */
+    public RandomKey(Double[] representation) {
+<span class="fc" id="L100">        this(Arrays.asList(representation));</span>
+<span class="fc" id="L101">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public List&lt;T&gt; decode(List&lt;T&gt; sequence) {
+<span class="fc" id="L107">        return decodeGeneric(sequence, getRepresentation(), sortedRepresentation);</span>
+    }
+
+    /**
+     * Decodes a permutation represented by &lt;code&gt;representation&lt;/code&gt; and
+     * returns a (generic) list with the permuted values.
+     *
+     * @param &lt;S&gt; generic type of the sequence values
+     * @param sequence the unpermuted sequence
+     * @param representation representation of the permutation ([0,1] vector)
+     * @param sortedRepr sorted &lt;code&gt;representation&lt;/code&gt;
+     * @return list with the sequence values permuted according to the representation
+     */
+    private static &lt;S&gt; List&lt;S&gt; decodeGeneric(List&lt;S&gt; sequence, List&lt;Double&gt; representation, List&lt;Double&gt; sortedRepr) {
+<span class="fc" id="L121">        int l = sequence.size();</span>
+
+<span class="pc bpc" id="L123" title="1 of 2 branches missed.">        if (representation.size() != l) {</span>
+<span class="nc" id="L124">            throw new IllegalArgumentException(String.format(&quot;Length of sequence for decoding (%s) has to be equal to the length of the RandomKey (%s)&quot;, l, representation.size()));</span>
+        }
+<span class="pc bpc" id="L126" title="1 of 2 branches missed.">        if (representation.size() != sortedRepr.size()) {</span>
+<span class="nc" id="L127">            throw new IllegalArgumentException(String.format(&quot;Representation and sortedRepr must have same sizes, %d != %d&quot;, representation.size(), sortedRepr.size()));</span>
+        }
+
+<span class="fc" id="L130">        List&lt;Double&gt; reprCopy = new ArrayList&lt;Double&gt; (representation);// do not modify the orig. representation</span>
+
+        // now find the indices in the original repr and use them for permuting
+<span class="fc" id="L133">        List&lt;S&gt; res = new ArrayList&lt;S&gt; (l);</span>
+<span class="fc bfc" id="L134" title="All 2 branches covered.">        for (int i=0; i&lt;l; i++) {</span>
+<span class="fc" id="L135">            int index = reprCopy.indexOf(sortedRepr.get(i));</span>
+<span class="fc" id="L136">            res.add(sequence.get(index));</span>
+<span class="fc" id="L137">            reprCopy.set(index, null);</span>
+        }
+<span class="fc" id="L139">        return res;</span>
+    }
+
+    /**
+     * Returns &lt;code&gt;true&lt;/code&gt; iff &lt;code&gt;another&lt;/code&gt; is a RandomKey and
+     * encodes the same permutation.
+     *
+     * @param another chromosome to compare
+     * @return true iff chromosomes encode the same permutation
+     */
+    @Override
+    protected boolean isSame(Chromosome another) {
+        // type check
+<span class="pc bpc" id="L152" title="1 of 2 branches missed.">        if (! (another instanceof RandomKey&lt;?&gt;)) {</span>
+<span class="nc" id="L153">            return false;</span>
+        }
+<span class="fc" id="L155">        RandomKey&lt;?&gt; anotherRk = (RandomKey&lt;?&gt;) another;</span>
+        // size check
+<span class="fc bfc" id="L157" title="All 2 branches covered.">        if (getLength() != anotherRk.getLength()) {</span>
+<span class="fc" id="L158">            return false;</span>
+        }
+
+        // two different representations can still encode the same permutation
+        // the ordering is what counts
+<span class="fc" id="L163">        List&lt;Integer&gt; thisPerm = this.baseSeqPermutation;</span>
+<span class="fc" id="L164">        List&lt;Integer&gt; anotherPerm = anotherRk.baseSeqPermutation;</span>
+
+<span class="fc bfc" id="L166" title="All 2 branches covered.">        for (int i=0; i&lt;getLength(); i++) {</span>
+<span class="fc bfc" id="L167" title="All 2 branches covered.">            if (thisPerm.get(i) != anotherPerm.get(i)) {</span>
+<span class="fc" id="L168">                return false;</span>
+            }
+        }
+        // the permutations are the same
+<span class="fc" id="L172">        return true;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    protected void checkValidity(java.util.List&lt;Double&gt; chromosomeRepresentation) throws InvalidRepresentationException {
+<span class="fc bfc" id="L180" title="All 2 branches covered.">        for (double val : chromosomeRepresentation) {</span>
+<span class="fc bfc" id="L181" title="All 4 branches covered.">            if (val &lt; 0 || val &gt; 1) {</span>
+<span class="fc" id="L182">                throw new InvalidRepresentationException(</span>
+<span class="fc" id="L183">                        LocalizedFormats.OUT_OF_RANGE_SIMPLE, val, 0, 1);</span>
+            }
+<span class="fc" id="L185">        }</span>
+<span class="fc" id="L186">    }</span>
+
+
+    /**
+     * Generates a representation corresponding to a random permutation of
+     * length l which can be passed to the RandomKey constructor.
+     *
+     * @param l
+     *            length of the permutation
+     * @return representation of a random permutation
+     */
+    public static final List&lt;Double&gt; randomPermutation(int l) {
+<span class="fc" id="L198">        List&lt;Double&gt; repr = new ArrayList&lt;Double&gt;(l);</span>
+<span class="fc bfc" id="L199" title="All 2 branches covered.">        for (int i=0; i&lt;l; i++) {</span>
+<span class="fc" id="L200">            repr.add(GeneticAlgorithm.getRandomGenerator().nextDouble());</span>
+        }
+<span class="fc" id="L202">        return repr;</span>
+    }
+
+    /**
+     * Generates a representation corresponding to an identity permutation of
+     * length l which can be passed to the RandomKey constructor.
+     *
+     * @param l
+     *            length of the permutation
+     * @return representation of an identity permutation
+     */
+    public static final List&lt;Double&gt; identityPermutation(int l) {
+<span class="fc" id="L214">        List&lt;Double&gt; repr = new ArrayList&lt;Double&gt;(l);</span>
+<span class="fc bfc" id="L215" title="All 2 branches covered.">        for (int i=0; i&lt;l; i++) {</span>
+<span class="fc" id="L216">            repr.add((double)i/l);</span>
+        }
+<span class="fc" id="L218">        return repr;</span>
+    }
+
+    /**
+     * Generates a representation of a permutation corresponding to the
+     * &lt;code&gt;data&lt;/code&gt; sorted by &lt;code&gt;comparator&lt;/code&gt;. The
+     * &lt;code&gt;data&lt;/code&gt; is not modified during the process.
+     *
+     * This is useful if you want to inject some permutations to the initial
+     * population.
+     *
+     * @param &lt;S&gt; type of the data
+     * @param data list of data determining the order
+     * @param comparator how the data will be compared
+     * @return list representation of the permutation corresponding to the parameters
+     */
+    public static &lt;S&gt; List&lt;Double&gt; comparatorPermutation(List&lt;S&gt; data, Comparator&lt;S&gt; comparator) {
+<span class="fc" id="L235">        List&lt;S&gt; sortedData = new ArrayList&lt;S&gt; (data);</span>
+<span class="fc" id="L236">        Collections.sort(sortedData, comparator);</span>
+
+<span class="fc" id="L238">        return inducedPermutation(data, sortedData);</span>
+    }
+
+    /**
+     * Generates a representation of a permutation corresponding to a
+     * permutation which yields &lt;code&gt;permutedData&lt;/code&gt; when applied to
+     * &lt;code&gt;originalData&lt;/code&gt;.
+     *
+     * This method can be viewed as an inverse to {@link #decode(List)}.
+     *
+     * @param &lt;S&gt; type of the data
+     * @param originalData the original, unpermuted data
+     * @param permutedData the data, somehow permuted
+     * @return representation of a permutation corresponding to the permutation &lt;code&gt;originalData -&gt; permutedData&lt;/code&gt;
+     * @throws IllegalArgumentException iff the &lt;code&gt;permutedData&lt;/code&gt; and &lt;code&gt;originalData&lt;/code&gt; contains different data
+     */
+    public static &lt;S&gt; List&lt;Double&gt; inducedPermutation(List&lt;S&gt; originalData, List&lt;S&gt; permutedData) throws IllegalArgumentException {
+<span class="fc bfc" id="L255" title="All 2 branches covered.">        if (originalData.size() != permutedData.size()) {</span>
+<span class="fc" id="L256">            throw new IllegalArgumentException(&quot;originalData and permutedData must have same length&quot;);</span>
+        }
+<span class="fc" id="L258">        int l = originalData.size();</span>
+
+<span class="fc" id="L260">        List&lt;S&gt; origDataCopy = new ArrayList&lt;S&gt; (originalData);</span>
+
+<span class="fc" id="L262">        Double[] res = new Double[l];</span>
+<span class="fc bfc" id="L263" title="All 2 branches covered.">        for (int i=0; i&lt;l; i++) {</span>
+<span class="fc" id="L264">            int index = origDataCopy.indexOf(permutedData.get(i));</span>
+<span class="fc bfc" id="L265" title="All 2 branches covered.">            if (index == -1) {</span>
+<span class="fc" id="L266">                throw new IllegalArgumentException(&quot;originalData and permutedData must contain the same objects.&quot;);</span>
+            }
+<span class="fc" id="L268">            res[index] = (double) i / l;</span>
+<span class="fc" id="L269">            origDataCopy.set(index, null);</span>
+        }
+<span class="fc" id="L271">        return Arrays.asList(res);</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public String toString() {
+<span class="nc" id="L279">        return String.format(&quot;(f=%s pi=(%s))&quot;, getFitness(), baseSeqPermutation);</span>
+    }
+
+    /**
+     * Helper for constructor. Generates a list of natural numbers (0,1,...,l-1).
+     *
+     * @param l length of list to generate
+     * @return list of integers from 0 to l-1
+     */
+    private static List&lt;Integer&gt; baseSequence(int l) {
+<span class="fc" id="L289">        List&lt;Integer&gt; baseSequence = new ArrayList&lt;Integer&gt; (l);</span>
+<span class="fc bfc" id="L290" title="All 2 branches covered.">        for (int i=0; i&lt;l; i++) {</span>
+<span class="fc" id="L291">            baseSequence.add(i);</span>
+        }
+<span class="fc" id="L293">        return baseSequence;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

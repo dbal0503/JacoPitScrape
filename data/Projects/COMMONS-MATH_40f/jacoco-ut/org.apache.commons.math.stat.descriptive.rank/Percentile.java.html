@@ -1,0 +1,500 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Percentile.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Commons Math</a> &gt; <a href="index.source.html" class="el_package">org.apache.commons.math.stat.descriptive.rank</a> &gt; <span class="el_source">Percentile.java</span></div><h1>Percentile.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.commons.math.stat.descriptive.rank;
+
+import java.io.Serializable;
+import java.util.Arrays;
+
+import org.apache.commons.math.exception.NullArgumentException;
+import org.apache.commons.math.exception.OutOfRangeException;
+import org.apache.commons.math.exception.util.LocalizedFormats;
+import org.apache.commons.math.stat.descriptive.AbstractUnivariateStatistic;
+import org.apache.commons.math.util.FastMath;
+import org.apache.commons.math.util.MathUtils;
+
+/**
+ * Provides percentile computation.
+ * &lt;p&gt;
+ * There are several commonly used methods for estimating percentiles (a.k.a.
+ * quantiles) based on sample data.  For large samples, the different methods
+ * agree closely, but when sample sizes are small, different methods will give
+ * significantly different results.  The algorithm implemented here works as follows:
+ * &lt;ol&gt;
+ * &lt;li&gt;Let &lt;code&gt;n&lt;/code&gt; be the length of the (sorted) array and
+ * &lt;code&gt;0 &lt; p &lt;= 100&lt;/code&gt; be the desired percentile.&lt;/li&gt;
+ * &lt;li&gt;If &lt;code&gt; n = 1 &lt;/code&gt; return the unique array element (regardless of
+ * the value of &lt;code&gt;p&lt;/code&gt;); otherwise &lt;/li&gt;
+ * &lt;li&gt;Compute the estimated percentile position
+ * &lt;code&gt; pos = p * (n + 1) / 100&lt;/code&gt; and the difference, &lt;code&gt;d&lt;/code&gt;
+ * between &lt;code&gt;pos&lt;/code&gt; and &lt;code&gt;floor(pos)&lt;/code&gt; (i.e. the fractional
+ * part of &lt;code&gt;pos&lt;/code&gt;).&lt;/li&gt;
+ * &lt;li&gt; If &lt;code&gt;pos &lt; 1&lt;/code&gt; return the smallest element in the array.&lt;/li&gt;
+ * &lt;li&gt; Else if &lt;code&gt;pos &gt;= n&lt;/code&gt; return the largest element in the array.&lt;/li&gt;
+ * &lt;li&gt; Else let &lt;code&gt;lower&lt;/code&gt; be the element in position
+ * &lt;code&gt;floor(pos)&lt;/code&gt; in the array and let &lt;code&gt;upper&lt;/code&gt; be the
+ * next element in the array.  Return &lt;code&gt;lower + d * (upper - lower)&lt;/code&gt;
+ * &lt;/li&gt;
+ * &lt;/ol&gt;&lt;/p&gt;
+ * &lt;p&gt;
+ * To compute percentiles, the data must be at least partially ordered.  Input
+ * arrays are copied and recursively partitioned using an ordering definition.
+ * The ordering used by &lt;code&gt;Arrays.sort(double[])&lt;/code&gt; is the one determined
+ * by {@link java.lang.Double#compareTo(Double)}.  This ordering makes
+ * &lt;code&gt;Double.NaN&lt;/code&gt; larger than any other value (including
+ * &lt;code&gt;Double.POSITIVE_INFINITY&lt;/code&gt;).  Therefore, for example, the median
+ * (50th percentile) of
+ * &lt;code&gt;{0, 1, 2, 3, 4, Double.NaN}&lt;/code&gt; evaluates to &lt;code&gt;2.5.&lt;/code&gt;&lt;/p&gt;
+ * &lt;p&gt;
+ * Since percentile estimation usually involves interpolation between array
+ * elements, arrays containing  &lt;code&gt;NaN&lt;/code&gt; or infinite values will often
+ * result in &lt;code&gt;NaN&lt;/code&gt; or infinite values returned.&lt;/p&gt;
+ * &lt;p&gt;
+ * Since 2.2, Percentile uses only selection instead of complete sorting
+ * and caches selection algorithm state between calls to the various
+ * {@code evaluate} methods. This greatly improves efficiency, both for a single
+ * percentile and multiple percentile computations. To maximize performance when
+ * multiple percentiles are computed based on the same data, users should set the
+ * data array once using either one of the {@link #evaluate(double[], double)} or
+ * {@link #setData(double[])} methods and thereafter {@link #evaluate(double)}
+ * with just the percentile provided.
+ * &lt;/p&gt;
+ * &lt;p&gt;
+ * &lt;strong&gt;Note that this implementation is not synchronized.&lt;/strong&gt; If
+ * multiple threads access an instance of this class concurrently, and at least
+ * one of the threads invokes the &lt;code&gt;increment()&lt;/code&gt; or
+ * &lt;code&gt;clear()&lt;/code&gt; method, it must be synchronized externally.&lt;/p&gt;
+ *
+ * @version $Id$
+ */
+public class Percentile extends AbstractUnivariateStatistic implements Serializable {
+
+    /** Serializable version identifier */
+    private static final long serialVersionUID = -8091216485095130416L;
+
+    /** Minimum size under which we use a simple insertion sort rather than Hoare's select. */
+    private static final int MIN_SELECT_SIZE = 15;
+
+    /** Maximum number of partitioning pivots cached (each level double the number of pivots). */
+    private static final int MAX_CACHED_LEVELS = 10;
+
+    /** Determines what percentile is computed when evaluate() is activated
+     * with no quantile argument */
+<span class="pc" id="L96">    private double quantile = 0.0;</span>
+
+    /** Cached pivots. */
+    private int[] cachedPivots;
+
+    /**
+     * Constructs a Percentile with a default quantile
+     * value of 50.0.
+     */
+    public Percentile() {
+<span class="fc" id="L106">        this(50.0);</span>
+<span class="fc" id="L107">    }</span>
+
+    /**
+     * Constructs a Percentile with the specific quantile value.
+     * @param p the quantile
+     * @throws IllegalArgumentException  if p is not greater than 0 and less
+     * than or equal to 100
+     */
+<span class="fc" id="L115">    public Percentile(final double p) {</span>
+<span class="fc" id="L116">        setQuantile(p);</span>
+<span class="fc" id="L117">        cachedPivots = null;</span>
+<span class="fc" id="L118">    }</span>
+
+    /**
+     * Copy constructor, creates a new {@code Percentile} identical
+     * to the {@code original}
+     *
+     * @param original the {@code Percentile} instance to copy
+     */
+<span class="nc" id="L126">    public Percentile(Percentile original) {</span>
+<span class="nc" id="L127">        copy(original, this);</span>
+<span class="nc" id="L128">    }</span>
+
+    /** {@inheritDoc} */
+    @Override
+    public void setData(final double[] values) {
+<span class="pc bpc" id="L133" title="1 of 2 branches missed.">        if (values == null) {</span>
+<span class="fc" id="L134">            cachedPivots = null;</span>
+        } else {
+<span class="nc" id="L136">            cachedPivots = new int[(0x1 &lt;&lt; MAX_CACHED_LEVELS) - 1];</span>
+<span class="nc" id="L137">            Arrays.fill(cachedPivots, -1);</span>
+        }
+<span class="fc" id="L139">        super.setData(values);</span>
+<span class="fc" id="L140">    }</span>
+
+    /** {@inheritDoc} */
+    @Override
+    public void setData(final double[] values, final int begin, final int length) {
+<span class="nc bnc" id="L145" title="All 2 branches missed.">        if (values == null) {</span>
+<span class="nc" id="L146">            cachedPivots = null;</span>
+        } else {
+<span class="nc" id="L148">            cachedPivots = new int[(0x1 &lt;&lt; MAX_CACHED_LEVELS) - 1];</span>
+<span class="nc" id="L149">            Arrays.fill(cachedPivots, -1);</span>
+        }
+<span class="nc" id="L151">        super.setData(values, begin, length);</span>
+<span class="nc" id="L152">    }</span>
+
+    /**
+     * Returns the result of evaluating the statistic over the stored data.
+     * &lt;p&gt;
+     * The stored array is the one which was set by previous calls to
+     * &lt;/p&gt;
+     * @param p the percentile value to compute
+     * @return the value of the statistic applied to the stored data
+     */
+    public double evaluate(final double p) {
+<span class="nc" id="L163">        return evaluate(getDataRef(), p);</span>
+    }
+
+    /**
+     * Returns an estimate of the &lt;code&gt;p&lt;/code&gt;th percentile of the values
+     * in the &lt;code&gt;values&lt;/code&gt; array.
+     * &lt;p&gt;
+     * Calls to this method do not modify the internal &lt;code&gt;quantile&lt;/code&gt;
+     * state of this statistic.&lt;/p&gt;
+     * &lt;p&gt;
+     * &lt;ul&gt;
+     * &lt;li&gt;Returns &lt;code&gt;Double.NaN&lt;/code&gt; if &lt;code&gt;values&lt;/code&gt; has length
+     * &lt;code&gt;0&lt;/code&gt;&lt;/li&gt;
+     * &lt;li&gt;Returns (for any value of &lt;code&gt;p&lt;/code&gt;) &lt;code&gt;values[0]&lt;/code&gt;
+     *  if &lt;code&gt;values&lt;/code&gt; has length &lt;code&gt;1&lt;/code&gt;&lt;/li&gt;
+     * &lt;li&gt;Throws &lt;code&gt;IllegalArgumentException&lt;/code&gt; if &lt;code&gt;values&lt;/code&gt;
+     * is null or p is not a valid quantile value (p must be greater than 0
+     * and less than or equal to 100) &lt;/li&gt;
+     * &lt;/ul&gt;&lt;/p&gt;
+     * &lt;p&gt;
+     * See {@link Percentile} for a description of the percentile estimation
+     * algorithm used.&lt;/p&gt;
+     *
+     * @param values input array of values
+     * @param p the percentile value to compute
+     * @return the percentile value or Double.NaN if the array is empty
+     * @throws IllegalArgumentException if &lt;code&gt;values&lt;/code&gt; is null
+     *     or p is invalid
+     */
+    public double evaluate(final double[] values, final double p) {
+<span class="fc" id="L193">        test(values, 0, 0);</span>
+<span class="fc" id="L194">        return evaluate(values, 0, values.length, p);</span>
+    }
+
+    /**
+     * Returns an estimate of the &lt;code&gt;quantile&lt;/code&gt;th percentile of the
+     * designated values in the &lt;code&gt;values&lt;/code&gt; array.  The quantile
+     * estimated is determined by the &lt;code&gt;quantile&lt;/code&gt; property.
+     * &lt;p&gt;
+     * &lt;ul&gt;
+     * &lt;li&gt;Returns &lt;code&gt;Double.NaN&lt;/code&gt; if &lt;code&gt;length = 0&lt;/code&gt;&lt;/li&gt;
+     * &lt;li&gt;Returns (for any value of &lt;code&gt;quantile&lt;/code&gt;)
+     * &lt;code&gt;values[begin]&lt;/code&gt; if &lt;code&gt;length = 1 &lt;/code&gt;&lt;/li&gt;
+     * &lt;li&gt;Throws &lt;code&gt;IllegalArgumentException&lt;/code&gt; if &lt;code&gt;values&lt;/code&gt;
+     * is null,  or &lt;code&gt;start&lt;/code&gt; or &lt;code&gt;length&lt;/code&gt;
+     * is invalid&lt;/li&gt;
+     * &lt;/ul&gt;&lt;/p&gt;
+     * &lt;p&gt;
+     * See {@link Percentile} for a description of the percentile estimation
+     * algorithm used.&lt;/p&gt;
+     *
+     * @param values the input array
+     * @param start index of the first array element to include
+     * @param length the number of elements to include
+     * @return the percentile value
+     * @throws IllegalArgumentException if the parameters are not valid
+     *
+     */
+    @Override
+    public double evaluate( final double[] values, final int start, final int length) {
+<span class="fc" id="L223">        return evaluate(values, start, length, quantile);</span>
+    }
+
+     /**
+     * Returns an estimate of the &lt;code&gt;p&lt;/code&gt;th percentile of the values
+     * in the &lt;code&gt;values&lt;/code&gt; array, starting with the element in (0-based)
+     * position &lt;code&gt;begin&lt;/code&gt; in the array and including &lt;code&gt;length&lt;/code&gt;
+     * values.
+     * &lt;p&gt;
+     * Calls to this method do not modify the internal &lt;code&gt;quantile&lt;/code&gt;
+     * state of this statistic.&lt;/p&gt;
+     * &lt;p&gt;
+     * &lt;ul&gt;
+     * &lt;li&gt;Returns &lt;code&gt;Double.NaN&lt;/code&gt; if &lt;code&gt;length = 0&lt;/code&gt;&lt;/li&gt;
+     * &lt;li&gt;Returns (for any value of &lt;code&gt;p&lt;/code&gt;) &lt;code&gt;values[begin]&lt;/code&gt;
+     *  if &lt;code&gt;length = 1 &lt;/code&gt;&lt;/li&gt;
+     * &lt;li&gt;Throws &lt;code&gt;IllegalArgumentException&lt;/code&gt; if &lt;code&gt;values&lt;/code&gt;
+     *  is null , &lt;code&gt;begin&lt;/code&gt; or &lt;code&gt;length&lt;/code&gt; is invalid, or
+     * &lt;code&gt;p&lt;/code&gt; is not a valid quantile value (p must be greater than 0
+     * and less than or equal to 100)&lt;/li&gt;
+     * &lt;/ul&gt;&lt;/p&gt;
+     * &lt;p&gt;
+     * See {@link Percentile} for a description of the percentile estimation
+     * algorithm used.&lt;/p&gt;
+     *
+     * @param values array of input values
+     * @param p  the percentile to compute
+     * @param begin  the first (0-based) element to include in the computation
+     * @param length  the number of array elements to include
+     * @return  the percentile value
+     * @throws IllegalArgumentException if the parameters are not valid or the
+     * input array is null
+     */
+    public double evaluate(final double[] values, final int begin,
+            final int length, final double p) {
+
+<span class="fc" id="L259">        test(values, begin, length);</span>
+
+<span class="fc bfc" id="L261" title="All 4 branches covered.">        if ((p &gt; 100) || (p &lt;= 0)) {</span>
+<span class="fc" id="L262">            throw new OutOfRangeException(LocalizedFormats.OUT_OF_BOUNDS_QUANTILE_VALUE, p, 0, 100);</span>
+        }
+<span class="fc bfc" id="L264" title="All 2 branches covered.">        if (length == 0) {</span>
+<span class="fc" id="L265">            return Double.NaN;</span>
+        }
+<span class="fc bfc" id="L267" title="All 2 branches covered.">        if (length == 1) {</span>
+<span class="fc" id="L268">            return values[begin]; // always return single value for n = 1</span>
+        }
+<span class="fc" id="L270">        double n = length;</span>
+<span class="fc" id="L271">        double pos = p * (n + 1) / 100;</span>
+<span class="fc" id="L272">        double fpos = FastMath.floor(pos);</span>
+<span class="fc" id="L273">        int intPos = (int) fpos;</span>
+<span class="fc" id="L274">        double dif = pos - fpos;</span>
+        double[] work;
+        int[] pivotsHeap;
+<span class="pc bpc" id="L277" title="1 of 2 branches missed.">        if (values == getDataRef()) {</span>
+<span class="nc" id="L278">            work = getDataRef();</span>
+<span class="nc" id="L279">            pivotsHeap = cachedPivots;</span>
+        } else {
+<span class="fc" id="L281">            work = new double[length];</span>
+<span class="fc" id="L282">            System.arraycopy(values, begin, work, 0, length);</span>
+<span class="fc" id="L283">            pivotsHeap = new int[(0x1 &lt;&lt; MAX_CACHED_LEVELS) - 1];</span>
+<span class="fc" id="L284">            Arrays.fill(pivotsHeap, -1);</span>
+        }
+
+<span class="fc bfc" id="L287" title="All 2 branches covered.">        if (pos &lt; 1) {</span>
+<span class="fc" id="L288">            return select(work, pivotsHeap, 0);</span>
+        }
+<span class="fc bfc" id="L290" title="All 2 branches covered.">        if (pos &gt;= n) {</span>
+<span class="fc" id="L291">            return select(work, pivotsHeap, length - 1);</span>
+        }
+<span class="fc" id="L293">        double lower = select(work, pivotsHeap, intPos - 1);</span>
+<span class="fc" id="L294">        double upper = select(work, pivotsHeap, intPos);</span>
+<span class="fc" id="L295">        return lower + dif * (upper - lower);</span>
+    }
+
+    /**
+     * Select the k&lt;sup&gt;th&lt;/sup&gt; smallest element from work array
+     * @param work work array (will be reorganized during the call)
+     * @param pivotsHeap set of pivot index corresponding to elements that
+     * are already at their sorted location, stored as an implicit heap
+     * (i.e. a sorted binary tree stored in a flat array, where the
+     * children of a node at index n are at indices 2n+1 for the left
+     * child and 2n+2 for the right child, with 0-based indices)
+     * @param k index of the desired element
+     * @return k&lt;sup&gt;th&lt;/sup&gt; smallest element
+     */
+    private double select(final double[] work, final int[] pivotsHeap, final int k) {
+
+<span class="fc" id="L311">        int begin = 0;</span>
+<span class="fc" id="L312">        int end   = work.length;</span>
+<span class="fc" id="L313">        int node  = 0;</span>
+
+<span class="fc bfc" id="L315" title="All 2 branches covered.">        while (end - begin &gt; MIN_SELECT_SIZE) {</span>
+
+            final int pivot;
+<span class="fc bfc" id="L318" title="All 4 branches covered.">            if ((node &lt; pivotsHeap.length) &amp;&amp; (pivotsHeap[node] &gt;= 0)) {</span>
+                // the pivot has already been found in a previous call
+                // and the array has already been partitioned around it
+<span class="fc" id="L321">                pivot = pivotsHeap[node];</span>
+            } else {
+                // select a pivot and partition work array around it
+<span class="fc" id="L324">                pivot = partition(work, begin, end, medianOf3(work, begin, end));</span>
+<span class="fc bfc" id="L325" title="All 2 branches covered.">                if (node &lt; pivotsHeap.length) {</span>
+<span class="fc" id="L326">                    pivotsHeap[node] =  pivot;</span>
+                }
+            }
+
+<span class="pc bpc" id="L330" title="1 of 2 branches missed.">            if (k == pivot) {</span>
+                // the pivot was exactly the element we wanted
+<span class="nc" id="L332">                return work[k];</span>
+<span class="fc bfc" id="L333" title="All 2 branches covered.">            } else if (k &lt; pivot) {</span>
+                // the element is in the left partition
+<span class="fc" id="L335">                end  = pivot;</span>
+<span class="fc" id="L336">                node = Math.min(2 * node + 1, pivotsHeap.length); // the min is here to avoid integer overflow</span>
+            } else {
+                // the element is in the right partition
+<span class="fc" id="L339">                begin = pivot + 1;</span>
+<span class="fc" id="L340">                node  = Math.min(2 * node + 2, pivotsHeap.length); // the min is here to avoid integer overflow</span>
+            }
+
+<span class="fc" id="L343">        }</span>
+
+        // the element is somewhere in the small sub-array
+        // sort the sub-array using insertion sort
+<span class="fc" id="L347">        insertionSort(work, begin, end);</span>
+<span class="fc" id="L348">        return work[k];</span>
+
+    }
+
+    /** Select a pivot index as the median of three
+     * @param work data array
+     * @param begin index of the first element of the slice
+     * @param end index after the last element of the slice
+     * @return the index of the median element chosen between the
+     * first, the middle and the last element of the array slice
+     */
+    int medianOf3(final double[] work, final int begin, final int end) {
+
+<span class="fc" id="L361">        final int inclusiveEnd = end - 1;</span>
+<span class="fc" id="L362">        final int    middle    = begin + (inclusiveEnd - begin) / 2;</span>
+<span class="fc" id="L363">        final double wBegin    = work[begin];</span>
+<span class="fc" id="L364">        final double wMiddle   = work[middle];</span>
+<span class="fc" id="L365">        final double wEnd      = work[inclusiveEnd];</span>
+
+<span class="fc bfc" id="L367" title="All 2 branches covered.">        if (wBegin &lt; wMiddle) {</span>
+<span class="fc bfc" id="L368" title="All 2 branches covered.">            if (wMiddle &lt; wEnd) {</span>
+<span class="fc" id="L369">                return middle;</span>
+            } else {
+<span class="fc bfc" id="L371" title="All 2 branches covered.">                return (wBegin &lt; wEnd) ? inclusiveEnd : begin;</span>
+            }
+        } else {
+<span class="fc bfc" id="L374" title="All 2 branches covered.">            if (wBegin &lt; wEnd) {</span>
+<span class="fc" id="L375">                return begin;</span>
+            } else {
+<span class="fc bfc" id="L377" title="All 2 branches covered.">                return (wMiddle &lt; wEnd) ? inclusiveEnd : middle;</span>
+            }
+        }
+
+    }
+
+    /**
+     * Partition an array slice around a pivot
+     * &lt;p&gt;
+     * Partitioning exchanges array elements such that all elements
+     * smaller than pivot are before it and all elements larger than
+     * pivot are after it
+     * &lt;/p&gt;
+     * @param work data array
+     * @param begin index of the first element of the slice
+     * @param end index after the last element of the slice
+     * @param pivot initial index of the pivot
+     * @return index of the pivot after partition
+     */
+    private int partition(final double[] work, final int begin, final int end, final int pivot) {
+
+<span class="fc" id="L398">        final double value = work[pivot];</span>
+<span class="fc" id="L399">        work[pivot] = work[begin];</span>
+
+<span class="fc" id="L401">        int i = begin + 1;</span>
+<span class="fc" id="L402">        int j = end - 1;</span>
+<span class="fc bfc" id="L403" title="All 2 branches covered.">        while (i &lt; j) {</span>
+<span class="fc bfc" id="L404" title="All 4 branches covered.">            while ((i &lt; j) &amp;&amp; (work[j] &gt;= value)) {</span>
+<span class="fc" id="L405">                --j;</span>
+            }
+<span class="fc bfc" id="L407" title="All 4 branches covered.">            while ((i &lt; j) &amp;&amp; (work[i] &lt;= value)) {</span>
+<span class="fc" id="L408">                ++i;</span>
+            }
+
+<span class="fc bfc" id="L411" title="All 2 branches covered.">            if (i &lt; j) {</span>
+<span class="fc" id="L412">                final double tmp = work[i];</span>
+<span class="fc" id="L413">                work[i++] = work[j];</span>
+<span class="fc" id="L414">                work[j--] = tmp;</span>
+<span class="fc" id="L415">            }</span>
+        }
+
+<span class="pc bpc" id="L418" title="1 of 4 branches missed.">        if ((i &gt;= end) || (work[i] &gt; value)) {</span>
+<span class="fc" id="L419">            --i;</span>
+        }
+<span class="fc" id="L421">        work[begin] = work[i];</span>
+<span class="fc" id="L422">        work[i]     = value;</span>
+<span class="fc" id="L423">        return i;</span>
+
+    }
+
+    /**
+     * Sort in place a (small) array slice using insertion sort
+     * @param work array to sort
+     * @param begin index of the first element of the slice to sort
+     * @param end index after the last element of the slice to sort
+     */
+    private void insertionSort(final double[] work, final int begin, final int end) {
+<span class="fc bfc" id="L434" title="All 2 branches covered.">        for (int j = begin + 1; j &lt; end; j++) {</span>
+<span class="fc" id="L435">            final double saved = work[j];</span>
+<span class="fc" id="L436">            int i = j - 1;</span>
+<span class="fc bfc" id="L437" title="All 4 branches covered.">            while ((i &gt;= begin) &amp;&amp; (saved &lt; work[i])) {</span>
+<span class="fc" id="L438">                work[i + 1] = work[i];</span>
+<span class="fc" id="L439">                i--;</span>
+            }
+<span class="fc" id="L441">            work[i + 1] = saved;</span>
+        }
+<span class="fc" id="L443">    }</span>
+
+    /**
+     * Returns the value of the quantile field (determines what percentile is
+     * computed when evaluate() is called with no quantile argument).
+     *
+     * @return quantile
+     */
+    public double getQuantile() {
+<span class="fc" id="L452">        return quantile;</span>
+    }
+
+    /**
+     * Sets the value of the quantile field (determines what percentile is
+     * computed when evaluate() is called with no quantile argument).
+     *
+     * @param p a value between 0 &lt; p &lt;= 100
+     * @throws IllegalArgumentException  if p is not greater than 0 and less
+     * than or equal to 100
+     */
+    public void setQuantile(final double p) {
+<span class="pc bpc" id="L464" title="1 of 4 branches missed.">        if (p &lt;= 0 || p &gt; 100) {</span>
+<span class="fc" id="L465">            throw new OutOfRangeException(LocalizedFormats.OUT_OF_BOUNDS_QUANTILE_VALUE, p, 0, 100);</span>
+        }
+<span class="fc" id="L467">        quantile = p;</span>
+<span class="fc" id="L468">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public Percentile copy() {
+<span class="fc" id="L475">        Percentile result = new Percentile();</span>
+<span class="fc" id="L476">        copy(this, result);</span>
+<span class="fc" id="L477">        return result;</span>
+    }
+
+    /**
+     * Copies source to dest.
+     * &lt;p&gt;Neither source nor dest can be null.&lt;/p&gt;
+     *
+     * @param source Percentile to copy
+     * @param dest Percentile to copy to
+     * @throws NullArgumentException if either source or dest is null
+     */
+    public static void copy(Percentile source, Percentile dest)
+        throws NullArgumentException {
+<span class="fc" id="L490">        MathUtils.checkNotNull(source);</span>
+<span class="fc" id="L491">        MathUtils.checkNotNull(dest);</span>
+<span class="fc" id="L492">        dest.setData(source.getDataRef());</span>
+<span class="pc bpc" id="L493" title="1 of 2 branches missed.">        if (source.cachedPivots != null) {</span>
+<span class="nc" id="L494">            System.arraycopy(source.cachedPivots, 0, dest.cachedPivots, 0, source.cachedPivots.length);</span>
+        }
+<span class="fc" id="L496">        dest.quantile = source.quantile;</span>
+<span class="fc" id="L497">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

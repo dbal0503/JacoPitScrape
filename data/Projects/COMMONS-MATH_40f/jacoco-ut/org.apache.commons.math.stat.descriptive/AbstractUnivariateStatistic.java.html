@@ -1,0 +1,290 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AbstractUnivariateStatistic.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Commons Math</a> &gt; <a href="index.source.html" class="el_package">org.apache.commons.math.stat.descriptive</a> &gt; <span class="el_source">AbstractUnivariateStatistic.java</span></div><h1>AbstractUnivariateStatistic.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.commons.math.stat.descriptive;
+
+import org.apache.commons.math.exception.DimensionMismatchException;
+import org.apache.commons.math.exception.NotPositiveException;
+import org.apache.commons.math.exception.NullArgumentException;
+import org.apache.commons.math.exception.NumberIsTooLargeException;
+import org.apache.commons.math.exception.MathIllegalArgumentException;
+import org.apache.commons.math.exception.util.LocalizedFormats;
+
+/**
+ * Abstract base class for all implementations of the
+ * {@link UnivariateStatistic} interface.
+ * &lt;p&gt;
+ * Provides a default implementation of &lt;code&gt;evaluate(double[]),&lt;/code&gt;
+ * delegating to &lt;code&gt;evaluate(double[], int, int)&lt;/code&gt; in the natural way.
+ * &lt;/p&gt;
+ * &lt;p&gt;
+ * Also includes a &lt;code&gt;test&lt;/code&gt; method that performs generic parameter
+ * validation for the &lt;code&gt;evaluate&lt;/code&gt; methods.&lt;/p&gt;
+ *
+ * @version $Id$
+ */
+<span class="fc" id="L39">public abstract class AbstractUnivariateStatistic</span>
+    implements UnivariateStatistic {
+
+    /** Stored data. */
+    private double[] storedData;
+
+    /**
+     * Set the data array.
+     * &lt;p&gt;
+     * The stored value is a copy of the parameter array, not the array itself
+     * &lt;/p&gt;
+     * @param values data array to store (may be null to remove stored data)
+     * @see #evaluate()
+     */
+    public void setData(final double[] values) {
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">        storedData = (values == null) ? null : values.clone();</span>
+<span class="fc" id="L55">    }</span>
+
+    /**
+     * Get a copy of the stored data array.
+     * @return copy of the stored data array (may be null)
+     */
+    public double[] getData() {
+<span class="nc bnc" id="L62" title="All 2 branches missed.">        return (storedData == null) ? null : storedData.clone();</span>
+    }
+
+    /**
+     * Get a reference to the stored data array.
+     * @return reference to the stored data array (may be null)
+     */
+    protected double[] getDataRef() {
+<span class="fc" id="L70">        return storedData;</span>
+    }
+
+    /**
+     * Set the data array.
+     * @param values data array to store
+     * @param begin the index of the first element to include
+     * @param length the number of elements to include
+     * @see #evaluate()
+     */
+    public void setData(final double[] values, final int begin, final int length) {
+<span class="nc" id="L81">        storedData = new double[length];</span>
+<span class="nc" id="L82">        System.arraycopy(values, begin, storedData, 0, length);</span>
+<span class="nc" id="L83">    }</span>
+
+    /**
+     * Returns the result of evaluating the statistic over the stored data.
+     * &lt;p&gt;
+     * The stored array is the one which was set by previous calls to
+     * &lt;/p&gt;
+     * @return the value of the statistic applied to the stored data
+     */
+    public double evaluate() {
+<span class="nc" id="L93">        return evaluate(storedData);</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public double evaluate(final double[] values) {
+<span class="fc" id="L100">        test(values, 0, 0);</span>
+<span class="fc" id="L101">        return evaluate(values, 0, values.length);</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public abstract double evaluate(final double[] values, final int begin, final int length);
+
+    /**
+     * {@inheritDoc}
+     */
+    public abstract UnivariateStatistic copy();
+
+    /**
+     * This method is used by &lt;code&gt;evaluate(double[], int, int)&lt;/code&gt; methods
+     * to verify that the input parameters designate a subarray of positive length.
+     * &lt;p&gt;
+     * &lt;ul&gt;
+     * &lt;li&gt;returns &lt;code&gt;true&lt;/code&gt; iff the parameters designate a subarray of
+     * positive length&lt;/li&gt;
+     * &lt;li&gt;throws &lt;code&gt;IllegalArgumentException&lt;/code&gt; if the array is null or
+     * or the indices are invalid&lt;/li&gt;
+     * &lt;li&gt;returns &lt;code&gt;false&lt;/li&gt; if the array is non-null, but
+     * &lt;code&gt;length&lt;/code&gt; is 0.
+     * &lt;/ul&gt;&lt;/p&gt;
+     *
+     * @param values the input array
+     * @param begin index of the first array element to include
+     * @param length the number of elements to include
+     * @return true if the parameters are valid and designate a subarray of positive length
+     * @throws IllegalArgumentException if the indices are invalid or the array is null
+     */
+    protected boolean test(
+        final double[] values,
+        final int begin,
+        final int length) {
+<span class="fc" id="L137">        return test(values, begin, length, false);</span>
+    }
+
+    /**
+     * This method is used by &lt;code&gt;evaluate(double[], int, int)&lt;/code&gt; methods
+     * to verify that the input parameters designate a subarray of positive length.
+     * &lt;p&gt;
+     * &lt;ul&gt;
+     * &lt;li&gt;returns &lt;code&gt;true&lt;/code&gt; iff the parameters designate a subarray of
+     * non-negative length&lt;/li&gt;
+     * &lt;li&gt;throws &lt;code&gt;IllegalArgumentException&lt;/code&gt; if the array is null or
+     * or the indices are invalid&lt;/li&gt;
+     * &lt;li&gt;returns &lt;code&gt;false&lt;/li&gt; if the array is non-null, but
+     * &lt;code&gt;length&lt;/code&gt; is 0 unless &lt;code&gt;allowEmpty&lt;/code&gt; is &lt;code&gt;true&lt;/code&gt;
+     * &lt;/ul&gt;&lt;/p&gt;
+     *
+     * @param values the input array
+     * @param begin index of the first array element to include
+     * @param length the number of elements to include
+     * @param allowEmpty if &lt;code&gt;true&lt;/code&gt; then zero length arrays are allowed
+     * @return true if the parameters are valid
+     * @throws IllegalArgumentException if the indices are invalid or the array is null
+     * @since 3.0
+     */
+    protected boolean test(final double[] values, final int begin, final int length, final boolean allowEmpty){
+
+<span class="fc bfc" id="L163" title="All 2 branches covered.">        if (values == null) {</span>
+<span class="fc" id="L164">            throw new NullArgumentException(LocalizedFormats.INPUT_ARRAY);</span>
+        }
+
+<span class="fc bfc" id="L167" title="All 2 branches covered.">        if (begin &lt; 0) {</span>
+<span class="fc" id="L168">            throw new NotPositiveException(LocalizedFormats.START_POSITION, begin);</span>
+        }
+
+<span class="fc bfc" id="L171" title="All 2 branches covered.">        if (length &lt; 0) {</span>
+<span class="fc" id="L172">            throw new NotPositiveException(LocalizedFormats.LENGTH, length);</span>
+        }
+
+<span class="fc bfc" id="L175" title="All 2 branches covered.">        if (begin + length &gt; values.length) {</span>
+<span class="fc" id="L176">            throw new NumberIsTooLargeException(LocalizedFormats.SUBARRAY_ENDS_AFTER_ARRAY_END,</span>
+<span class="fc" id="L177">                                                begin + length, values.length, true);</span>
+        }
+
+<span class="fc bfc" id="L180" title="All 4 branches covered.">        if (length == 0 &amp;&amp; !allowEmpty) {</span>
+<span class="fc" id="L181">            return false;</span>
+        }
+
+<span class="fc" id="L184">        return true;</span>
+
+    }
+
+    /**
+     * This method is used by &lt;code&gt;evaluate(double[], double[], int, int)&lt;/code&gt; methods
+     * to verify that the begin and length parameters designate a subarray of positive length
+     * and the weights are all non-negative, non-NaN, finite, and not all zero.
+     * &lt;p&gt;
+     * &lt;ul&gt;
+     * &lt;li&gt;returns &lt;code&gt;true&lt;/code&gt; iff the parameters designate a subarray of
+     * positive length and the weights array contains legitimate values.&lt;/li&gt;
+     * &lt;li&gt;throws &lt;code&gt;IllegalArgumentException&lt;/code&gt; if any of the following are true:
+     * &lt;ul&gt;&lt;li&gt;the values array is null&lt;/li&gt;
+     *     &lt;li&gt;the weights array is null&lt;/li&gt;
+     *     &lt;li&gt;the weights array does not have the same length as the values array&lt;/li&gt;
+     *     &lt;li&gt;the weights array contains one or more infinite values&lt;/li&gt;
+     *     &lt;li&gt;the weights array contains one or more NaN values&lt;/li&gt;
+     *     &lt;li&gt;the weights array contains negative values&lt;/li&gt;
+     *     &lt;li&gt;the start and length arguments do not determine a valid array&lt;/li&gt;&lt;/ul&gt;
+     * &lt;/li&gt;
+     * &lt;li&gt;returns &lt;code&gt;false&lt;/li&gt; if the array is non-null, but
+     * &lt;code&gt;length&lt;/code&gt; is 0.
+     * &lt;/ul&gt;&lt;/p&gt;
+     *
+     * @param values the input array
+     * @param weights the weights array
+     * @param begin index of the first array element to include
+     * @param length the number of elements to include
+     * @return true if the parameters are valid and designate a subarray of positive length
+     * @throws IllegalArgumentException if the indices are invalid or the array is null
+     * @since 2.1
+     */
+    protected boolean test(
+        final double[] values,
+        final double[] weights,
+        final int begin,
+        final int length) {
+<span class="fc" id="L222">        return test(values, weights, begin, length, false);</span>
+    }
+
+    /**
+     * This method is used by &lt;code&gt;evaluate(double[], double[], int, int)&lt;/code&gt; methods
+     * to verify that the begin and length parameters designate a subarray of positive length
+     * and the weights are all non-negative, non-NaN, finite, and not all zero.
+     * &lt;p&gt;
+     * &lt;ul&gt;
+     * &lt;li&gt;returns &lt;code&gt;true&lt;/code&gt; iff the parameters designate a subarray of
+     * non-negative length and the weights array contains legitimate values.&lt;/li&gt;
+     * &lt;li&gt;throws &lt;code&gt;IllegalArgumentException&lt;/code&gt; if any of the following are true:
+     * &lt;ul&gt;&lt;li&gt;the values array is null&lt;/li&gt;
+     *     &lt;li&gt;the weights array is null&lt;/li&gt;
+     *     &lt;li&gt;the weights array does not have the same length as the values array&lt;/li&gt;
+     *     &lt;li&gt;the weights array contains one or more infinite values&lt;/li&gt;
+     *     &lt;li&gt;the weights array contains one or more NaN values&lt;/li&gt;
+     *     &lt;li&gt;the weights array contains negative values&lt;/li&gt;
+     *     &lt;li&gt;the start and length arguments do not determine a valid array&lt;/li&gt;&lt;/ul&gt;
+     * &lt;/li&gt;
+     * &lt;li&gt;returns &lt;code&gt;false&lt;/li&gt; if the array is non-null, but
+     * &lt;code&gt;length&lt;/code&gt; is 0 unless &lt;code&gt;allowEmpty&lt;/code&gt; is &lt;code&gt;true&lt;/code&gt;.
+     * &lt;/ul&gt;&lt;/p&gt;
+     *
+     * @param values the input array.
+     * @param weights the weights array.
+     * @param begin index of the first array element to include.
+     * @param length the number of elements to include.
+     * @param allowEmpty if {@code true} than allow zero length arrays to pass.
+     * @return {@code true} if the parameters are valid.
+     * @throws IllegalArgumentException if the indices are invalid or the array
+     * is {@code null}.
+     * @since 3.0
+     */
+    protected boolean test(final double[] values, final double[] weights, final int begin, final int length, final boolean allowEmpty){
+
+<span class="fc bfc" id="L258" title="All 2 branches covered.">        if (weights == null) {</span>
+<span class="fc" id="L259">            throw new NullArgumentException(LocalizedFormats.INPUT_ARRAY);</span>
+        }
+
+<span class="fc bfc" id="L262" title="All 2 branches covered.">        if (weights.length != values.length) {</span>
+<span class="fc" id="L263">            throw new DimensionMismatchException(weights.length, values.length);</span>
+        }
+
+<span class="fc" id="L266">        boolean containsPositiveWeight = false;</span>
+<span class="fc bfc" id="L267" title="All 2 branches covered.">        for (int i = begin; i &lt; begin + length; i++) {</span>
+<span class="pc bpc" id="L268" title="1 of 2 branches missed.">            if (Double.isNaN(weights[i])) {</span>
+<span class="nc" id="L269">                throw new MathIllegalArgumentException(LocalizedFormats.NAN_ELEMENT_AT_INDEX, i);</span>
+            }
+<span class="pc bpc" id="L271" title="1 of 2 branches missed.">            if (Double.isInfinite(weights[i])) {</span>
+<span class="nc" id="L272">                throw new MathIllegalArgumentException(LocalizedFormats.INFINITE_ARRAY_ELEMENT, weights[i], i);</span>
+            }
+<span class="fc bfc" id="L274" title="All 2 branches covered.">            if (weights[i] &lt; 0) {</span>
+<span class="fc" id="L275">                throw new MathIllegalArgumentException(LocalizedFormats.NEGATIVE_ELEMENT_AT_INDEX, i, weights[i]);</span>
+            }
+<span class="pc bpc" id="L277" title="1 of 4 branches missed.">            if (!containsPositiveWeight &amp;&amp; weights[i] &gt; 0.0) {</span>
+<span class="fc" id="L278">                containsPositiveWeight = true;</span>
+            }
+        }
+
+<span class="pc bpc" id="L282" title="1 of 2 branches missed.">        if (!containsPositiveWeight) {</span>
+<span class="nc" id="L283">            throw new MathIllegalArgumentException(LocalizedFormats.WEIGHT_AT_LEAST_ONE_NON_ZERO);</span>
+        }
+
+<span class="fc" id="L286">        return test(values, begin, length, allowEmpty);</span>
+    }
+}
+
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

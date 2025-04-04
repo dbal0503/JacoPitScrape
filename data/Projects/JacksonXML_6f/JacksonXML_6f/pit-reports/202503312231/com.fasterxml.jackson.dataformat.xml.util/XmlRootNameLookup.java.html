@@ -1,0 +1,1782 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <link rel="stylesheet" type="text/css" href="../style.css">
+</head>
+<body>
+
+
+<h1>XmlRootNameLookup.java</h1>
+
+<table class="src">
+
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_1'/>
+1
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_1'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>package com.fasterxml.jackson.dataformat.xml.util;</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_2'/>
+2
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_2'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''></span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_3'/>
+3
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_3'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>import javax.xml.namespace.QName;</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_4'/>
+4
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_4'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''></span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_5'/>
+5
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_5'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>import com.fasterxml.jackson.databind.*;</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_6'/>
+6
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_6'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>import com.fasterxml.jackson.databind.cfg.MapperConfig;</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_7'/>
+7
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_7'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>import com.fasterxml.jackson.databind.introspect.AnnotatedClass;</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_8'/>
+8
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_8'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>import com.fasterxml.jackson.databind.type.ClassKey;</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_9'/>
+9
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_9'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>import com.fasterxml.jackson.databind.util.LRUMap;</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_10'/>
+10
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_10'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>import com.fasterxml.jackson.dataformat.xml.XmlAnnotationIntrospector;</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_11'/>
+11
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_11'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''></span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_12'/>
+12
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_12'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>/**</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_13'/>
+13
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_13'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''> * Helper class used for efficiently finding root element name used with</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_14'/>
+14
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_14'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''> * XML serializations.</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_15'/>
+15
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_15'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''> */</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_16'/>
+16
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_16'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>public class XmlRootNameLookup</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_17'/>
+17
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_17'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>    implements java.io.Serializable</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_18'/>
+18
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_18'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>{</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_19'/>
+19
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_19'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>    private static final long serialVersionUID = 1L;</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_20'/>
+20
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_20'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''></span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_21'/>
+21
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_21'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>    /**</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_22'/>
+22
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_22'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>     * For efficient operation, let&#39;s try to minimize number of times we</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_23'/>
+23
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_23'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>     * need to introspect root element name to use.</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_24'/>
+24
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_24'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>     *&#60;p&#62;</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_25'/>
+25
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_25'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>     * Note: changed to &#60;code&#62;transient&#60;/code&#62; for 2.3; no point in serializing such</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_26'/>
+26
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_26'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>     * state</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_27'/>
+27
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_27'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>     */</span></pre></td></tr>
+
+
+<tr>
+<td class='covered'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_28'/>
+28
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_28'></a>
+<span>
+</span>
+</span>
+</td>
+<td class='covered'><pre><span  class=''>    protected final transient LRUMap&#60;ClassKey,QName&#62; _rootNames = new LRUMap&#60;ClassKey,QName&#62;(40, 200);</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_29'/>
+29
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_29'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''></span></pre></td></tr>
+
+
+<tr>
+<td class='covered'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_30'/>
+30
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_30'></a>
+<span>
+</span>
+</span>
+</td>
+<td class='covered'><pre><span  class=''>    public XmlRootNameLookup() { }</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_31'/>
+31
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_31'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>    </span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_32'/>
+32
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_32'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>    protected Object readResolve() {</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_33'/>
+33
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_33'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>        // just need to make 100% sure it gets set to non-null, that&#39;s all</span></pre></td></tr>
+
+
+<tr>
+<td class='covered'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_34'/>
+34
+</td>
+<td class='survived'>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_34'>3</a>
+<span>
+
+1. readResolve : removed conditional - replaced equality check with true &rarr; SURVIVED<br/>
+
+2. readResolve : negated conditional &rarr; KILLED<br/>
+
+3. readResolve : removed conditional - replaced equality check with false &rarr; KILLED<br/>
+
+</span>
+</span>
+</td>
+<td class='covered'><pre><span  class='survived'>        if (_rootNames == null) {</span></pre></td></tr>
+
+
+<tr>
+<td class='covered'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_35'/>
+35
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_35'></a>
+<span>
+</span>
+</span>
+</td>
+<td class='covered'><pre><span  class=''>            return new XmlRootNameLookup();</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_36'/>
+36
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_36'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>        }</span></pre></td></tr>
+
+
+<tr>
+<td class='uncovered'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_37'/>
+37
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_37'></a>
+<span>
+</span>
+</span>
+</td>
+<td class='uncovered'><pre><span  class=''>        return this;</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_38'/>
+38
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_38'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>    }</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_39'/>
+39
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_39'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''></span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_40'/>
+40
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_40'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>    public QName findRootName(JavaType rootType, MapperConfig&#60;?&#62; config) {</span></pre></td></tr>
+
+
+<tr>
+<td class='covered'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_41'/>
+41
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_41'></a>
+<span>
+</span>
+</span>
+</td>
+<td class='covered'><pre><span  class=''>        return findRootName(rootType.getRawClass(), config);</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_42'/>
+42
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_42'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>    }</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_43'/>
+43
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_43'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''></span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_44'/>
+44
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_44'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>    public QName findRootName(Class&#60;?&#62; rootType, MapperConfig&#60;?&#62; config)</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_45'/>
+45
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_45'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>    {</span></pre></td></tr>
+
+
+<tr>
+<td class='covered'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_46'/>
+46
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_46'></a>
+<span>
+</span>
+</span>
+</td>
+<td class='covered'><pre><span  class=''>        ClassKey key = new ClassKey(rootType);</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_47'/>
+47
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_47'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>        QName name;</span></pre></td></tr>
+
+
+<tr>
+<td class='covered'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_48'/>
+48
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_48'></a>
+<span>
+</span>
+</span>
+</td>
+<td class='covered'><pre><span  class=''>        synchronized (_rootNames) {</span></pre></td></tr>
+
+
+<tr>
+<td class='covered'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_49'/>
+49
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_49'></a>
+<span>
+</span>
+</span>
+</td>
+<td class='covered'><pre><span  class=''>            name = _rootNames.get(key);</span></pre></td></tr>
+
+
+<tr>
+<td class='covered'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_50'/>
+50
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_50'></a>
+<span>
+</span>
+</span>
+</td>
+<td class='covered'><pre><span  class=''>        }</span></pre></td></tr>
+
+
+<tr>
+<td class='covered'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_51'/>
+51
+</td>
+<td class='survived'>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_51'>3</a>
+<span>
+
+1. findRootName : removed conditional - replaced equality check with false &rarr; SURVIVED<br/>
+
+2. findRootName : negated conditional &rarr; KILLED<br/>
+
+3. findRootName : removed conditional - replaced equality check with true &rarr; KILLED<br/>
+
+</span>
+</span>
+</td>
+<td class='covered'><pre><span  class='survived'>        if (name != null) {</span></pre></td></tr>
+
+
+<tr>
+<td class='covered'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_52'/>
+52
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_52'></a>
+<span>
+</span>
+</span>
+</td>
+<td class='covered'><pre><span  class=''>            return name;</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_53'/>
+53
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_53'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>        }</span></pre></td></tr>
+
+
+<tr>
+<td class='covered'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_54'/>
+54
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_54'></a>
+<span>
+</span>
+</span>
+</td>
+<td class='covered'><pre><span  class=''>        name = _findRootName(rootType, config);</span></pre></td></tr>
+
+
+<tr>
+<td class='covered'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_55'/>
+55
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_55'></a>
+<span>
+</span>
+</span>
+</td>
+<td class='covered'><pre><span  class=''>        synchronized (_rootNames) {</span></pre></td></tr>
+
+
+<tr>
+<td class='covered'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_56'/>
+56
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_56'></a>
+<span>
+</span>
+</span>
+</td>
+<td class='covered'><pre><span  class=''>            _rootNames.put(key, name);</span></pre></td></tr>
+
+
+<tr>
+<td class='covered'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_57'/>
+57
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_57'></a>
+<span>
+</span>
+</span>
+</td>
+<td class='covered'><pre><span  class=''>        }</span></pre></td></tr>
+
+
+<tr>
+<td class='covered'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_58'/>
+58
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_58'></a>
+<span>
+</span>
+</span>
+</td>
+<td class='covered'><pre><span  class=''>        return name;</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_59'/>
+59
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_59'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>    }</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_60'/>
+60
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_60'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>    </span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_61'/>
+61
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_61'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>    // NOTE: needed to be synchronized in 2.6.4, but 2.7.0 adds a proper fix</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_62'/>
+62
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_62'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>    // for annotation introspection hence not needed any more</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_63'/>
+63
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_63'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>    protected QName _findRootName(Class&#60;?&#62; rootType, MapperConfig&#60;?&#62; config)</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_64'/>
+64
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_64'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>    {</span></pre></td></tr>
+
+
+<tr>
+<td class='covered'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_65'/>
+65
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_65'></a>
+<span>
+</span>
+</span>
+</td>
+<td class='covered'><pre><span  class=''>        BeanDescription beanDesc = config.introspectClassAnnotations(rootType);</span></pre></td></tr>
+
+
+<tr>
+<td class='covered'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_66'/>
+66
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_66'></a>
+<span>
+</span>
+</span>
+</td>
+<td class='covered'><pre><span  class=''>        AnnotationIntrospector intr = config.getAnnotationIntrospector();</span></pre></td></tr>
+
+
+<tr>
+<td class='covered'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_67'/>
+67
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_67'></a>
+<span>
+</span>
+</span>
+</td>
+<td class='covered'><pre><span  class=''>        AnnotatedClass ac = beanDesc.getClassInfo();</span></pre></td></tr>
+
+
+<tr>
+<td class='covered'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_68'/>
+68
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_68'></a>
+<span>
+</span>
+</span>
+</td>
+<td class='covered'><pre><span  class=''>        String localName = null;</span></pre></td></tr>
+
+
+<tr>
+<td class='covered'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_69'/>
+69
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_69'></a>
+<span>
+</span>
+</span>
+</td>
+<td class='covered'><pre><span  class=''>        String ns = null;</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_70'/>
+70
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_70'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''></span></pre></td></tr>
+
+
+<tr>
+<td class='covered'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_71'/>
+71
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_71'></a>
+<span>
+</span>
+</span>
+</td>
+<td class='covered'><pre><span  class=''>        PropertyName root = intr.findRootName(ac);</span></pre></td></tr>
+
+
+<tr>
+<td class='covered'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_72'/>
+72
+</td>
+<td class='killed'>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_72'>3</a>
+<span>
+
+1. _findRootName : negated conditional &rarr; KILLED<br/>
+
+2. _findRootName : removed conditional - replaced equality check with false &rarr; KILLED<br/>
+
+3. _findRootName : removed conditional - replaced equality check with true &rarr; KILLED<br/>
+
+</span>
+</span>
+</td>
+<td class='covered'><pre><span  class='killed'>        if (root != null) {</span></pre></td></tr>
+
+
+<tr>
+<td class='covered'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_73'/>
+73
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_73'></a>
+<span>
+</span>
+</span>
+</td>
+<td class='covered'><pre><span  class=''>            localName = root.getSimpleName();</span></pre></td></tr>
+
+
+<tr>
+<td class='covered'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_74'/>
+74
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_74'></a>
+<span>
+</span>
+</span>
+</td>
+<td class='covered'><pre><span  class=''>            ns = root.getNamespace();</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_75'/>
+75
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_75'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>        }</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_76'/>
+76
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_76'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>        // No answer so far? Let&#39;s just default to using simple class name</span></pre></td></tr>
+
+
+<tr>
+<td class='covered'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_77'/>
+77
+</td>
+<td class='survived'>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_77'>6</a>
+<span>
+
+1. _findRootName : removed conditional - replaced equality check with false &rarr; SURVIVED<br/>
+
+2. _findRootName : negated conditional &rarr; KILLED<br/>
+
+3. _findRootName : negated conditional &rarr; KILLED<br/>
+
+4. _findRootName : removed conditional - replaced equality check with false &rarr; KILLED<br/>
+
+5. _findRootName : removed conditional - replaced equality check with true &rarr; KILLED<br/>
+
+6. _findRootName : removed conditional - replaced equality check with true &rarr; KILLED<br/>
+
+</span>
+</span>
+</td>
+<td class='covered'><pre><span  class='survived'>        if (localName == null || localName.length() == 0) {</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_78'/>
+78
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_78'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>            // Should we strip out enclosing class tho? For now, nope:</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_79'/>
+79
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_79'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>            // one caveat: array simple names end with &#34;[]&#34;; also, &#34;$&#34; needs replacing</span></pre></td></tr>
+
+
+<tr>
+<td class='covered'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_80'/>
+80
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_80'></a>
+<span>
+</span>
+</span>
+</td>
+<td class='covered'><pre><span  class=''>            localName = StaxUtil.sanitizeXmlTypeName(rootType.getSimpleName());</span></pre></td></tr>
+
+
+<tr>
+<td class='covered'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_81'/>
+81
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_81'></a>
+<span>
+</span>
+</span>
+</td>
+<td class='covered'><pre><span  class=''>            return new QName(&#34;&#34;, localName);</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_82'/>
+82
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_82'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>        }</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_83'/>
+83
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_83'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>        // Otherwise let&#39;s see if there&#39;s namespace, too (if we are missing it)</span></pre></td></tr>
+
+
+<tr>
+<td class='covered'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_84'/>
+84
+</td>
+<td class='survived'>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_84'>6</a>
+<span>
+
+1. _findRootName : removed conditional - replaced equality check with false &rarr; SURVIVED<br/>
+
+2. _findRootName : negated conditional &rarr; KILLED<br/>
+
+3. _findRootName : negated conditional &rarr; KILLED<br/>
+
+4. _findRootName : removed conditional - replaced equality check with false &rarr; KILLED<br/>
+
+5. _findRootName : removed conditional - replaced equality check with true &rarr; KILLED<br/>
+
+6. _findRootName : removed conditional - replaced equality check with true &rarr; KILLED<br/>
+
+</span>
+</span>
+</td>
+<td class='covered'><pre><span  class='survived'>        if (ns == null || ns.length() == 0) {</span></pre></td></tr>
+
+
+<tr>
+<td class='covered'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_85'/>
+85
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_85'></a>
+<span>
+</span>
+</span>
+</td>
+<td class='covered'><pre><span  class=''>            ns = findNamespace(intr, ac);</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_86'/>
+86
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_86'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>        }</span></pre></td></tr>
+
+
+<tr>
+<td class='covered'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_87'/>
+87
+</td>
+<td class='survived'>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_87'>3</a>
+<span>
+
+1. _findRootName : removed conditional - replaced equality check with false &rarr; SURVIVED<br/>
+
+2. _findRootName : negated conditional &rarr; KILLED<br/>
+
+3. _findRootName : removed conditional - replaced equality check with true &rarr; KILLED<br/>
+
+</span>
+</span>
+</td>
+<td class='covered'><pre><span  class='survived'>        if (ns == null) { // some QName impls barf on nulls...</span></pre></td></tr>
+
+
+<tr>
+<td class='covered'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_88'/>
+88
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_88'></a>
+<span>
+</span>
+</span>
+</td>
+<td class='covered'><pre><span  class=''>            ns = &#34;&#34;;</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_89'/>
+89
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_89'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>        }</span></pre></td></tr>
+
+
+<tr>
+<td class='covered'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_90'/>
+90
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_90'></a>
+<span>
+</span>
+</span>
+</td>
+<td class='covered'><pre><span  class=''>        return new QName(ns, localName);</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_91'/>
+91
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_91'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>    }</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_92'/>
+92
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_92'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''></span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_93'/>
+93
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_93'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>    private String findNamespace(AnnotationIntrospector ai, AnnotatedClass ann)</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_94'/>
+94
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_94'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>    {</span></pre></td></tr>
+
+
+<tr>
+<td class='covered'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_95'/>
+95
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_95'></a>
+<span>
+</span>
+</span>
+</td>
+<td class='covered'><pre><span  class=''>        for (AnnotationIntrospector intr : ai.allIntrospectors()) {</span></pre></td></tr>
+
+
+<tr>
+<td class='covered'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_96'/>
+96
+</td>
+<td class='survived'>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_96'>3</a>
+<span>
+
+1. findNamespace : removed conditional - replaced equality check with false &rarr; SURVIVED<br/>
+
+2. findNamespace : negated conditional &rarr; KILLED<br/>
+
+3. findNamespace : removed conditional - replaced equality check with true &rarr; KILLED<br/>
+
+</span>
+</span>
+</td>
+<td class='covered'><pre><span  class='survived'>            if (intr instanceof XmlAnnotationIntrospector) {</span></pre></td></tr>
+
+
+<tr>
+<td class='covered'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_97'/>
+97
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_97'></a>
+<span>
+</span>
+</span>
+</td>
+<td class='covered'><pre><span  class=''>                String ns = ((XmlAnnotationIntrospector) intr).findNamespace(ann);</span></pre></td></tr>
+
+
+<tr>
+<td class='covered'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_98'/>
+98
+</td>
+<td class='survived'>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_98'>3</a>
+<span>
+
+1. findNamespace : negated conditional &rarr; SURVIVED<br/>
+
+2. findNamespace : removed conditional - replaced equality check with false &rarr; SURVIVED<br/>
+
+3. findNamespace : removed conditional - replaced equality check with true &rarr; SURVIVED<br/>
+
+</span>
+</span>
+</td>
+<td class='covered'><pre><span  class='survived'>                if (ns != null) {</span></pre></td></tr>
+
+
+<tr>
+<td class='uncovered'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_99'/>
+99
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_99'></a>
+<span>
+</span>
+</span>
+</td>
+<td class='uncovered'><pre><span  class=''>                    return ns;</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_100'/>
+100
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_100'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>                }</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_101'/>
+101
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_101'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>            }</span></pre></td></tr>
+
+
+<tr>
+<td class='covered'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_102'/>
+102
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_102'></a>
+<span>
+</span>
+</span>
+</td>
+<td class='covered'><pre><span  class=''>        }</span></pre></td></tr>
+
+
+<tr>
+<td class='covered'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_103'/>
+103
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_103'></a>
+<span>
+</span>
+</span>
+</td>
+<td class='covered'><pre><span  class=''>        return null;</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_104'/>
+104
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_104'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>    }</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@5a09566b_105'/>
+105
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_105'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>}</span></pre></td></tr>
+
+
+
+<tr><td></td><td></td><td><h2>Mutations</h2></td></tr>
+
+
+<tr>
+<td><a href='#org.pitest.mutationtest.report.html.SourceFile@5a09566b_34'>34</a></td> 
+<td></td>
+<td>
+
+<a name='grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_34'/> 
+
+<p class='KILLED'><span class='pop'>1.<span><b>1</b><br/><b>Location : </b>readResolve<br/><b>Killed by : </b>com.fasterxml.jackson.dataformat.xml.ser.TestJDKSerializability.testMapper(com.fasterxml.jackson.dataformat.xml.ser.TestJDKSerializability)</span></span> negated conditional &rarr; KILLED</p> <p class='KILLED'><span class='pop'>2.<span><b>2</b><br/><b>Location : </b>readResolve<br/><b>Killed by : </b>com.fasterxml.jackson.dataformat.xml.ser.TestJDKSerializability.testMapper(com.fasterxml.jackson.dataformat.xml.ser.TestJDKSerializability)</span></span> removed conditional - replaced equality check with false &rarr; KILLED</p> <p class='SURVIVED'><span class='pop'>3.<span><b>3</b><br/><b>Location : </b>readResolve<br/><b>Killed by : </b>none</span></span> removed conditional - replaced equality check with true &rarr; SURVIVED</p> 
+</td>
+</tr>
+
+<tr>
+<td><a href='#org.pitest.mutationtest.report.html.SourceFile@5a09566b_51'>51</a></td> 
+<td></td>
+<td>
+
+<a name='grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_51'/> 
+
+<p class='KILLED'><span class='pop'>1.<span><b>1</b><br/><b>Location : </b>findRootName<br/><b>Killed by : </b>com.fasterxml.jackson.dataformat.xml.ser.TestSerialization.testCustomSerializer(com.fasterxml.jackson.dataformat.xml.ser.TestSerialization)</span></span> negated conditional &rarr; KILLED</p> <p class='SURVIVED'><span class='pop'>2.<span><b>2</b><br/><b>Location : </b>findRootName<br/><b>Killed by : </b>none</span></span> removed conditional - replaced equality check with false &rarr; SURVIVED</p> <p class='KILLED'><span class='pop'>3.<span><b>3</b><br/><b>Location : </b>findRootName<br/><b>Killed by : </b>com.fasterxml.jackson.dataformat.xml.ser.TestSerialization.testCustomSerializer(com.fasterxml.jackson.dataformat.xml.ser.TestSerialization)</span></span> removed conditional - replaced equality check with true &rarr; KILLED</p> 
+</td>
+</tr>
+
+<tr>
+<td><a href='#org.pitest.mutationtest.report.html.SourceFile@5a09566b_72'>72</a></td> 
+<td></td>
+<td>
+
+<a name='grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_72'/> 
+
+<p class='KILLED'><span class='pop'>1.<span><b>1</b><br/><b>Location : </b>_findRootName<br/><b>Killed by : </b>com.fasterxml.jackson.dataformat.xml.ser.TestSerialization.testCustomSerializer(com.fasterxml.jackson.dataformat.xml.ser.TestSerialization)</span></span> negated conditional &rarr; KILLED</p> <p class='KILLED'><span class='pop'>2.<span><b>2</b><br/><b>Location : </b>_findRootName<br/><b>Killed by : </b>com.fasterxml.jackson.dataformat.xml.ser.TestSerializationAttr.testIssue117AnySetterAttrs(com.fasterxml.jackson.dataformat.xml.ser.TestSerializationAttr)</span></span> removed conditional - replaced equality check with false &rarr; KILLED</p> <p class='KILLED'><span class='pop'>3.<span><b>3</b><br/><b>Location : </b>_findRootName<br/><b>Killed by : </b>com.fasterxml.jackson.dataformat.xml.ser.TestSerialization.testCustomSerializer(com.fasterxml.jackson.dataformat.xml.ser.TestSerialization)</span></span> removed conditional - replaced equality check with true &rarr; KILLED</p> 
+</td>
+</tr>
+
+<tr>
+<td><a href='#org.pitest.mutationtest.report.html.SourceFile@5a09566b_77'>77</a></td> 
+<td></td>
+<td>
+
+<a name='grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_77'/> 
+
+<p class='KILLED'><span class='pop'>1.<span><b>1</b><br/><b>Location : </b>_findRootName<br/><b>Killed by : </b>com.fasterxml.jackson.dataformat.xml.ser.TestSerialization.testCustomSerializer(com.fasterxml.jackson.dataformat.xml.ser.TestSerialization)</span></span> negated conditional &rarr; KILLED</p> <p class='KILLED'><span class='pop'>2.<span><b>2</b><br/><b>Location : </b>_findRootName<br/><b>Killed by : </b>com.fasterxml.jackson.dataformat.xml.ser.TestSerializationAttr.testIssue117AnySetterAttrs(com.fasterxml.jackson.dataformat.xml.ser.TestSerializationAttr)</span></span> negated conditional &rarr; KILLED</p> <p class='KILLED'><span class='pop'>3.<span><b>3</b><br/><b>Location : </b>_findRootName<br/><b>Killed by : </b>com.fasterxml.jackson.dataformat.xml.ser.TestSerializationAttr.testIssue117AnySetterAttrs(com.fasterxml.jackson.dataformat.xml.ser.TestSerializationAttr)</span></span> removed conditional - replaced equality check with false &rarr; KILLED</p> <p class='SURVIVED'><span class='pop'>4.<span><b>4</b><br/><b>Location : </b>_findRootName<br/><b>Killed by : </b>none</span></span> removed conditional - replaced equality check with false &rarr; SURVIVED</p> <p class='KILLED'><span class='pop'>5.<span><b>5</b><br/><b>Location : </b>_findRootName<br/><b>Killed by : </b>com.fasterxml.jackson.dataformat.xml.ser.TestSerialization.testCustomSerializer(com.fasterxml.jackson.dataformat.xml.ser.TestSerialization)</span></span> removed conditional - replaced equality check with true &rarr; KILLED</p> <p class='KILLED'><span class='pop'>6.<span><b>6</b><br/><b>Location : </b>_findRootName<br/><b>Killed by : </b>com.fasterxml.jackson.dataformat.xml.ser.TestSerializationAttr.testIssue117AnySetterAttrs(com.fasterxml.jackson.dataformat.xml.ser.TestSerializationAttr)</span></span> removed conditional - replaced equality check with true &rarr; KILLED</p> 
+</td>
+</tr>
+
+<tr>
+<td><a href='#org.pitest.mutationtest.report.html.SourceFile@5a09566b_84'>84</a></td> 
+<td></td>
+<td>
+
+<a name='grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_84'/> 
+
+<p class='KILLED'><span class='pop'>1.<span><b>1</b><br/><b>Location : </b>_findRootName<br/><b>Killed by : </b>com.fasterxml.jackson.dataformat.xml.ser.TestNamespaces.testRootNamespace(com.fasterxml.jackson.dataformat.xml.ser.TestNamespaces)</span></span> negated conditional &rarr; KILLED</p> <p class='KILLED'><span class='pop'>2.<span><b>2</b><br/><b>Location : </b>_findRootName<br/><b>Killed by : </b>com.fasterxml.jackson.dataformat.xml.ser.TestNamespaces.testRootNamespace(com.fasterxml.jackson.dataformat.xml.ser.TestNamespaces)</span></span> negated conditional &rarr; KILLED</p> <p class='KILLED'><span class='pop'>3.<span><b>3</b><br/><b>Location : </b>_findRootName<br/><b>Killed by : </b>com.fasterxml.jackson.dataformat.xml.ser.TestNamespaces.testRootNamespace(com.fasterxml.jackson.dataformat.xml.ser.TestNamespaces)</span></span> removed conditional - replaced equality check with false &rarr; KILLED</p> <p class='SURVIVED'><span class='pop'>4.<span><b>4</b><br/><b>Location : </b>_findRootName<br/><b>Killed by : </b>none</span></span> removed conditional - replaced equality check with false &rarr; SURVIVED</p> <p class='KILLED'><span class='pop'>5.<span><b>5</b><br/><b>Location : </b>_findRootName<br/><b>Killed by : </b>com.fasterxml.jackson.dataformat.xml.jaxb.AttributesWithJAXBTest.testAttributeAndElement(com.fasterxml.jackson.dataformat.xml.jaxb.AttributesWithJAXBTest)</span></span> removed conditional - replaced equality check with true &rarr; KILLED</p> <p class='KILLED'><span class='pop'>6.<span><b>6</b><br/><b>Location : </b>_findRootName<br/><b>Killed by : </b>com.fasterxml.jackson.dataformat.xml.ser.TestNamespaces.testRootNamespace(com.fasterxml.jackson.dataformat.xml.ser.TestNamespaces)</span></span> removed conditional - replaced equality check with true &rarr; KILLED</p> 
+</td>
+</tr>
+
+<tr>
+<td><a href='#org.pitest.mutationtest.report.html.SourceFile@5a09566b_87'>87</a></td> 
+<td></td>
+<td>
+
+<a name='grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_87'/> 
+
+<p class='KILLED'><span class='pop'>1.<span><b>1</b><br/><b>Location : </b>_findRootName<br/><b>Killed by : </b>com.fasterxml.jackson.dataformat.xml.ser.TestNamespaces.testRootNamespace(com.fasterxml.jackson.dataformat.xml.ser.TestNamespaces)</span></span> negated conditional &rarr; KILLED</p> <p class='SURVIVED'><span class='pop'>2.<span><b>2</b><br/><b>Location : </b>_findRootName<br/><b>Killed by : </b>none</span></span> removed conditional - replaced equality check with false &rarr; SURVIVED</p> <p class='KILLED'><span class='pop'>3.<span><b>3</b><br/><b>Location : </b>_findRootName<br/><b>Killed by : </b>com.fasterxml.jackson.dataformat.xml.ser.TestNamespaces.testRootNamespace(com.fasterxml.jackson.dataformat.xml.ser.TestNamespaces)</span></span> removed conditional - replaced equality check with true &rarr; KILLED</p> 
+</td>
+</tr>
+
+<tr>
+<td><a href='#org.pitest.mutationtest.report.html.SourceFile@5a09566b_96'>96</a></td> 
+<td></td>
+<td>
+
+<a name='grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_96'/> 
+
+<p class='KILLED'><span class='pop'>1.<span><b>1</b><br/><b>Location : </b>findNamespace<br/><b>Killed by : </b>com.fasterxml.jackson.dataformat.xml.ser.TestSerializationAttr.testIssue117AnySetterAttrs(com.fasterxml.jackson.dataformat.xml.ser.TestSerializationAttr)</span></span> negated conditional &rarr; KILLED</p> <p class='SURVIVED'><span class='pop'>2.<span><b>2</b><br/><b>Location : </b>findNamespace<br/><b>Killed by : </b>none</span></span> removed conditional - replaced equality check with false &rarr; SURVIVED</p> <p class='KILLED'><span class='pop'>3.<span><b>3</b><br/><b>Location : </b>findNamespace<br/><b>Killed by : </b>com.fasterxml.jackson.dataformat.xml.ser.TestSerializationAttr.testIssue117AnySetterAttrs(com.fasterxml.jackson.dataformat.xml.ser.TestSerializationAttr)</span></span> removed conditional - replaced equality check with true &rarr; KILLED</p> 
+</td>
+</tr>
+
+<tr>
+<td><a href='#org.pitest.mutationtest.report.html.SourceFile@5a09566b_98'>98</a></td> 
+<td></td>
+<td>
+
+<a name='grouporg.pitest.mutationtest.report.html.SourceFile@5a09566b_98'/> 
+
+<p class='SURVIVED'><span class='pop'>1.<span><b>1</b><br/><b>Location : </b>findNamespace<br/><b>Killed by : </b>none</span></span> negated conditional &rarr; SURVIVED</p> <p class='SURVIVED'><span class='pop'>2.<span><b>2</b><br/><b>Location : </b>findNamespace<br/><b>Killed by : </b>none</span></span> removed conditional - replaced equality check with false &rarr; SURVIVED</p> <p class='SURVIVED'><span class='pop'>3.<span><b>3</b><br/><b>Location : </b>findNamespace<br/><b>Killed by : </b>none</span></span> removed conditional - replaced equality check with true &rarr; SURVIVED</p> 
+</td>
+</tr>
+
+</table>
+
+
+<h2>Active mutators</h2>
+<ul>
+
+<li class='mutator'>CONDITIONALS_BOUNDARY</li>
+
+<li class='mutator'>NEGATE_CONDITIONALS</li>
+
+<li class='mutator'>REMOVE_CONDITIONALS_EQUAL_ELSE</li>
+
+<li class='mutator'>REMOVE_CONDITIONALS_EQUAL_IF</li>
+
+<li class='mutator'>REMOVE_CONDITIONALS_ORDER_ELSE</li>
+
+<li class='mutator'>REMOVE_CONDITIONALS_ORDER_IF</li>
+
+<li class='mutator'>REMOVE_INCREMENTS</li>
+
+</ul>
+
+<h2>Tests examined</h2>
+<ul>
+<li>com.fasterxml.jackson.dataformat.xml.misc.XmlTextTest.testSimple198(com.fasterxml.jackson.dataformat.xml.misc.XmlTextTest) (3 ms)</li><li>com.fasterxml.jackson.dataformat.xml.misc.UnwrappingWithXMLTest.testSimpleUnwrappingRoundtrip(com.fasterxml.jackson.dataformat.xml.misc.UnwrappingWithXMLTest) (7 ms)</li><li>com.fasterxml.jackson.dataformat.xml.ser.TestSerialization.testCDataString(com.fasterxml.jackson.dataformat.xml.ser.TestSerialization) (5 ms)</li><li>com.fasterxml.jackson.dataformat.xml.ser.TestSerialization.testCustomSerializer(com.fasterxml.jackson.dataformat.xml.ser.TestSerialization) (5 ms)</li><li>com.fasterxml.jackson.dataformat.xml.lists.ListWithAttributes.testIdsFromAttributes(com.fasterxml.jackson.dataformat.xml.lists.ListWithAttributes) (3 ms)</li><li>com.fasterxml.jackson.dataformat.xml.ser.TestBinaryStreamToXMLSerialization.testWith2Bytes(com.fasterxml.jackson.dataformat.xml.ser.TestBinaryStreamToXMLSerialization) (2 ms)</li><li>com.fasterxml.jackson.dataformat.xml.lists.UnwrappedListsTest.testUnwrappedLists(com.fasterxml.jackson.dataformat.xml.lists.UnwrappedListsTest) (2 ms)</li><li>com.fasterxml.jackson.dataformat.xml.ser.TestSerialization.testSimpleNsElem(com.fasterxml.jackson.dataformat.xml.ser.TestSerialization) (6 ms)</li><li>com.fasterxml.jackson.dataformat.xml.deser.TestViews.testIssue7(com.fasterxml.jackson.dataformat.xml.deser.TestViews) (6 ms)</li><li>com.fasterxml.jackson.dataformat.xml.jaxb.AttributesWithJAXBTest.testAttributeAndElement(com.fasterxml.jackson.dataformat.xml.jaxb.AttributesWithJAXBTest) (4 ms)</li><li>com.fasterxml.jackson.dataformat.xml.ser.TestSerializationOrdering.testOrdering(com.fasterxml.jackson.dataformat.xml.ser.TestSerializationOrdering) (2 ms)</li><li>com.fasterxml.jackson.dataformat.xml.lists.ListSerializationTest.testStringList(com.fasterxml.jackson.dataformat.xml.lists.ListSerializationTest) (2 ms)</li><li>com.fasterxml.jackson.dataformat.xml.ser.TestBinaryStreamToXMLSerialization.testWith1Byte(com.fasterxml.jackson.dataformat.xml.ser.TestBinaryStreamToXMLSerialization) (3 ms)</li><li>com.fasterxml.jackson.dataformat.xml.ser.TestSerialization.testCDataStringArray(com.fasterxml.jackson.dataformat.xml.ser.TestSerialization) (5 ms)</li><li>com.fasterxml.jackson.dataformat.xml.misc.PolymorphicTypesTest.testAsClassProperty(com.fasterxml.jackson.dataformat.xml.misc.PolymorphicTypesTest) (3 ms)</li><li>com.fasterxml.jackson.dataformat.xml.lists.ListDeserializationTest.testWrappedList(com.fasterxml.jackson.dataformat.xml.lists.ListDeserializationTest) (4 ms)</li><li>com.fasterxml.jackson.dataformat.xml.ser.TestSerializationAttr.testIssue117AnySetterAttrs(com.fasterxml.jackson.dataformat.xml.ser.TestSerializationAttr) (2 ms)</li><li>com.fasterxml.jackson.dataformat.xml.incr.IncrementalWritingTest.testSimple(com.fasterxml.jackson.dataformat.xml.incr.IncrementalWritingTest) (2 ms)</li><li>com.fasterxml.jackson.dataformat.xml.misc.PolymorphicTypesTest.testAsPropertyWithObjectId(com.fasterxml.jackson.dataformat.xml.misc.PolymorphicTypesTest) (3 ms)</li><li>com.fasterxml.jackson.dataformat.xml.deser.SimpleStringValuesTest.testStringsInList(com.fasterxml.jackson.dataformat.xml.deser.SimpleStringValuesTest) (7 ms)</li><li>com.fasterxml.jackson.dataformat.xml.jaxb.WithJAXBAnnotationsTest.testAsTextWithJAXB(com.fasterxml.jackson.dataformat.xml.jaxb.WithJAXBAnnotationsTest) (2 ms)</li><li>com.fasterxml.jackson.dataformat.xml.MapperCopyTest.testMapperSerialization(com.fasterxml.jackson.dataformat.xml.MapperCopyTest) (59 ms)</li><li>com.fasterxml.jackson.dataformat.xml.jaxb.ElementWrapperTest.testElementWrapper(com.fasterxml.jackson.dataformat.xml.jaxb.ElementWrapperTest) (2 ms)</li><li>com.fasterxml.jackson.dataformat.xml.misc.RootNameTest.testRootNameAnnotation(com.fasterxml.jackson.dataformat.xml.misc.RootNameTest) (2 ms)</li><li>com.fasterxml.jackson.dataformat.xml.lists.UnwrappedListsTest.testWrappedLists(com.fasterxml.jackson.dataformat.xml.lists.UnwrappedListsTest) (2 ms)</li><li>com.fasterxml.jackson.dataformat.xml.lists.ListAnnotationSharingTest.testAnnotationSharing(com.fasterxml.jackson.dataformat.xml.lists.ListAnnotationSharingTest) (4 ms)</li><li>com.fasterxml.jackson.dataformat.xml.lists.DeserializePolyList178Test.testPolyIdList178(com.fasterxml.jackson.dataformat.xml.lists.DeserializePolyList178Test) (5 ms)</li><li>com.fasterxml.jackson.dataformat.xml.misc.UnwrappingWithXMLTest.testUnwrappingSubWithAttribute(com.fasterxml.jackson.dataformat.xml.misc.UnwrappingWithXMLTest) (3 ms)</li><li>com.fasterxml.jackson.dataformat.xml.lists.RootListHandlingTest.testArraySerialization(com.fasterxml.jackson.dataformat.xml.lists.RootListHandlingTest) (6 ms)</li><li>com.fasterxml.jackson.dataformat.xml.ser.TestSerialization.testMap(com.fasterxml.jackson.dataformat.xml.ser.TestSerialization) (8 ms)</li><li>com.fasterxml.jackson.dataformat.xml.ser.TestNamespaces.testRootNamespace(com.fasterxml.jackson.dataformat.xml.ser.TestNamespaces) (1 ms)</li><li>com.fasterxml.jackson.dataformat.xml.lists.ListDeserializationTest.testWrappedListWithGetters(com.fasterxml.jackson.dataformat.xml.lists.ListDeserializationTest) (3 ms)</li><li>com.fasterxml.jackson.dataformat.xml.stream.FormatDetectionTest.testListViaObjectReader(com.fasterxml.jackson.dataformat.xml.stream.FormatDetectionTest) (9 ms)</li><li>com.fasterxml.jackson.dataformat.xml.ser.TestSerialization.testNakedMap(com.fasterxml.jackson.dataformat.xml.ser.TestSerialization) (6 ms)</li><li>com.fasterxml.jackson.dataformat.xml.deser.ExceptionDeserializationTest.testEmptyString162(com.fasterxml.jackson.dataformat.xml.deser.ExceptionDeserializationTest) (22 ms)</li><li>com.fasterxml.jackson.dataformat.xml.misc.XmlTextTest.testXmlTextWithSuppressedValue(com.fasterxml.jackson.dataformat.xml.misc.XmlTextTest) (2 ms)</li><li>com.fasterxml.jackson.dataformat.xml.deser.TestEnums.testEnum(com.fasterxml.jackson.dataformat.xml.deser.TestEnums) (3 ms)</li><li>com.fasterxml.jackson.dataformat.xml.ser.TestSerialization.testSimpleAttrAndElem(com.fasterxml.jackson.dataformat.xml.ser.TestSerialization) (4 ms)</li><li>com.fasterxml.jackson.dataformat.xml.deser.TestViews.testNullSuppression(com.fasterxml.jackson.dataformat.xml.deser.TestViews) (3 ms)</li><li>com.fasterxml.jackson.dataformat.xml.lists.ListRoundtripTest.testParentListRoundtrip(com.fasterxml.jackson.dataformat.xml.lists.ListRoundtripTest) (4 ms)</li><li>com.fasterxml.jackson.dataformat.xml.jaxb.ElementWrapperTest.testNoElementWrapper(com.fasterxml.jackson.dataformat.xml.jaxb.ElementWrapperTest) (2 ms)</li><li>com.fasterxml.jackson.dataformat.xml.ser.TestXmlDeclaration.testXml10Declaration(com.fasterxml.jackson.dataformat.xml.ser.TestXmlDeclaration) (1 ms)</li><li>com.fasterxml.jackson.dataformat.xml.lists.ListSerializationTest.testSimpleWrappedList(com.fasterxml.jackson.dataformat.xml.lists.ListSerializationTest) (2 ms)</li><li>com.fasterxml.jackson.dataformat.xml.jaxb.WithJAXBAnnotationsTest.testSerializeAsAttr(com.fasterxml.jackson.dataformat.xml.jaxb.WithJAXBAnnotationsTest) (2 ms)</li><li>com.fasterxml.jackson.dataformat.xml.stream.XmlGeneratorTest.testWriteToFile(com.fasterxml.jackson.dataformat.xml.stream.XmlGeneratorTest) (191 ms)</li><li>com.fasterxml.jackson.dataformat.xml.jaxb.WithJAXBAnnotationsTest.testRootName(com.fasterxml.jackson.dataformat.xml.jaxb.WithJAXBAnnotationsTest) (2 ms)</li><li>com.fasterxml.jackson.dataformat.xml.ser.TestBinaryStreamToXMLSerialization.testWith0Bytes(com.fasterxml.jackson.dataformat.xml.ser.TestBinaryStreamToXMLSerialization) (5 ms)</li><li>com.fasterxml.jackson.dataformat.xml.ser.TestBinaryStreamToXMLSerialization.testWith3Bytes(com.fasterxml.jackson.dataformat.xml.ser.TestBinaryStreamToXMLSerialization) (2 ms)</li><li>com.fasterxml.jackson.dataformat.xml.lists.WrappedListsTest.testEmptyList(com.fasterxml.jackson.dataformat.xml.lists.WrappedListsTest) (1 ms)</li><li>com.fasterxml.jackson.dataformat.xml.deser.TestViews.testIssue44(com.fasterxml.jackson.dataformat.xml.deser.TestViews) (4 ms)</li><li>com.fasterxml.jackson.dataformat.xml.ser.TestSerialization.testSimpleAttribute(com.fasterxml.jackson.dataformat.xml.ser.TestSerialization) (4 ms)</li><li>com.fasterxml.jackson.dataformat.xml.ser.TestSerializationManual.testIssue54(com.fasterxml.jackson.dataformat.xml.ser.TestSerializationManual) (2 ms)</li><li>com.fasterxml.jackson.dataformat.xml.jaxb.AttributesWithJAXBTest.testTwoAttributes(com.fasterxml.jackson.dataformat.xml.jaxb.AttributesWithJAXBTest) (2 ms)</li><li>com.fasterxml.jackson.dataformat.xml.ser.TestSerializerCustom.testIssue42(com.fasterxml.jackson.dataformat.xml.ser.TestSerializerCustom) (4 ms)</li><li>com.fasterxml.jackson.dataformat.xml.jaxb.WithJAXBAnnotationsTest.testPersonAsXml(com.fasterxml.jackson.dataformat.xml.jaxb.WithJAXBAnnotationsTest) (3 ms)</li><li>com.fasterxml.jackson.dataformat.xml.deser.NullConversionsGenericTest.testNullsToGenericPojo(com.fasterxml.jackson.dataformat.xml.deser.NullConversionsGenericTest) (9 ms)</li><li>com.fasterxml.jackson.dataformat.xml.ser.TestSerializationAttr.testSimpleNsAttr(com.fasterxml.jackson.dataformat.xml.ser.TestSerializationAttr) (2 ms)</li><li>com.fasterxml.jackson.dataformat.xml.misc.EmptyPolymorphicTest.testEmpty(com.fasterxml.jackson.dataformat.xml.misc.EmptyPolymorphicTest) (3 ms)</li><li>com.fasterxml.jackson.dataformat.xml.lists.Issue101UnwrappedListAttributesTest.testWithTwoAttributes(com.fasterxml.jackson.dataformat.xml.lists.Issue101UnwrappedListAttributesTest) (4 ms)</li><li>com.fasterxml.jackson.dataformat.xml.MapperCopyTest.testCopyWith(com.fasterxml.jackson.dataformat.xml.MapperCopyTest) (43 ms)</li><li>com.fasterxml.jackson.dataformat.xml.misc.UnwrappingWithXMLTest.testUnwrappingWithAttribute(com.fasterxml.jackson.dataformat.xml.misc.UnwrappingWithXMLTest) (2 ms)</li><li>com.fasterxml.jackson.dataformat.xml.ser.TestSerializationAttr.testIssue6(com.fasterxml.jackson.dataformat.xml.ser.TestSerializationAttr) (2 ms)</li><li>com.fasterxml.jackson.dataformat.xml.lists.UnwrappedListsTest.testDefaultWrapping(com.fasterxml.jackson.dataformat.xml.lists.UnwrappedListsTest) (5 ms)</li><li>com.fasterxml.jackson.dataformat.xml.ser.TestBinaryStreamToXMLSerialization.testWith4Bytes(com.fasterxml.jackson.dataformat.xml.ser.TestBinaryStreamToXMLSerialization) (3 ms)</li><li>com.fasterxml.jackson.dataformat.xml.deser.TestDeserialization.testRoundTripWithJacksonExample(com.fasterxml.jackson.dataformat.xml.deser.TestDeserialization) (9 ms)</li><li>com.fasterxml.jackson.dataformat.xml.lists.RootListHandlingTest.testListSerialization(com.fasterxml.jackson.dataformat.xml.lists.RootListHandlingTest) (7 ms)</li><li>com.fasterxml.jackson.dataformat.xml.ser.TestXmlDeclaration.testXml11Declaration(com.fasterxml.jackson.dataformat.xml.ser.TestXmlDeclaration) (1 ms)</li><li>com.fasterxml.jackson.dataformat.xml.lists.ListRoundtripTest.testListWithAttrOnlyValues(com.fasterxml.jackson.dataformat.xml.lists.ListRoundtripTest) (3 ms)</li><li>com.fasterxml.jackson.dataformat.xml.RoundtripContentTest.testRoundtrip(com.fasterxml.jackson.dataformat.xml.RoundtripContentTest) (83 ms)</li><li>com.fasterxml.jackson.dataformat.xml.stream.XmlParserTest.testRoundTripWithSample(com.fasterxml.jackson.dataformat.xml.stream.XmlParserTest) (4 ms)</li><li>com.fasterxml.jackson.dataformat.xml.ser.TestJDKSerializability.testMapper(com.fasterxml.jackson.dataformat.xml.ser.TestJDKSerializability) (6 ms)</li><li>com.fasterxml.jackson.dataformat.xml.ser.TestSerializationAttr.testIssue19(com.fasterxml.jackson.dataformat.xml.ser.TestSerializationAttr) (2 ms)</li><li>com.fasterxml.jackson.dataformat.xml.misc.PolymorphicTypesTest.testAsClassObject(com.fasterxml.jackson.dataformat.xml.misc.PolymorphicTypesTest) (2 ms)</li>
+</ul>
+
+<br/>
+
+Report generated by <a href='http://pitest.org'>PIT</a> 1.7.3
+
+</body>
+</html>

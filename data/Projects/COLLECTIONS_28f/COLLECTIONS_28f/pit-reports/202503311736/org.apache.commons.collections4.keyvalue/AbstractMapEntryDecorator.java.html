@@ -1,0 +1,1451 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <link rel="stylesheet" type="text/css" href="../style.css">
+</head>
+<body>
+
+
+<h1>AbstractMapEntryDecorator.java</h1>
+
+<table class="src">
+
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_1'/>
+1
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_1'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>/*</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_2'/>
+2
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_2'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''> * Licensed to the Apache Software Foundation (ASF) under one or more</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_3'/>
+3
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_3'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''> * contributor license agreements.  See the NOTICE file distributed with</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_4'/>
+4
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_4'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''> * this work for additional information regarding copyright ownership.</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_5'/>
+5
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_5'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''> * The ASF licenses this file to You under the Apache License, Version 2.0</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_6'/>
+6
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_6'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''> * (the &#34;License&#34;); you may not use this file except in compliance with</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_7'/>
+7
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_7'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''> * the License.  You may obtain a copy of the License at</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_8'/>
+8
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_8'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''> *</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_9'/>
+9
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_9'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''> *      http://www.apache.org/licenses/LICENSE-2.0</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_10'/>
+10
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_10'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''> *</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_11'/>
+11
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_11'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''> * Unless required by applicable law or agreed to in writing, software</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_12'/>
+12
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_12'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''> * distributed under the License is distributed on an &#34;AS IS&#34; BASIS,</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_13'/>
+13
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_13'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''> * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_14'/>
+14
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_14'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''> * See the License for the specific language governing permissions and</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_15'/>
+15
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_15'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''> * limitations under the License.</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_16'/>
+16
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_16'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''> */</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_17'/>
+17
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_17'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>package org.apache.commons.collections4.keyvalue;</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_18'/>
+18
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_18'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''></span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_19'/>
+19
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_19'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>import java.util.Map;</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_20'/>
+20
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_20'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''></span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_21'/>
+21
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_21'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>import org.apache.commons.collections4.KeyValue;</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_22'/>
+22
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_22'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''></span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_23'/>
+23
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_23'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>/**</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_24'/>
+24
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_24'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''> * Provides a base decorator that allows additional functionality to be</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_25'/>
+25
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_25'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''> * added to a {@link java.util.Map.Entry Map.Entry}.</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_26'/>
+26
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_26'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''> *</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_27'/>
+27
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_27'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''> * @since 3.0</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_28'/>
+28
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_28'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''> * @version $Id$</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_29'/>
+29
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_29'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''> */</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_30'/>
+30
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_30'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>public abstract class AbstractMapEntryDecorator&#60;K, V&#62; implements Map.Entry&#60;K, V&#62;, KeyValue&#60;K, V&#62; {</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_31'/>
+31
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_31'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''></span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_32'/>
+32
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_32'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>    /** The &#60;code&#62;Map.Entry&#60;/code&#62; to decorate */</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_33'/>
+33
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_33'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>    private final Map.Entry&#60;K, V&#62; entry;</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_34'/>
+34
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_34'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''></span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_35'/>
+35
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_35'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>    /**</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_36'/>
+36
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_36'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>     * Constructor that wraps (not copies).</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_37'/>
+37
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_37'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>     *</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_38'/>
+38
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_38'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>     * @param entry  the &#60;code&#62;Map.Entry&#60;/code&#62; to decorate, must not be null</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_39'/>
+39
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_39'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>     * @throws NullPointerException if the collection is null</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_40'/>
+40
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_40'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>     */</span></pre></td></tr>
+
+
+<tr>
+<td class='covered'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_41'/>
+41
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_41'></a>
+<span>
+</span>
+</span>
+</td>
+<td class='covered'><pre><span  class=''>    public AbstractMapEntryDecorator(final Map.Entry&#60;K, V&#62; entry) {</span></pre></td></tr>
+
+
+<tr>
+<td class='covered'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_42'/>
+42
+</td>
+<td class='survived'>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_42'>3</a>
+<span>
+1. &#60;init&#62; : removed conditional - replaced equality check with false &rarr; SURVIVED<br/>
+2. &#60;init&#62; : negated conditional &rarr; KILLED<br/>
+3. &#60;init&#62; : removed conditional - replaced equality check with true &rarr; KILLED<br/>
+
+</span>
+</span>
+</td>
+<td class='covered'><pre><span  class='survived'>        if (entry == null) {</span></pre></td></tr>
+
+
+<tr>
+<td class='uncovered'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_43'/>
+43
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_43'></a>
+<span>
+</span>
+</span>
+</td>
+<td class='uncovered'><pre><span  class=''>            throw new NullPointerException(&#34;Map Entry must not be null.&#34;);</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_44'/>
+44
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_44'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>        }</span></pre></td></tr>
+
+
+<tr>
+<td class='covered'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_45'/>
+45
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_45'></a>
+<span>
+</span>
+</span>
+</td>
+<td class='covered'><pre><span  class=''>        this.entry = entry;</span></pre></td></tr>
+
+
+<tr>
+<td class='covered'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_46'/>
+46
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_46'></a>
+<span>
+</span>
+</span>
+</td>
+<td class='covered'><pre><span  class=''>    }</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_47'/>
+47
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_47'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''></span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_48'/>
+48
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_48'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>    /**</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_49'/>
+49
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_49'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>     * Gets the map being decorated.</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_50'/>
+50
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_50'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>     *</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_51'/>
+51
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_51'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>     * @return the decorated map</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_52'/>
+52
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_52'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>     */</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_53'/>
+53
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_53'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>    protected Map.Entry&#60;K, V&#62; getMapEntry() {</span></pre></td></tr>
+
+
+<tr>
+<td class='covered'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_54'/>
+54
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_54'></a>
+<span>
+</span>
+</span>
+</td>
+<td class='covered'><pre><span  class=''>        return entry;</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_55'/>
+55
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_55'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>    }</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_56'/>
+56
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_56'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''></span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_57'/>
+57
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_57'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>    //-----------------------------------------------------------------------</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_58'/>
+58
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_58'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''></span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_59'/>
+59
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_59'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>    @Override</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_60'/>
+60
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_60'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>    public K getKey() {</span></pre></td></tr>
+
+
+<tr>
+<td class='covered'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_61'/>
+61
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_61'></a>
+<span>
+</span>
+</span>
+</td>
+<td class='covered'><pre><span  class=''>        return entry.getKey();</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_62'/>
+62
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_62'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>    }</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_63'/>
+63
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_63'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''></span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_64'/>
+64
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_64'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>    @Override</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_65'/>
+65
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_65'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>    public V getValue() {</span></pre></td></tr>
+
+
+<tr>
+<td class='covered'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_66'/>
+66
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_66'></a>
+<span>
+</span>
+</span>
+</td>
+<td class='covered'><pre><span  class=''>        return entry.getValue();</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_67'/>
+67
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_67'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>    }</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_68'/>
+68
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_68'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''></span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_69'/>
+69
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_69'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>    @Override</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_70'/>
+70
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_70'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>    public V setValue(final V object) {</span></pre></td></tr>
+
+
+<tr>
+<td class='uncovered'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_71'/>
+71
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_71'></a>
+<span>
+</span>
+</span>
+</td>
+<td class='uncovered'><pre><span  class=''>        return entry.setValue(object);</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_72'/>
+72
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_72'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>    }</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_73'/>
+73
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_73'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''></span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_74'/>
+74
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_74'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>    @Override</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_75'/>
+75
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_75'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>    public boolean equals(final Object object) {</span></pre></td></tr>
+
+
+<tr>
+<td class='uncovered'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_76'/>
+76
+</td>
+<td class='survived'>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_76'>2</a>
+<span>
+1. equals : negated conditional &rarr; NO_COVERAGE<br/>
+2. equals : removed conditional - replaced equality check with true &rarr; NO_COVERAGE<br/>
+
+</span>
+</span>
+</td>
+<td class='uncovered'><pre><span  class='survived'>        if (object == this) {</span></pre></td></tr>
+
+
+<tr>
+<td class='uncovered'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_77'/>
+77
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_77'></a>
+<span>
+</span>
+</span>
+</td>
+<td class='uncovered'><pre><span  class=''>            return true;</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_78'/>
+78
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_78'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>        }</span></pre></td></tr>
+
+
+<tr>
+<td class='uncovered'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_79'/>
+79
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_79'></a>
+<span>
+</span>
+</span>
+</td>
+<td class='uncovered'><pre><span  class=''>        return entry.equals(object);</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_80'/>
+80
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_80'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>    }</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_81'/>
+81
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_81'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''></span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_82'/>
+82
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_82'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>    @Override</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_83'/>
+83
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_83'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>    public int hashCode() {</span></pre></td></tr>
+
+
+<tr>
+<td class='covered'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_84'/>
+84
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_84'></a>
+<span>
+</span>
+</span>
+</td>
+<td class='covered'><pre><span  class=''>        return entry.hashCode();</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_85'/>
+85
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_85'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>    }</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_86'/>
+86
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_86'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''></span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_87'/>
+87
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_87'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>    @Override</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_88'/>
+88
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_88'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>    public String toString() {</span></pre></td></tr>
+
+
+<tr>
+<td class='uncovered'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_89'/>
+89
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_89'></a>
+<span>
+</span>
+</span>
+</td>
+<td class='uncovered'><pre><span  class=''>        return entry.toString();</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_90'/>
+90
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_90'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>    }</span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_91'/>
+91
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_91'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''></span></pre></td></tr>
+
+
+<tr>
+<td class='na'>
+<a name='org.pitest.mutationtest.report.html.SourceFile@3f3fb878_92'/>
+92
+</td>
+<td class=''>
+<span class='pop'>
+<a href='#grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_92'></a>
+<span>
+</span>
+</span>
+</td>
+<td class=''><pre><span  class=''>}</span></pre></td></tr>
+
+
+
+<tr><td></td><td></td><td><h2>Mutations</h2></td></tr>
+
+<tr>
+<td><a href='#org.pitest.mutationtest.report.html.SourceFile@3f3fb878_42'>42</a></td> 
+<td></td>
+<td>
+
+<a name='grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_42'/> 
+
+<p class='KILLED'><span class='pop'>1.<span><b>1</b><br/><b>Location : </b>&#60;init&#62;<br/><b>Killed by : </b>org.apache.commons.collections4.map.UnmodifiableMapTest.testEntrySetContains3(org.apache.commons.collections4.map.UnmodifiableMapTest)</span></span> negated conditional &rarr; KILLED</p> <p class='SURVIVED'><span class='pop'>2.<span><b>2</b><br/><b>Location : </b>&#60;init&#62;<br/><b>Killed by : </b>none</span></span> removed conditional - replaced equality check with false &rarr; SURVIVED</p> <p class='KILLED'><span class='pop'>3.<span><b>3</b><br/><b>Location : </b>&#60;init&#62;<br/><b>Killed by : </b>org.apache.commons.collections4.map.UnmodifiableMapTest.testEntrySetContains3(org.apache.commons.collections4.map.UnmodifiableMapTest)</span></span> removed conditional - replaced equality check with true &rarr; KILLED</p> 
+</td>
+</tr>
+<tr>
+<td><a href='#org.pitest.mutationtest.report.html.SourceFile@3f3fb878_76'>76</a></td> 
+<td></td>
+<td>
+
+<a name='grouporg.pitest.mutationtest.report.html.SourceFile@3f3fb878_76'/> 
+
+<p class='NO_COVERAGE'><span class='pop'>1.<span><b>1</b><br/><b>Location : </b>equals<br/><b>Killed by : </b>none</span></span> negated conditional &rarr; NO_COVERAGE</p> <p class='NO_COVERAGE'><span class='pop'>2.<span><b>2</b><br/><b>Location : </b>equals<br/><b>Killed by : </b>none</span></span> removed conditional - replaced equality check with true &rarr; NO_COVERAGE</p> 
+</td>
+</tr>
+
+</table>
+
+
+<h2>Active mutators</h2>
+<ul>
+<li class='mutator'>CONDITIONALS_BOUNDARY</li>
+<li class='mutator'>NEGATE_CONDITIONALS</li>
+<li class='mutator'>REMOVE_CONDITIONALS_EQUAL_ELSE</li>
+<li class='mutator'>REMOVE_CONDITIONALS_EQUAL_IF</li>
+<li class='mutator'>REMOVE_CONDITIONALS_ORDER_ELSE</li>
+<li class='mutator'>REMOVE_CONDITIONALS_ORDER_IF</li>
+<li class='mutator'>REMOVE_INCREMENTS</li>
+
+</ul>
+
+<h2>Tests examined</h2>
+<ul>
+<li>org.apache.commons.collections4.map.UnmodifiableOrderedMapTest.testMapSize(org.apache.commons.collections4.map.UnmodifiableOrderedMapTest) (0 ms)</li><li>org.apache.commons.collections4.map.TransformedMapTest.testMapRemove(org.apache.commons.collections4.map.TransformedMapTest) (2 ms)</li><li>org.apache.commons.collections4.map.TransformedMapTest.testEntrySetContains2(org.apache.commons.collections4.map.TransformedMapTest) (1 ms)</li><li>org.apache.commons.collections4.map.UnmodifiableMapTest.testMapContainsKey(org.apache.commons.collections4.map.UnmodifiableMapTest) (1 ms)</li><li>org.apache.commons.collections4.map.PredicatedSortedMapTest.testPut(org.apache.commons.collections4.map.PredicatedSortedMapTest) (0 ms)</li><li>org.apache.commons.collections4.map.PredicatedSortedMapTest.testEntrySetRemoveAll(org.apache.commons.collections4.map.PredicatedSortedMapTest) (5 ms)</li><li>org.apache.commons.collections4.map.PredicatedMapTest.testEntrySetRemove1(org.apache.commons.collections4.map.PredicatedMapTest) (0 ms)</li><li>org.apache.commons.collections4.map.UnmodifiableOrderedMapTest.testMapEquals(org.apache.commons.collections4.map.UnmodifiableOrderedMapTest) (1 ms)</li><li>org.apache.commons.collections4.map.UnmodifiableMapTest.testEntrySetIteratorRemoveChangesMap(org.apache.commons.collections4.map.UnmodifiableMapTest) (1 ms)</li><li>org.apache.commons.collections4.map.UnmodifiableOrderedMapTest.testEntrySetContains1(org.apache.commons.collections4.map.UnmodifiableOrderedMapTest) (0 ms)</li><li>org.apache.commons.collections4.map.PredicatedMapTest.testEntrySetRetainAll(org.apache.commons.collections4.map.PredicatedMapTest) (1 ms)</li><li>org.apache.commons.collections4.map.UnmodifiableOrderedMapTest.testMapToString(org.apache.commons.collections4.map.UnmodifiableOrderedMapTest) (1 ms)</li><li>org.apache.commons.collections4.map.UnmodifiableOrderedMapTest.testMapIsEmpty(org.apache.commons.collections4.map.UnmodifiableOrderedMapTest) (1 ms)</li><li>org.apache.commons.collections4.map.UnmodifiableSortedMapTest.testEntrySetContains1(org.apache.commons.collections4.map.UnmodifiableSortedMapTest) (0 ms)</li><li>org.apache.commons.collections4.map.PredicatedSortedMapTest.testEntrySetContains1(org.apache.commons.collections4.map.PredicatedSortedMapTest) (0 ms)</li><li>org.apache.commons.collections4.map.UnmodifiableMapTest.testEntrySetContains2(org.apache.commons.collections4.map.UnmodifiableMapTest) (0 ms)</li><li>org.apache.commons.collections4.map.PredicatedSortedMapTest.testEntrySetRemove1(org.apache.commons.collections4.map.PredicatedSortedMapTest) (0 ms)</li><li>org.apache.commons.collections4.map.TransformedMapTest.testMapContainsKey(org.apache.commons.collections4.map.TransformedMapTest) (0 ms)</li><li>org.apache.commons.collections4.map.PredicatedSortedMapTest.testEntrySetRetainAll(org.apache.commons.collections4.map.PredicatedSortedMapTest) (1 ms)</li><li>org.apache.commons.collections4.map.TransformedMapTest.testEntrySetRemove3(org.apache.commons.collections4.map.TransformedMapTest) (0 ms)</li><li>org.apache.commons.collections4.map.UnmodifiableOrderedMapTest.testEntrySetContains2(org.apache.commons.collections4.map.UnmodifiableOrderedMapTest) (1 ms)</li><li>org.apache.commons.collections4.map.PredicatedSortedMapTest.testMapSize(org.apache.commons.collections4.map.PredicatedSortedMapTest) (0 ms)</li><li>org.apache.commons.collections4.map.PredicatedSortedMapTest.testMapPut(org.apache.commons.collections4.map.PredicatedSortedMapTest) (2 ms)</li><li>org.apache.commons.collections4.map.UnmodifiableMapTest.testEntrySetContains1(org.apache.commons.collections4.map.UnmodifiableMapTest) (1 ms)</li><li>org.apache.commons.collections4.map.PredicatedMapTest.testEntrySetRemove2(org.apache.commons.collections4.map.PredicatedMapTest) (0 ms)</li><li>org.apache.commons.collections4.map.PredicatedMapTest.testFailFastEntrySet(org.apache.commons.collections4.map.PredicatedMapTest) (1 ms)</li><li>org.apache.commons.collections4.map.TransformedMapTest.testFailFastEntrySet(org.apache.commons.collections4.map.TransformedMapTest) (0 ms)</li><li>org.apache.commons.collections4.map.PredicatedMapTest.testMapIsEmpty(org.apache.commons.collections4.map.PredicatedMapTest) (0 ms)</li><li>org.apache.commons.collections4.map.PredicatedSortedMapTest.testMapEquals(org.apache.commons.collections4.map.PredicatedSortedMapTest) (0 ms)</li><li>org.apache.commons.collections4.map.UnmodifiableOrderedMapTest.testMapContainsValue(org.apache.commons.collections4.map.UnmodifiableOrderedMapTest) (1 ms)</li><li>org.apache.commons.collections4.map.UnmodifiableSortedMapTest.testEntrySetContains2(org.apache.commons.collections4.map.UnmodifiableSortedMapTest) (0 ms)</li><li>org.apache.commons.collections4.map.UnmodifiableOrderedMapTest.testEntrySetIteratorRemoveChangesMap(org.apache.commons.collections4.map.UnmodifiableOrderedMapTest) (0 ms)</li><li>org.apache.commons.collections4.map.PredicatedMapTest.testMapToString(org.apache.commons.collections4.map.PredicatedMapTest) (0 ms)</li><li>org.apache.commons.collections4.map.PredicatedSortedMapTest.testEntrySetRemove2(org.apache.commons.collections4.map.PredicatedSortedMapTest) (0 ms)</li><li>org.apache.commons.collections4.map.TransformedMapTest.testEntrySetIteratorRemoveChangesMap(org.apache.commons.collections4.map.TransformedMapTest) (0 ms)</li><li>org.apache.commons.collections4.map.UnmodifiableMapTest.testEntrySetContains3(org.apache.commons.collections4.map.UnmodifiableMapTest) (0 ms)</li><li>org.apache.commons.collections4.map.PredicatedMapTest.testMapContainsValue(org.apache.commons.collections4.map.PredicatedMapTest) (0 ms)</li><li>org.apache.commons.collections4.map.TransformedMapTest.testMapPut(org.apache.commons.collections4.map.TransformedMapTest) (2 ms)</li><li>org.apache.commons.collections4.map.UnmodifiableOrderedMapTest.testEntrySetRetainAll(org.apache.commons.collections4.map.UnmodifiableOrderedMapTest) (0 ms)</li><li>org.apache.commons.collections4.map.UnmodifiableMapTest.testMapEquals(org.apache.commons.collections4.map.UnmodifiableMapTest) (1 ms)</li><li>org.apache.commons.collections4.map.UnmodifiableSortedMapTest.testMapIsEmpty(org.apache.commons.collections4.map.UnmodifiableSortedMapTest) (0 ms)</li><li>org.apache.commons.collections4.map.PredicatedSortedMapTest.testEntrySetContains2(org.apache.commons.collections4.map.PredicatedSortedMapTest) (0 ms)</li><li>org.apache.commons.collections4.map.PredicatedMapTest.testEntrySetContains3(org.apache.commons.collections4.map.PredicatedMapTest) (0 ms)</li><li>org.apache.commons.collections4.map.PredicatedMapTest.testMapContainsKey(org.apache.commons.collections4.map.PredicatedMapTest) (1 ms)</li><li>org.apache.commons.collections4.map.TransformedMapTest.testMapPutAll(org.apache.commons.collections4.map.TransformedMapTest) (1 ms)</li><li>org.apache.commons.collections4.map.TransformedMapTest.testMapContainsValue(org.apache.commons.collections4.map.TransformedMapTest) (1 ms)</li><li>org.apache.commons.collections4.map.TransformedMapTest.testEntrySetRemove2(org.apache.commons.collections4.map.TransformedMapTest) (0 ms)</li><li>org.apache.commons.collections4.map.TransformedMapTest.testEntrySetRemoveAll(org.apache.commons.collections4.map.TransformedMapTest) (0 ms)</li><li>org.apache.commons.collections4.map.PredicatedSortedMapTest.testEntrySetIteratorRemoveChangesMap(org.apache.commons.collections4.map.PredicatedSortedMapTest) (0 ms)</li><li>org.apache.commons.collections4.map.UnmodifiableSortedMapTest.testMapContainsValue(org.apache.commons.collections4.map.UnmodifiableSortedMapTest) (0 ms)</li><li>org.apache.commons.collections4.map.PredicatedSortedMapTest.testMapContainsKey(org.apache.commons.collections4.map.PredicatedSortedMapTest) (0 ms)</li><li>org.apache.commons.collections4.map.UnmodifiableSortedMapTest.testMapToString(org.apache.commons.collections4.map.UnmodifiableSortedMapTest) (0 ms)</li><li>org.apache.commons.collections4.map.TransformedMapTest.testEntrySetContains3(org.apache.commons.collections4.map.TransformedMapTest) (0 ms)</li><li>org.apache.commons.collections4.map.PredicatedMapTest.testEntrySetContains1(org.apache.commons.collections4.map.PredicatedMapTest) (1 ms)</li><li>org.apache.commons.collections4.map.UnmodifiableMapTest.testMapToString(org.apache.commons.collections4.map.UnmodifiableMapTest) (1 ms)</li><li>org.apache.commons.collections4.map.UnmodifiableSortedMapTest.testMapEquals(org.apache.commons.collections4.map.UnmodifiableSortedMapTest) (1 ms)</li><li>org.apache.commons.collections4.map.PredicatedMapTest.testEntrySetIteratorRemoveChangesMap(org.apache.commons.collections4.map.PredicatedMapTest) (1 ms)</li><li>org.apache.commons.collections4.map.PredicatedSortedMapTest.testMapRemove(org.apache.commons.collections4.map.PredicatedSortedMapTest) (2 ms)</li><li>org.apache.commons.collections4.map.UnmodifiableOrderedMapTest.testEntrySetRemoveAll(org.apache.commons.collections4.map.UnmodifiableOrderedMapTest) (1 ms)</li><li>org.apache.commons.collections4.map.UnmodifiableOrderedMapTest.testEntrySetContains3(org.apache.commons.collections4.map.UnmodifiableOrderedMapTest) (0 ms)</li><li>org.apache.commons.collections4.map.UnmodifiableSortedMapTest.testMapContainsKey(org.apache.commons.collections4.map.UnmodifiableSortedMapTest) (1 ms)</li><li>org.apache.commons.collections4.map.UnmodifiableOrderedMapTest.testMapContainsKey(org.apache.commons.collections4.map.UnmodifiableOrderedMapTest) (2 ms)</li><li>org.apache.commons.collections4.map.PredicatedMapTest.testEntrySetContains2(org.apache.commons.collections4.map.PredicatedMapTest) (0 ms)</li><li>org.apache.commons.collections4.map.TransformedMapTest.testMapSize(org.apache.commons.collections4.map.TransformedMapTest) (0 ms)</li><li>org.apache.commons.collections4.map.PredicatedMapTest.testMapSize(org.apache.commons.collections4.map.PredicatedMapTest) (1 ms)</li><li>org.apache.commons.collections4.map.UnmodifiableSortedMapTest.testMapSize(org.apache.commons.collections4.map.UnmodifiableSortedMapTest) (0 ms)</li><li>org.apache.commons.collections4.BagUtilsTest.testPredicatedBag(org.apache.commons.collections4.BagUtilsTest) (3 ms)</li><li>org.apache.commons.collections4.map.PredicatedMapTest.testPut(org.apache.commons.collections4.map.PredicatedMapTest) (1 ms)</li><li>org.apache.commons.collections4.map.UnmodifiableMapTest.testEntrySetRetainAll(org.apache.commons.collections4.map.UnmodifiableMapTest) (1 ms)</li><li>org.apache.commons.collections4.map.PredicatedMapTest.testEntrySetRemoveAll(org.apache.commons.collections4.map.PredicatedMapTest) (0 ms)</li><li>org.apache.commons.collections4.map.UnmodifiableSortedMapTest.testEntrySetRemoveAll(org.apache.commons.collections4.map.UnmodifiableSortedMapTest) (1 ms)</li><li>org.apache.commons.collections4.map.UnmodifiableMapTest.testMapContainsValue(org.apache.commons.collections4.map.UnmodifiableMapTest) (0 ms)</li><li>org.apache.commons.collections4.map.UnmodifiableSortedMapTest.testEntrySetContains3(org.apache.commons.collections4.map.UnmodifiableSortedMapTest) (1 ms)</li><li>org.apache.commons.collections4.map.PredicatedSortedMapTest.testEntrySetContains3(org.apache.commons.collections4.map.PredicatedSortedMapTest) (1 ms)</li><li>org.apache.commons.collections4.map.TransformedMapTest.testMapEquals(org.apache.commons.collections4.map.TransformedMapTest) (0 ms)</li><li>org.apache.commons.collections4.map.PredicatedSortedMapTest.testMapIsEmpty(org.apache.commons.collections4.map.PredicatedSortedMapTest) (0 ms)</li><li>org.apache.commons.collections4.map.PredicatedMapTest.testMapRemove(org.apache.commons.collections4.map.PredicatedMapTest) (1 ms)</li><li>org.apache.commons.collections4.map.PredicatedMapTest.testMapPutAll(org.apache.commons.collections4.map.PredicatedMapTest) (1 ms)</li><li>org.apache.commons.collections4.map.UnmodifiableMapTest.testEntrySetRemoveAll(org.apache.commons.collections4.map.UnmodifiableMapTest) (0 ms)</li><li>org.apache.commons.collections4.map.TransformedMapTest.testEntrySetRemove1(org.apache.commons.collections4.map.TransformedMapTest) (1 ms)</li><li>org.apache.commons.collections4.map.TransformedMapTest.testTransformedMap(org.apache.commons.collections4.map.TransformedMapTest) (0 ms)</li><li>org.apache.commons.collections4.map.TransformedMapTest.testMapIsEmpty(org.apache.commons.collections4.map.TransformedMapTest) (0 ms)</li><li>org.apache.commons.collections4.map.UnmodifiableMapTest.testMapSize(org.apache.commons.collections4.map.UnmodifiableMapTest) (1 ms)</li><li>org.apache.commons.collections4.map.TransformedMapTest.testEntrySetContains1(org.apache.commons.collections4.map.TransformedMapTest) (0 ms)</li><li>org.apache.commons.collections4.map.PredicatedMapTest.testMapPut(org.apache.commons.collections4.map.PredicatedMapTest) (2 ms)</li><li>org.apache.commons.collections4.map.PredicatedMapTest.testEntrySetRemove3(org.apache.commons.collections4.map.PredicatedMapTest) (1 ms)</li><li>org.apache.commons.collections4.map.PredicatedSortedMapTest.testMapPutAll(org.apache.commons.collections4.map.PredicatedSortedMapTest) (1 ms)</li><li>org.apache.commons.collections4.map.PredicatedSortedMapTest.testMapContainsValue(org.apache.commons.collections4.map.PredicatedSortedMapTest) (1 ms)</li><li>org.apache.commons.collections4.map.UnmodifiableSortedMapTest.testEntrySetRetainAll(org.apache.commons.collections4.map.UnmodifiableSortedMapTest) (0 ms)</li><li>org.apache.commons.collections4.map.TransformedMapTest.testMapToString(org.apache.commons.collections4.map.TransformedMapTest) (1 ms)</li><li>org.apache.commons.collections4.map.UnmodifiableMapTest.testMapIsEmpty(org.apache.commons.collections4.map.UnmodifiableMapTest) (0 ms)</li><li>org.apache.commons.collections4.map.UnmodifiableSortedMapTest.testEntrySetIteratorRemoveChangesMap(org.apache.commons.collections4.map.UnmodifiableSortedMapTest) (0 ms)</li><li>org.apache.commons.collections4.map.PredicatedSortedMapTest.testEntrySetRemove3(org.apache.commons.collections4.map.PredicatedSortedMapTest) (0 ms)</li><li>org.apache.commons.collections4.map.PredicatedMapTest.testMapEquals(org.apache.commons.collections4.map.PredicatedMapTest) (1 ms)</li><li>org.apache.commons.collections4.map.TransformedMapTest.testEntrySetRetainAll(org.apache.commons.collections4.map.TransformedMapTest) (1 ms)</li><li>org.apache.commons.collections4.map.PredicatedSortedMapTest.testMapToString(org.apache.commons.collections4.map.PredicatedSortedMapTest) (1 ms)</li>
+</ul>
+
+<br/>
+
+Report generated by <a href='http://pitest.org'>PIT</a> 1.7.3
+
+</body>
+</html>

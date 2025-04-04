@@ -1,0 +1,229 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PascalDistribution.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Commons Math</a> &gt; <a href="index.source.html" class="el_package">org.apache.commons.math.distribution</a> &gt; <span class="el_source">PascalDistribution.java</span></div><h1>PascalDistribution.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.commons.math.distribution;
+
+import java.io.Serializable;
+
+import org.apache.commons.math.exception.OutOfRangeException;
+import org.apache.commons.math.exception.NotPositiveException;
+import org.apache.commons.math.exception.util.LocalizedFormats;
+import org.apache.commons.math.special.Beta;
+import org.apache.commons.math.util.ArithmeticUtils;
+import org.apache.commons.math.util.FastMath;
+
+/**
+ * &lt;p&gt;
+ * Implementation of the Pascal distribution. The Pascal distribution is a
+ * special case of the Negative Binomial distribution where the number of
+ * successes parameter is an integer.
+ * &lt;/p&gt;
+ * &lt;p&gt;
+ * There are various ways to express the probability mass and distribution
+ * functions for the Pascal distribution.  The convention employed by the
+ * library is to express these functions in terms of the number of failures in
+ * a Bernoulli experiment
+ * (see &lt;a href=&quot;http://en.wikipedia.org/wiki/Negative_binomial_distribution#Waiting_time_in_a_Bernoulli_process&quot;&gt;Waiting Time in a Bernoulli Process&lt;/a&gt;).
+ * &lt;/p&gt;
+ *
+ * @see &lt;a href=&quot;http://en.wikipedia.org/wiki/Negative_binomial_distribution&quot;&gt;
+ * Negative binomial distribution (Wikipedia)&lt;/a&gt;
+ * @see &lt;a href=&quot;http://mathworld.wolfram.com/NegativeBinomialDistribution.html&quot;&gt;
+ * Negative binomial distribution (MathWorld)&lt;/a&gt;
+ * @version $Id$
+ * @since 1.2 (changed to concrete class in 3.0)
+ */
+public class PascalDistribution extends AbstractIntegerDistribution
+    implements Serializable {
+    /** Serializable version identifier. */
+    private static final long serialVersionUID = 6751309484392813623L;
+    /** The number of successes. */
+    private final int numberOfSuccesses;
+    /** The probability of success. */
+    private final double probabilityOfSuccess;
+
+    /**
+     * Create a Pascal distribution with the given number of trials and
+     * probability of success.
+     *
+     * @param r Number of successes.
+     * @param p Probability of success.
+     * @throws NotPositiveException if the number of successes is not positive
+     * @throws OutOfRangeException if the probability of success is not in the
+     * range [0, 1]
+     */
+    public PascalDistribution(int r, double p)
+<span class="fc" id="L69">        throws NotPositiveException, OutOfRangeException {</span>
+<span class="pc bpc" id="L70" title="1 of 2 branches missed.">        if (r &lt; 0) {</span>
+<span class="nc" id="L71">            throw new NotPositiveException(LocalizedFormats.NUMBER_OF_SUCCESSES,</span>
+<span class="nc" id="L72">                                           r);</span>
+        }
+<span class="pc bpc" id="L74" title="2 of 4 branches missed.">        if (p &lt; 0 || p &gt; 1) {</span>
+<span class="nc" id="L75">            throw new OutOfRangeException(p, 0, 1);</span>
+        }
+
+<span class="fc" id="L78">        numberOfSuccesses = r;</span>
+<span class="fc" id="L79">        probabilityOfSuccess = p;</span>
+<span class="fc" id="L80">    }</span>
+
+    /**
+     * Access the number of successes for this distribution.
+     *
+     * @return the number of successes.
+     */
+    public int getNumberOfSuccesses() {
+<span class="fc" id="L88">        return numberOfSuccesses;</span>
+    }
+
+    /**
+     * Access the probability of success for this distribution.
+     *
+     * @return the probability of success.
+     */
+    public double getProbabilityOfSuccess() {
+<span class="fc" id="L97">        return probabilityOfSuccess;</span>
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    protected int getDomainLowerBound(double p) {
+<span class="fc" id="L103">        return -1;</span>
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    protected int getDomainUpperBound(double p) {
+        // use MAX - 1 because MAX causes loop
+<span class="fc" id="L110">        return Integer.MAX_VALUE - 1;</span>
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public double cumulativeProbability(int x) {
+        double ret;
+<span class="fc bfc" id="L117" title="All 2 branches covered.">        if (x &lt; 0) {</span>
+<span class="fc" id="L118">            ret = 0.0;</span>
+        } else {
+<span class="fc" id="L120">            ret = Beta.regularizedBeta(probabilityOfSuccess,</span>
+                numberOfSuccesses, x + 1);
+        }
+<span class="fc" id="L123">        return ret;</span>
+    }
+
+    /** {@inheritDoc} */
+    public double probability(int x) {
+        double ret;
+<span class="fc bfc" id="L129" title="All 2 branches covered.">        if (x &lt; 0) {</span>
+<span class="fc" id="L130">            ret = 0.0;</span>
+        } else {
+<span class="fc" id="L132">            ret = ArithmeticUtils.binomialCoefficientDouble(x +</span>
+                  numberOfSuccesses - 1, numberOfSuccesses - 1) *
+<span class="fc" id="L134">                  FastMath.pow(probabilityOfSuccess, numberOfSuccesses) *</span>
+<span class="fc" id="L135">                  FastMath.pow(1.0 - probabilityOfSuccess, x);</span>
+        }
+<span class="fc" id="L137">        return ret;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * Returns {@code -1} when {@code p == 0} and
+     * {@code Integer.MAX_VALUE} when {@code p == 1}.
+     */
+    @Override
+    public int inverseCumulativeProbability(final double p) {
+        int ret;
+
+        // handle extreme values explicitly
+<span class="fc bfc" id="L151" title="All 2 branches covered.">        if (p == 0) {</span>
+<span class="fc" id="L152">            ret = -1;</span>
+<span class="fc bfc" id="L153" title="All 2 branches covered.">        } else if (p == 1) {</span>
+<span class="fc" id="L154">            ret = Integer.MAX_VALUE;</span>
+        } else {
+<span class="fc" id="L156">            ret = super.inverseCumulativeProbability(p);</span>
+        }
+
+<span class="fc" id="L159">        return ret;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * The lower bound of the support is always 0 no matter the parameters.
+     *
+     * @return lower bound of the support (always 0)
+     */
+    @Override
+    public int getSupportLowerBound() {
+<span class="nc" id="L171">        return 0;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * The upper bound of the support is always positive infinity no matter the
+     * parameters. Positive infinity is symbolised by {@code Integer.MAX_VALUE}
+     * together with {@link #isSupportUpperBoundInclusive()} being
+     * {@code false}.
+     *
+     * @return upper bound of the support (always {@code Integer.MAX_VALUE}
+     * for positive infinity)
+     */
+    @Override
+    public int getSupportUpperBound() {
+<span class="nc" id="L187">        return Integer.MAX_VALUE;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * For number of successes {@code r} and probability of success {@code p},
+     * the mean is {@code (r * p) / (1 - p)}.
+     */
+    @Override
+    protected double calculateNumericalMean() {
+<span class="fc" id="L198">        final double p = getProbabilityOfSuccess();</span>
+<span class="fc" id="L199">        final double r = getNumberOfSuccesses();</span>
+<span class="fc" id="L200">        return (r * p) / (1 - p);</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * For number of successes {@code r} and probability of success {@code p},
+     * the mean is {@code (r * p) / (1 - p)^2}.
+     */
+    @Override
+    protected double calculateNumericalVariance() {
+<span class="fc" id="L211">        final double p = getProbabilityOfSuccess();</span>
+<span class="fc" id="L212">        final double r = getNumberOfSuccesses();</span>
+<span class="fc" id="L213">        final double pInv = 1 - p;</span>
+<span class="fc" id="L214">        return (r * p) / (pInv * pInv);</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * Always returns {@code false}.
+     *
+     * @see PascalDistribution#getSupportUpperBound() getSupportUpperBound()
+     */
+    @Override
+    public boolean isSupportUpperBoundInclusive() {
+<span class="nc" id="L226">        return false;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

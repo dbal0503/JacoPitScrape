@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BitsStreamGenerator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Commons Math</a> &gt; <a href="index.source.html" class="el_package">org.apache.commons.math.random</a> &gt; <span class="el_source">BitsStreamGenerator.java</span></div><h1>BitsStreamGenerator.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.commons.math.random;
+
+import org.apache.commons.math.exception.NotStrictlyPositiveException;
+import org.apache.commons.math.util.FastMath;
+
+/** Base class for random number generators that generates bits streams.
+
+ * @version $Id$
+ * @since 2.0
+
+ */
+public abstract class BitsStreamGenerator implements RandomGenerator {
+
+    /** Next gaussian. */
+    private double nextGaussian;
+
+    /** Creates a new random number generator.
+     */
+<span class="fc" id="L35">    public BitsStreamGenerator() {</span>
+<span class="fc" id="L36">        nextGaussian = Double.NaN;</span>
+<span class="fc" id="L37">    }</span>
+
+    /** {@inheritDoc} */
+    public abstract void setSeed(int seed);
+
+    /** {@inheritDoc} */
+    public abstract void setSeed(int[] seed);
+
+    /** {@inheritDoc} */
+    public abstract void setSeed(long seed);
+
+    /** Generate next pseudorandom number.
+     * &lt;p&gt;This method is the core generation algorithm. It is used by all the
+     * public generation methods for the various primitive types {@link
+     * #nextBoolean()}, {@link #nextBytes(byte[])}, {@link #nextDouble()},
+     * {@link #nextFloat()}, {@link #nextGaussian()}, {@link #nextInt()},
+     * {@link #next(int)} and {@link #nextLong()}.&lt;/p&gt;
+     * @param bits number of random bits to produce
+     * @return random bits generated
+     */
+    protected abstract int next(int bits);
+
+    /** {@inheritDoc} */
+    public boolean nextBoolean() {
+<span class="fc bfc" id="L61" title="All 2 branches covered.">        return next(1) != 0;</span>
+    }
+
+    /** {@inheritDoc} */
+    public void nextBytes(byte[] bytes) {
+<span class="fc" id="L66">        int i = 0;</span>
+<span class="fc" id="L67">        final int iEnd = bytes.length - 3;</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">        while (i &lt; iEnd) {</span>
+<span class="fc" id="L69">            final int random = next(32);</span>
+<span class="fc" id="L70">            bytes[i]     = (byte) (random &amp; 0xff);</span>
+<span class="fc" id="L71">            bytes[i + 1] = (byte) ((random &gt;&gt;  8) &amp; 0xff);</span>
+<span class="fc" id="L72">            bytes[i + 2] = (byte) ((random &gt;&gt; 16) &amp; 0xff);</span>
+<span class="fc" id="L73">            bytes[i + 3] = (byte) ((random &gt;&gt; 24) &amp; 0xff);</span>
+<span class="fc" id="L74">            i += 4;</span>
+<span class="fc" id="L75">        }</span>
+<span class="fc" id="L76">        int random = next(32);</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">        while (i &lt; bytes.length) {</span>
+<span class="fc" id="L78">            bytes[i++] = (byte) (random &amp; 0xff);</span>
+<span class="fc" id="L79">            random     = random &gt;&gt; 8;</span>
+        }
+<span class="fc" id="L81">    }</span>
+
+    /** {@inheritDoc} */
+    public double nextDouble() {
+<span class="fc" id="L85">        final long high = ((long) next(26)) &lt;&lt; 26;</span>
+<span class="fc" id="L86">        final int  low  = next(26);</span>
+<span class="fc" id="L87">        return (high | low) * 0x1.0p-52d;</span>
+    }
+
+    /** {@inheritDoc} */
+    public float nextFloat() {
+<span class="fc" id="L92">        return next(23) * 0x1.0p-23f;</span>
+    }
+
+    /** {@inheritDoc} */
+    public double nextGaussian() {
+
+        final double random;
+<span class="fc bfc" id="L99" title="All 2 branches covered.">        if (Double.isNaN(nextGaussian)) {</span>
+            // generate a new pair of gaussian numbers
+<span class="fc" id="L101">            final double x = nextDouble();</span>
+<span class="fc" id="L102">            final double y = nextDouble();</span>
+<span class="fc" id="L103">            final double alpha = 2 * FastMath.PI * x;</span>
+<span class="fc" id="L104">            final double r      = FastMath.sqrt(-2 * FastMath.log(y));</span>
+<span class="fc" id="L105">            random       = r * FastMath.cos(alpha);</span>
+<span class="fc" id="L106">            nextGaussian = r * FastMath.sin(alpha);</span>
+<span class="fc" id="L107">        } else {</span>
+            // use the second element of the pair already generated
+<span class="fc" id="L109">            random = nextGaussian;</span>
+<span class="fc" id="L110">            nextGaussian = Double.NaN;</span>
+        }
+
+<span class="fc" id="L113">        return random;</span>
+
+    }
+
+    /** {@inheritDoc} */
+    public int nextInt() {
+<span class="fc" id="L119">        return next(32);</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     * &lt;p&gt;This default implementation is copied from Apache Harmony
+     * java.util.Random (r929253).&lt;/p&gt;
+     *
+     * &lt;p&gt;Implementation notes: &lt;ul&gt;
+     * &lt;li&gt;If n is a power of 2, this method returns
+     * {@code (int) ((n * (long) next(31)) &gt;&gt; 31)}.&lt;/li&gt;
+     *
+     * &lt;li&gt;If n is not a power of 2, what is returned is {@code next(31) % n}
+     * with {@code next(31)} values rejected (i.e. regenerated) until a
+     * value that is larger than the remainder of {@code Integer.MAX_VALUE / n}
+     * is generated. Rejection of this initial segment is necessary to ensure
+     * a uniform distribution.&lt;/li&gt;&lt;/ul&gt;&lt;/p&gt;
+     */
+    public int nextInt(int n) throws IllegalArgumentException {
+<span class="fc bfc" id="L138" title="All 2 branches covered.">        if (n &gt; 0) {</span>
+<span class="fc bfc" id="L139" title="All 2 branches covered.">            if ((n &amp; -n) == n) {</span>
+<span class="fc" id="L140">                return (int) ((n * (long) next(31)) &gt;&gt; 31);</span>
+            }
+            int bits;
+            int val;
+            do {
+<span class="fc" id="L145">                bits = next(31);</span>
+<span class="fc" id="L146">                val = bits % n;</span>
+<span class="fc bfc" id="L147" title="All 2 branches covered.">            } while (bits - val + (n - 1) &lt; 0);</span>
+<span class="fc" id="L148">            return val;</span>
+        }
+<span class="fc" id="L150">        throw new NotStrictlyPositiveException(n);</span>
+    }
+
+    /** {@inheritDoc} */
+    public long nextLong() {
+<span class="fc" id="L155">        final long high  = ((long) next(32)) &lt;&lt; 32;</span>
+<span class="fc" id="L156">        final long  low  = ((long) next(32)) &amp; 0xffffffffL;</span>
+<span class="fc" id="L157">        return high | low;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

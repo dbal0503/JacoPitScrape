@@ -1,0 +1,253 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BasicWeekyearDateTimeField.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Joda time</a> &gt; <a href="index.source.html" class="el_package">org.joda.time.chrono</a> &gt; <span class="el_source">BasicWeekyearDateTimeField.java</span></div><h1>BasicWeekyearDateTimeField.java</h1><pre class="source lang-java linenums">/*
+ *  Copyright 2001-2005 Stephen Colebourne
+ *
+ *  Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+package org.joda.time.chrono;
+
+import org.joda.time.DateTimeConstants;
+import org.joda.time.DateTimeFieldType;
+import org.joda.time.DurationField;
+import org.joda.time.field.FieldUtils;
+import org.joda.time.field.ImpreciseDateTimeField;
+
+/**
+ * Provides time calculations for the week of the weekyear component of time.
+ *
+ * @author Guy Allard
+ * @author Stephen Colebourne
+ * @author Brian S O'Neill
+ * @since 1.1, refactored from GJWeekyearDateTimeField
+ */
+final class BasicWeekyearDateTimeField extends ImpreciseDateTimeField {
+    
+    private static final long serialVersionUID = 6215066916806820644L;
+
+    private static final long WEEK_53 = (53L - 1) * DateTimeConstants.MILLIS_PER_WEEK;
+
+    private final BasicChronology iChronology;
+
+    /**
+     * Restricted constructor
+     */
+    BasicWeekyearDateTimeField(BasicChronology chronology) {
+<span class="fc" id="L44">        super(DateTimeFieldType.weekyear(), chronology.getAverageMillisPerYear());</span>
+<span class="fc" id="L45">        iChronology = chronology;</span>
+<span class="fc" id="L46">    }</span>
+
+    public boolean isLenient() {
+<span class="fc" id="L49">        return false;</span>
+    }
+
+    /**
+     * Get the Year of a week based year component of the specified time instant.
+     * 
+     * @see org.joda.time.DateTimeField#get
+     * @param instant  the time instant in millis to query.
+     * @return the year extracted from the input.
+     */
+    public int get(long instant) {
+<span class="fc" id="L60">        return iChronology.getWeekyear(instant);</span>
+    }
+
+    /**
+     * Add the specified years to the specified time instant.
+     * 
+     * @see org.joda.time.DateTimeField#add
+     * @param instant  the time instant in millis to update.
+     * @param years  the years to add (can be negative).
+     * @return the updated time instant.
+     */
+    public long add(long instant, int years) {
+<span class="fc bfc" id="L72" title="All 2 branches covered.">        if (years == 0) {</span>
+<span class="fc" id="L73">            return instant;</span>
+        }
+<span class="fc" id="L75">        return set(instant, get(instant) + years);</span>
+    }
+
+    public long add(long instant, long value) {
+<span class="nc" id="L79">        return add(instant, FieldUtils.safeToInt(value));</span>
+    }
+
+    /**
+     * Add to the year component of the specified time instant
+     * wrapping around within that component if necessary.
+     * 
+     * @see org.joda.time.DateTimeField#addWrapField
+     * @param instant  the time instant in millis to update.
+     * @param years  the years to add (can be negative).
+     * @return the updated time instant.
+     */
+    public long addWrapField(long instant, int years) {
+<span class="fc" id="L92">        return add(instant, years);</span>
+    }
+
+    public long getDifferenceAsLong(long minuendInstant, long subtrahendInstant) {
+<span class="fc bfc" id="L96" title="All 2 branches covered.">        if (minuendInstant &lt; subtrahendInstant) {</span>
+<span class="fc" id="L97">            return -getDifference(subtrahendInstant, minuendInstant);</span>
+        }
+
+<span class="fc" id="L100">        int minuendWeekyear = get(minuendInstant);</span>
+<span class="fc" id="L101">        int subtrahendWeekyear = get(subtrahendInstant);</span>
+
+<span class="fc" id="L103">        long minuendRem = remainder(minuendInstant);</span>
+<span class="fc" id="L104">        long subtrahendRem = remainder(subtrahendInstant);</span>
+
+        // Balance leap weekyear differences on remainders.
+<span class="fc bfc" id="L107" title="All 4 branches covered.">        if (subtrahendRem &gt;= WEEK_53 &amp;&amp; iChronology.getWeeksInYear(minuendWeekyear) &lt;= 52) {</span>
+<span class="fc" id="L108">            subtrahendRem -= DateTimeConstants.MILLIS_PER_WEEK;</span>
+        }
+
+<span class="fc" id="L111">        int difference = minuendWeekyear - subtrahendWeekyear;</span>
+<span class="fc bfc" id="L112" title="All 2 branches covered.">        if (minuendRem &lt; subtrahendRem) {</span>
+<span class="fc" id="L113">            difference--;</span>
+        }
+<span class="fc" id="L115">        return difference;</span>
+    }
+
+    /**
+     * Set the Year of a week based year component of the specified time instant.
+     *
+     * @see org.joda.time.DateTimeField#set
+     * @param instant  the time instant in millis to update.
+     * @param year  the year (-9999,9999) to set the date to.
+     * @return the updated DateTime.
+     * @throws IllegalArgumentException  if year is invalid.
+     */
+    public long set(long instant, int year) {
+<span class="fc" id="L128">        FieldUtils.verifyValueBounds(this, Math.abs(year),</span>
+<span class="fc" id="L129">                                     iChronology.getMinYear(), iChronology.getMaxYear());</span>
+        //
+        // Do nothing if no real change is requested.
+        //
+<span class="fc" id="L133">        int thisWeekyear = get( instant );</span>
+<span class="fc bfc" id="L134" title="All 2 branches covered.">        if ( thisWeekyear == year ) {</span>
+<span class="fc" id="L135">            return instant;</span>
+        }
+        //
+        // Calculate the DayOfWeek (to be preserved).
+        //
+<span class="fc" id="L140">        int thisDow = iChronology.getDayOfWeek(instant);</span>
+        //
+        // Calculate the maximum weeks in the target year.
+        //
+<span class="fc" id="L144">        int weeksInFromYear = iChronology.getWeeksInYear( thisWeekyear );</span>
+<span class="fc" id="L145">        int weeksInToYear = iChronology.getWeeksInYear( year );</span>
+<span class="fc bfc" id="L146" title="All 2 branches covered.">        int maxOutWeeks = (weeksInToYear &lt; weeksInFromYear) ?</span>
+<span class="fc" id="L147">            weeksInToYear : weeksInFromYear;</span>
+        //
+        // Get the current week of the year. This will be preserved in
+        // the output unless it is greater than the maximum possible
+        // for the target weekyear.  In that case it is adjusted
+        // to the maximum possible.
+        //
+<span class="fc" id="L154">        int setToWeek = iChronology.getWeekOfWeekyear(instant);</span>
+<span class="fc bfc" id="L155" title="All 2 branches covered.">        if ( setToWeek &gt; maxOutWeeks ) {</span>
+<span class="fc" id="L156">            setToWeek = maxOutWeeks;</span>
+        }
+        //
+        // Get a wroking copy of the current date-time.
+        // This can be a convenience for debugging.
+        //
+<span class="fc" id="L162">        long workInstant = instant; // Get a copy</span>
+        //
+        // Attempt to get close to the proper weekyear.
+        // Note - we cannot currently call ourself, so we just call
+        // set for the year.  This at least gets us close.
+        //
+<span class="fc" id="L168">        workInstant = iChronology.setYear( workInstant, year );</span>
+        //
+        // Calculate the weekyear number for the get close to value
+        // (which might not be equal to the year just set).
+        //
+<span class="fc" id="L173">        int workWoyYear = get( workInstant );</span>
+
+        //
+        // At most we are off by one year, which can be &quot;fixed&quot; by
+        // adding/subtracting a week.
+        //
+<span class="fc bfc" id="L179" title="All 2 branches covered.">        if ( workWoyYear &lt; year ) {</span>
+<span class="fc" id="L180">            workInstant += DateTimeConstants.MILLIS_PER_WEEK;</span>
+<span class="fc bfc" id="L181" title="All 2 branches covered.">        } else if ( workWoyYear &gt; year ) {</span>
+<span class="fc" id="L182">            workInstant -= DateTimeConstants.MILLIS_PER_WEEK;</span>
+        }
+        //
+        // Set the proper week in the current weekyear.
+        //
+
+        // BEGIN: possible set WeekOfWeekyear logic.
+<span class="fc" id="L189">        int currentWoyWeek = iChronology.getWeekOfWeekyear(workInstant);</span>
+        // No range check required (we already know it is OK).
+<span class="fc" id="L191">        workInstant = workInstant + (setToWeek - currentWoyWeek)</span>
+            * (long)DateTimeConstants.MILLIS_PER_WEEK;
+        // END: possible set WeekOfWeekyear logic.
+
+        //
+        // Reset DayOfWeek to previous value.
+        //
+        // Note: This works fine, but it ideally shouldn't invoke other
+        // fields from within a field.
+<span class="fc" id="L200">        workInstant = iChronology.dayOfWeek().set( workInstant, thisDow );</span>
+        //
+        // Return result.
+        //
+<span class="fc" id="L204">        return workInstant;</span>
+    }
+
+    public DurationField getRangeDurationField() {
+<span class="fc" id="L208">        return null;</span>
+    }
+
+    public boolean isLeap(long instant) {
+<span class="fc bfc" id="L212" title="All 2 branches covered.">        return iChronology.getWeeksInYear(iChronology.getWeekyear(instant)) &gt; 52;</span>
+    }
+
+    public int getLeapAmount(long instant) {
+<span class="fc" id="L216">        return iChronology.getWeeksInYear(iChronology.getWeekyear(instant)) - 52;</span>
+    }
+
+    public DurationField getLeapDurationField() {
+<span class="fc" id="L220">        return iChronology.weeks();</span>
+    }
+
+    public int getMinimumValue() {
+<span class="fc" id="L224">        return iChronology.getMinYear();</span>
+    }
+
+    public int getMaximumValue() {
+<span class="fc" id="L228">        return iChronology.getMaxYear();</span>
+    }
+
+    public long roundFloor(long instant) {
+        // Note: This works fine, but it ideally shouldn't invoke other
+        // fields from within a field.
+<span class="fc" id="L234">        instant = iChronology.weekOfWeekyear().roundFloor(instant);</span>
+<span class="fc" id="L235">        int wow = iChronology.getWeekOfWeekyear(instant);</span>
+<span class="fc bfc" id="L236" title="All 2 branches covered.">        if (wow &gt; 1) {</span>
+<span class="fc" id="L237">            instant -= ((long) DateTimeConstants.MILLIS_PER_WEEK) * (wow - 1);</span>
+        }
+<span class="fc" id="L239">        return instant;</span>
+    }
+
+    public long remainder(long instant) {
+<span class="fc" id="L243">        return instant - roundFloor(instant);</span>
+    }
+
+    /**
+     * Serialization singleton
+     */
+    private Object readResolve() {
+<span class="nc" id="L250">        return iChronology.weekyear();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

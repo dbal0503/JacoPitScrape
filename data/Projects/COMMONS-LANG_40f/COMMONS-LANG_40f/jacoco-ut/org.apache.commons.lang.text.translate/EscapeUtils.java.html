@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EscapeUtils.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Commons Lang</a> &gt; <a href="index.source.html" class="el_package">org.apache.commons.lang.text.translate</a> &gt; <span class="el_source">EscapeUtils.java</span></div><h1>EscapeUtils.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ * 
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.commons.lang.text.translate;
+
+import java.io.IOException;
+import java.io.Writer;
+
+// CsvEscaper
+import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang.CharUtils;
+
+/**
+ * Helper class defining various standard language escape functions. 
+ * @since 3.0
+ */
+<span class="fc" id="L30">public class EscapeUtils {</span>
+
+<span class="fc" id="L32">    public static final CharSequenceTranslator ESCAPE_JAVA = </span>
+          new LookupTranslator(
+            new String[][] { 
+              {&quot;\&quot;&quot;, &quot;\\\&quot;&quot;},
+              {&quot;\\&quot;, &quot;\\\\&quot;},
+<span class="fc" id="L37">          }).with(</span>
+<span class="fc" id="L38">            new LookupTranslator(EntityArrays.JAVA_CTRL_CHARS_ESCAPE())</span>
+<span class="fc" id="L39">          ).with(</span>
+<span class="fc" id="L40">            UnicodeEscaper.outsideOf(32, 0x7f) </span>
+        );
+
+    public static final String escapeJava(String input) {
+<span class="fc" id="L44">        return ESCAPE_JAVA.translate(input);</span>
+    }
+                
+<span class="fc" id="L47">    public static final CharSequenceTranslator ESCAPE_ECMASCRIPT = </span>
+        new AggregateTranslator(
+            new LookupTranslator(
+                      new String[][] { 
+                            {&quot;'&quot;, &quot;\\'&quot;},
+                            {&quot;\&quot;&quot;, &quot;\\\&quot;&quot;},
+                            {&quot;\\&quot;, &quot;\\\\&quot;},
+                            {&quot;/&quot;, &quot;\\/&quot;}
+                      }),
+<span class="fc" id="L56">            new LookupTranslator(EntityArrays.JAVA_CTRL_CHARS_ESCAPE()),</span>
+<span class="fc" id="L57">            UnicodeEscaper.outsideOf(32, 0x7f) </span>
+        );
+            
+    public static final String escapeEcmaScript(String input) {
+<span class="fc" id="L61">        return ESCAPE_ECMASCRIPT.translate(input);</span>
+    }
+                
+<span class="fc" id="L64">    public static final CharSequenceTranslator ESCAPE_XML = </span>
+        new AggregateTranslator(
+<span class="fc" id="L66">            new LookupTranslator(EntityArrays.BASIC_ESCAPE()),</span>
+<span class="fc" id="L67">            new LookupTranslator(EntityArrays.APOS_ESCAPE()),</span>
+<span class="fc" id="L68">            NumericEntityEscaper.above(0x7f)</span>
+        );
+
+    public static final String escapeXml(String input) {
+<span class="fc" id="L72">        return ESCAPE_XML.translate(input);</span>
+    }
+                
+<span class="fc" id="L75">    public static final CharSequenceTranslator ESCAPE_HTML3 = </span>
+        new AggregateTranslator(
+<span class="fc" id="L77">            new LookupTranslator(EntityArrays.BASIC_ESCAPE()),</span>
+<span class="fc" id="L78">            new LookupTranslator(EntityArrays.ISO8859_1_ESCAPE()),</span>
+<span class="fc" id="L79">            NumericEntityEscaper.above(0x7f)</span>
+        );
+
+    public static final String escapeHtml3(String input) {
+<span class="nc" id="L83">        return ESCAPE_HTML3.translate(input);</span>
+    }
+                
+<span class="fc" id="L86">    public static final CharSequenceTranslator ESCAPE_HTML4 = </span>
+        new AggregateTranslator(
+<span class="fc" id="L88">            new LookupTranslator(EntityArrays.BASIC_ESCAPE()),</span>
+<span class="fc" id="L89">            new LookupTranslator(EntityArrays.ISO8859_1_ESCAPE()),</span>
+<span class="fc" id="L90">            new LookupTranslator(EntityArrays.HTML40_EXTENDED_ESCAPE()),</span>
+<span class="fc" id="L91">            NumericEntityEscaper.above(0x7f)</span>
+        );
+
+    public static final String escapeHtml4(String input) {
+<span class="fc" id="L95">        return ESCAPE_HTML4.translate(input);</span>
+    }
+                
+<span class="fc" id="L98">    public static final CharSequenceTranslator ESCAPE_CSV = new CsvEscaper();</span>
+
+    public static final String escapeCsv(String input) {
+<span class="fc" id="L101">        return ESCAPE_CSV.translate(input);</span>
+    }
+                
+    // TODO: Create a parent class - 'SinglePassTranslator' ?
+    // TODO: It would handle the index checking, and length returning, and 
+    // TODO: could also have an optimization check method.
+<span class="fc" id="L107">    static class CsvEscaper extends CharSequenceTranslator {</span>
+
+        private static final char CSV_DELIMITER = ',';
+        private static final char CSV_QUOTE = '&quot;';
+<span class="fc" id="L111">        private static final String CSV_QUOTE_STR = String.valueOf(CSV_QUOTE);</span>
+<span class="fc" id="L112">        private static final char[] CSV_SEARCH_CHARS = new char[] {CSV_DELIMITER, CSV_QUOTE, CharUtils.CR, CharUtils.LF};</span>
+
+        // TODO: Replace with a RegexTranslator. That should consume the number of characters the regex uses up?
+        @Override
+        public int translate(CharSequence input, int index, Writer out) throws IOException {
+
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">            if(index != 0) {</span>
+<span class="nc" id="L119">                throw new IllegalStateException(&quot;CsvEscaper should never reach the [1] index&quot;);</span>
+            }
+
+<span class="fc bfc" id="L122" title="All 2 branches covered.">            if (StringUtils.containsNone(input.toString(), CSV_SEARCH_CHARS)) {</span>
+<span class="fc" id="L123">                out.write(input.toString());</span>
+            } else {
+<span class="fc" id="L125">                out.write(CSV_QUOTE);</span>
+<span class="fc" id="L126">                out.write(StringUtils.replace(input.toString(), CSV_QUOTE_STR, CSV_QUOTE_STR + CSV_QUOTE_STR));</span>
+<span class="fc" id="L127">                out.write(CSV_QUOTE);</span>
+            }
+<span class="fc" id="L129">            return input.length();</span>
+        }
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

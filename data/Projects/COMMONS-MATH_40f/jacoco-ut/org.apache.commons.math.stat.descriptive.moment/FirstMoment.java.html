@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FirstMoment.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Commons Math</a> &gt; <a href="index.source.html" class="el_package">org.apache.commons.math.stat.descriptive.moment</a> &gt; <span class="el_source">FirstMoment.java</span></div><h1>FirstMoment.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.commons.math.stat.descriptive.moment;
+
+import java.io.Serializable;
+
+import org.apache.commons.math.exception.NullArgumentException;
+import org.apache.commons.math.stat.descriptive.AbstractStorelessUnivariateStatistic;
+import org.apache.commons.math.util.MathUtils;
+
+/**
+ * Computes the first moment (arithmetic mean).  Uses the definitional formula:
+ * &lt;p&gt;
+ * mean = sum(x_i) / n &lt;/p&gt;
+ * &lt;p&gt;
+ * where &lt;code&gt;n&lt;/code&gt; is the number of observations. &lt;/p&gt;
+ * &lt;p&gt;
+ * To limit numeric errors, the value of the statistic is computed using the
+ * following recursive updating algorithm: &lt;/p&gt;
+ * &lt;p&gt;
+ * &lt;ol&gt;
+ * &lt;li&gt;Initialize &lt;code&gt;m = &lt;/code&gt; the first value&lt;/li&gt;
+ * &lt;li&gt;For each additional value, update using &lt;br&gt;
+ *   &lt;code&gt;m = m + (new value - m) / (number of observations)&lt;/code&gt;&lt;/li&gt;
+ * &lt;/ol&gt;&lt;/p&gt;
+ * &lt;p&gt;
+ *  Returns &lt;code&gt;Double.NaN&lt;/code&gt; if the dataset is empty.&lt;/p&gt;
+ * &lt;p&gt;
+ * &lt;strong&gt;Note that this implementation is not synchronized.&lt;/strong&gt; If
+ * multiple threads access an instance of this class concurrently, and at least
+ * one of the threads invokes the &lt;code&gt;increment()&lt;/code&gt; or
+ * &lt;code&gt;clear()&lt;/code&gt; method, it must be synchronized externally.&lt;/p&gt;
+ *
+ * @version $Id$
+ */
+class FirstMoment extends AbstractStorelessUnivariateStatistic
+    implements Serializable {
+
+    /** Serializable version identifier */
+    private static final long serialVersionUID = 6112755307178490473L;
+
+
+    /** Count of values that have been added */
+    protected long n;
+
+    /** First moment of values that have been added */
+    protected double m1;
+
+    /**
+     * Deviation of most recently added value from previous first moment.
+     * Retained to prevent repeated computation in higher order moments.
+     */
+    protected double dev;
+
+    /**
+     * Deviation of most recently added value from previous first moment,
+     * normalized by previous sample size.  Retained to prevent repeated
+     * computation in higher order moments
+     */
+    protected double nDev;
+
+    /**
+     * Create a FirstMoment instance
+     */
+<span class="fc" id="L79">    public FirstMoment() {</span>
+<span class="fc" id="L80">        n = 0;</span>
+<span class="fc" id="L81">        m1 = Double.NaN;</span>
+<span class="fc" id="L82">        dev = Double.NaN;</span>
+<span class="fc" id="L83">        nDev = Double.NaN;</span>
+<span class="fc" id="L84">    }</span>
+
+    /**
+     * Copy constructor, creates a new {@code FirstMoment} identical
+     * to the {@code original}
+     *
+     * @param original the {@code FirstMoment} instance to copy
+     */
+     public FirstMoment(FirstMoment original) {
+<span class="nc" id="L93">         super();</span>
+<span class="nc" id="L94">         copy(original, this);</span>
+<span class="nc" id="L95">     }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+     @Override
+    public void increment(final double d) {
+<span class="fc bfc" id="L102" title="All 2 branches covered.">        if (n == 0) {</span>
+<span class="fc" id="L103">            m1 = 0.0;</span>
+        }
+<span class="fc" id="L105">        n++;</span>
+<span class="fc" id="L106">        double n0 = n;</span>
+<span class="fc" id="L107">        dev = d - m1;</span>
+<span class="fc" id="L108">        nDev = dev / n0;</span>
+<span class="fc" id="L109">        m1 += nDev;</span>
+<span class="fc" id="L110">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void clear() {
+<span class="fc" id="L117">        m1 = Double.NaN;</span>
+<span class="fc" id="L118">        n = 0;</span>
+<span class="fc" id="L119">        dev = Double.NaN;</span>
+<span class="fc" id="L120">        nDev = Double.NaN;</span>
+<span class="fc" id="L121">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public double getResult() {
+<span class="fc" id="L128">        return m1;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public long getN() {
+<span class="fc" id="L135">        return n;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public FirstMoment copy() {
+<span class="fc" id="L143">        FirstMoment result = new FirstMoment();</span>
+<span class="fc" id="L144">        copy(this, result);</span>
+<span class="fc" id="L145">        return result;</span>
+    }
+
+    /**
+     * Copies source to dest.
+     * &lt;p&gt;Neither source nor dest can be null.&lt;/p&gt;
+     *
+     * @param source FirstMoment to copy
+     * @param dest FirstMoment to copy to
+     * @throws NullArgumentException if either source or dest is null
+     */
+    public static void copy(FirstMoment source, FirstMoment dest)
+        throws NullArgumentException {
+<span class="fc" id="L158">        MathUtils.checkNotNull(source);</span>
+<span class="fc" id="L159">        MathUtils.checkNotNull(dest);</span>
+<span class="fc" id="L160">        dest.setData(source.getDataRef());</span>
+<span class="fc" id="L161">        dest.n = source.n;</span>
+<span class="fc" id="L162">        dest.m1 = source.m1;</span>
+<span class="fc" id="L163">        dest.dev = source.dev;</span>
+<span class="fc" id="L164">        dest.nDev = source.nDev;</span>
+<span class="fc" id="L165">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BinomialDistribution.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Commons Math</a> &gt; <a href="index.source.html" class="el_package">org.apache.commons.math.distribution</a> &gt; <span class="el_source">BinomialDistribution.java</span></div><h1>BinomialDistribution.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.commons.math.distribution;
+
+import java.io.Serializable;
+
+import org.apache.commons.math.exception.OutOfRangeException;
+import org.apache.commons.math.exception.NotPositiveException;
+import org.apache.commons.math.exception.util.LocalizedFormats;
+import org.apache.commons.math.special.Beta;
+import org.apache.commons.math.util.FastMath;
+
+/**
+ * Implementation of the binomial distribution.
+ *
+ * @see &lt;a href=&quot;http://en.wikipedia.org/wiki/Binomial_distribution&quot;&gt;Binomial distribution (Wikipedia)&lt;/a&gt;
+ * @see &lt;a href=&quot;http://mathworld.wolfram.com/BinomialDistribution.html&quot;&gt;Binomial Distribution (MathWorld)&lt;/a&gt;
+ * @version $Id$
+ */
+public class BinomialDistribution extends AbstractIntegerDistribution
+        implements Serializable {
+    /** Serializable version identifier. */
+    private static final long serialVersionUID = 6751309484392813623L;
+    /** The number of trials. */
+    private final int numberOfTrials;
+    /** The probability of success. */
+    private final double probabilityOfSuccess;
+
+    /**
+     * Create a binomial distribution with the given number of trials and
+     * probability of success.
+     *
+     * @param trials Number of trials.
+     * @param p Probability of success.
+     * @throws NotPositiveException if {@code trials &lt; 0}.
+     * @throws OutOfRangeException if {@code p &lt; 0} or {@code p &gt; 1}.
+     */
+<span class="fc" id="L52">    public BinomialDistribution(int trials, double p) {</span>
+<span class="pc bpc" id="L53" title="1 of 2 branches missed.">        if (trials &lt; 0) {</span>
+<span class="nc" id="L54">            throw new NotPositiveException(LocalizedFormats.NUMBER_OF_TRIALS,</span>
+<span class="nc" id="L55">                                           trials);</span>
+        }
+<span class="pc bpc" id="L57" title="2 of 4 branches missed.">        if (p &lt; 0 || p &gt; 1) {</span>
+<span class="nc" id="L58">            throw new OutOfRangeException(p, 0, 1);</span>
+        }
+
+<span class="fc" id="L61">        probabilityOfSuccess = p;</span>
+<span class="fc" id="L62">        numberOfTrials = trials;</span>
+<span class="fc" id="L63">    }</span>
+
+    /**
+     * Access the number of trials for this distribution.
+     *
+     * @return the number of trials.
+     */
+    public int getNumberOfTrials() {
+<span class="fc" id="L71">        return numberOfTrials;</span>
+    }
+
+    /**
+     * Access the probability of success for this distribution.
+     *
+     * @return the probability of success.
+     */
+    public double getProbabilityOfSuccess() {
+<span class="fc" id="L80">        return probabilityOfSuccess;</span>
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    protected int getDomainLowerBound(double p) {
+<span class="fc" id="L86">        return -1;</span>
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    protected int getDomainUpperBound(double p) {
+<span class="fc" id="L92">        return numberOfTrials;</span>
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public double cumulativeProbability(int x) {
+        double ret;
+<span class="fc bfc" id="L99" title="All 2 branches covered.">        if (x &lt; 0) {</span>
+<span class="fc" id="L100">            ret = 0.0;</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">        } else if (x &gt;= numberOfTrials) {</span>
+<span class="fc" id="L102">            ret = 1.0;</span>
+        } else {
+<span class="fc" id="L104">            ret = 1.0 - Beta.regularizedBeta(getProbabilityOfSuccess(),</span>
+                    x + 1.0, numberOfTrials - x);
+        }
+<span class="fc" id="L107">        return ret;</span>
+    }
+
+    /** {@inheritDoc} */
+    public double probability(int x) {
+        double ret;
+<span class="fc bfc" id="L113" title="All 4 branches covered.">        if (x &lt; 0 || x &gt; numberOfTrials) {</span>
+<span class="fc" id="L114">            ret = 0.0;</span>
+        } else {
+<span class="fc" id="L116">            ret = FastMath.exp(SaddlePointExpansion.logBinomialProbability(x,</span>
+                    numberOfTrials, probabilityOfSuccess,
+                    1.0 - probabilityOfSuccess));
+        }
+<span class="fc" id="L120">        return ret;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * This implementation return -1 when {@code p == 0} and
+     * {@code Integer.MAX_VALUE} when {@code p == 1}.
+     */
+    @Override
+    public int inverseCumulativeProbability(final double p) {
+        // handle extreme values explicitly
+<span class="fc bfc" id="L132" title="All 2 branches covered.">        if (p == 0) {</span>
+<span class="fc" id="L133">            return -1;</span>
+        }
+<span class="fc bfc" id="L135" title="All 2 branches covered.">        if (p == 1) {</span>
+<span class="fc" id="L136">            return Integer.MAX_VALUE;</span>
+        }
+
+        // use default bisection impl
+<span class="fc" id="L140">        return super.inverseCumulativeProbability(p);</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * The lower bound of the support is always 0 no matter the number of trials
+     * and probability parameter.
+     *
+     * @return lower bound of the support (always 0)
+     */
+    @Override
+    public int getSupportLowerBound() {
+<span class="nc" id="L153">        return 0;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * The upper bound of the support is the number of trials.
+     *
+     * @return upper bound of the support (equal to number of trials)
+     */
+    @Override
+    public int getSupportUpperBound() {
+<span class="nc" id="L165">        return getNumberOfTrials();</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * For {@code n} trials and probability parameter {@code p}, the mean is
+     * {@code n * p}.
+     */
+    @Override
+    protected double calculateNumericalMean() {
+<span class="fc" id="L176">        return getNumberOfTrials() * getProbabilityOfSuccess();</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * For {@code n} trials and probability parameter {@code p}, the variance is
+     * {@code n * p * (1 - p)}.
+     */
+    @Override
+    protected double calculateNumericalVariance() {
+<span class="fc" id="L187">        final double p = getProbabilityOfSuccess();</span>
+<span class="fc" id="L188">        return getNumberOfTrials() * p * (1 - p);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

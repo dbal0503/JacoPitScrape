@@ -1,0 +1,273 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>WilcoxonSignedRankTestImpl.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Commons Math</a> &gt; <a href="index.source.html" class="el_package">org.apache.commons.math.stat.inference</a> &gt; <span class="el_source">WilcoxonSignedRankTestImpl.java</span></div><h1>WilcoxonSignedRankTestImpl.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.commons.math.stat.inference;
+
+import org.apache.commons.math.MathException;
+import org.apache.commons.math.distribution.NormalDistribution;
+import org.apache.commons.math.stat.ranking.NaNStrategy;
+import org.apache.commons.math.stat.ranking.NaturalRanking;
+import org.apache.commons.math.stat.ranking.TiesStrategy;
+import org.apache.commons.math.util.FastMath;
+
+/**
+ * An implementation of the Wilcoxon signed-rank test.
+ *
+ * @version $Id$
+ */
+public class WilcoxonSignedRankTestImpl implements WilcoxonSignedRankTest {
+
+    /** Ranking algorithm. */
+    private NaturalRanking naturalRanking;
+
+    /**
+     * Create a test instance where NaN's are left in place and ties get
+     * the average of applicable ranks. Use this unless you are very sure
+     * of what you are doing.
+     */
+<span class="fc" id="L41">    public WilcoxonSignedRankTestImpl() {</span>
+<span class="fc" id="L42">        naturalRanking = new NaturalRanking(NaNStrategy.FIXED,</span>
+                TiesStrategy.AVERAGE);
+<span class="fc" id="L44">    }</span>
+
+    /**
+     * Create a test instance using the given strategies for NaN's and ties.
+     * Only use this if you are sure of what you are doing.
+     *
+     * @param nanStrategy
+     *            specifies the strategy that should be used for Double.NaN's
+     * @param tiesStrategy
+     *            specifies the strategy that should be used for ties
+     */
+    public WilcoxonSignedRankTestImpl(NaNStrategy nanStrategy,
+<span class="nc" id="L56">            TiesStrategy tiesStrategy) {</span>
+<span class="nc" id="L57">        naturalRanking = new NaturalRanking(nanStrategy, tiesStrategy);</span>
+<span class="nc" id="L58">    }</span>
+
+    /**
+     * Ensures that the provided arrays fulfills the assumptions.
+     *
+     * @param x first sample
+     * @param y second sample
+     * @throws IllegalArgumentException
+     *             if assumptions are not met
+     */
+    private void ensureDataConformance(final double[] x, final double[] y)
+            throws IllegalArgumentException {
+<span class="fc bfc" id="L70" title="All 2 branches covered.">        if (x == null) {</span>
+<span class="fc" id="L71">            throw new IllegalArgumentException(&quot;x must not be null&quot;);</span>
+        }
+
+<span class="fc bfc" id="L74" title="All 2 branches covered.">        if (y == null) {</span>
+<span class="fc" id="L75">            throw new IllegalArgumentException(&quot;y must not be null&quot;);</span>
+        }
+
+<span class="fc bfc" id="L78" title="All 2 branches covered.">        if (x.length != y.length) {</span>
+<span class="fc" id="L79">            throw new IllegalArgumentException(</span>
+                    &quot;x and y must contain the same number of elements&quot;);
+        }
+
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">        if (x.length == 0) {</span>
+<span class="nc" id="L84">            throw new IllegalArgumentException(</span>
+                    &quot;x and y must contain at least one element&quot;);
+        }
+<span class="fc" id="L87">    }</span>
+
+    /**
+     * Calculates y[i] - x[i] for all i
+     *
+     * @param x first sample
+     * @param y second sample
+     * @return z = y - x
+     */
+    private double[] calculateDifferences(final double[] x, final double[] y) {
+
+<span class="fc" id="L98">        final double[] z = new double[x.length];</span>
+
+<span class="fc bfc" id="L100" title="All 2 branches covered.">        for (int i = 0; i &lt; x.length; ++i) {</span>
+<span class="fc" id="L101">            z[i] = y[i] - x[i];</span>
+        }
+
+<span class="fc" id="L104">        return z;</span>
+    }
+
+    /**
+     * Calculates |z[i]| for all i
+     *
+     * @param z sample
+     * @return |z|
+     * @throws IllegalArgumentException
+     *             if assumptions are not met
+     */
+    private double[] calculateAbsoluteDifferences(final double[] z)
+            throws IllegalArgumentException {
+<span class="pc bpc" id="L117" title="1 of 2 branches missed.">        if (z == null) {</span>
+<span class="nc" id="L118">            throw new IllegalArgumentException(&quot;z must not be null&quot;);</span>
+        }
+
+<span class="pc bpc" id="L121" title="1 of 2 branches missed.">        if (z.length == 0) {</span>
+<span class="nc" id="L122">            throw new IllegalArgumentException(</span>
+                    &quot;z must contain at least one element&quot;);
+        }
+
+<span class="fc" id="L126">        final double[] zAbs = new double[z.length];</span>
+
+<span class="fc bfc" id="L128" title="All 2 branches covered.">        for (int i = 0; i &lt; z.length; ++i) {</span>
+<span class="fc" id="L129">            zAbs[i] = FastMath.abs(z[i]);</span>
+        }
+
+<span class="fc" id="L132">        return zAbs;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @param x
+     *            the first sample
+     * @param y
+     *            the second sample
+     * @return wilcoxonSignedRank statistic (the larger of W+ and W-)
+     * @throws IllegalArgumentException
+     *             if preconditions are not met
+     */
+    public double wilcoxonSignedRank(final double[] x, final double[] y)
+            throws IllegalArgumentException {
+
+<span class="fc" id="L149">        ensureDataConformance(x, y);</span>
+
+        // throws IllegalArgumentException if x and y are not correctly
+        // specified
+<span class="fc" id="L153">        final double[] z = calculateDifferences(x, y);</span>
+<span class="fc" id="L154">        final double[] zAbs = calculateAbsoluteDifferences(z);</span>
+
+<span class="fc" id="L156">        final double[] ranks = naturalRanking.rank(zAbs);</span>
+
+<span class="fc" id="L158">        double Wplus = 0;</span>
+
+<span class="fc bfc" id="L160" title="All 2 branches covered.">        for (int i = 0; i &lt; z.length; ++i) {</span>
+<span class="fc bfc" id="L161" title="All 2 branches covered.">            if (z[i] &gt; 0) {</span>
+<span class="fc" id="L162">                Wplus += ranks[i];</span>
+            }
+        }
+
+<span class="fc" id="L166">        final int N = x.length;</span>
+<span class="fc" id="L167">        final double Wminus = (((double) (N * (N + 1))) / 2.0) - Wplus;</span>
+
+<span class="fc" id="L169">        return FastMath.max(Wplus, Wminus);</span>
+    }
+
+    /**
+     * Algorithm inspired by
+     * http://www.fon.hum.uva.nl/Service/Statistics/Signed_Rank_Algorihms.html#C
+     * by Rob van Son, Institute of Phonetic Sciences &amp; IFOTT,
+     * University of Amsterdam
+     *
+     * @param Wmax largest Wilcoxon signed rank value
+     * @param N number of subjects (corresponding to x.length)
+     * @return two-sided exact p-value
+     */
+    private double calculateExactPValue(final double Wmax, final int N) {
+
+        // Total number of outcomes (equal to 2^N but a lot faster)
+<span class="fc" id="L185">        final int m = 1 &lt;&lt; N;</span>
+
+<span class="fc" id="L187">        int largerRankSums = 0;</span>
+
+<span class="fc bfc" id="L189" title="All 2 branches covered.">        for (int i = 0; i &lt; m; ++i) {</span>
+<span class="fc" id="L190">            int rankSum = 0;</span>
+
+            // Generate all possible rank sums
+<span class="fc bfc" id="L193" title="All 2 branches covered.">            for (int j = 0; j &lt; N; ++j) {</span>
+
+                // (i &gt;&gt; j) &amp; 1 extract i's j-th bit from the right
+<span class="fc bfc" id="L196" title="All 2 branches covered.">                if (((i &gt;&gt; j) &amp; 1) == 1) {</span>
+<span class="fc" id="L197">                    rankSum += j + 1;</span>
+                }
+            }
+
+<span class="fc bfc" id="L201" title="All 2 branches covered.">            if (rankSum &gt;= Wmax) {</span>
+<span class="fc" id="L202">                ++largerRankSums;</span>
+            }
+        }
+
+        /*
+         * largerRankSums / m gives the one-sided p-value, so it's multiplied
+         * with 2 to get the two-sided p-value
+         */
+<span class="fc" id="L210">        return 2 * ((double) largerRankSums) / ((double) m);</span>
+    }
+
+    /**
+     * @param Wmin smallest Wilcoxon signed rank value
+     * @param N number of subjects (corresponding to x.length)
+     * @return two-sided asymptotic p-value
+     * @throws MathException if an error occurs computing the p-value
+     */
+    private double calculateAsymptoticPValue(final double Wmin, final int N) throws MathException {
+
+<span class="fc" id="L221">        final double ES = (double) (N * (N + 1)) / 4.0;</span>
+
+        /* Same as (but saves computations):
+         * final double VarW = ((double) (N * (N + 1) * (2*N + 1))) / 24;
+         */
+<span class="fc" id="L226">        final double VarS = ES * ((double) (2 * N + 1) / 6.0);</span>
+
+        // - 0.5 is a continuity correction
+<span class="fc" id="L229">        final double z = (Wmin - ES - 0.5) / FastMath.sqrt(VarS);</span>
+
+<span class="fc" id="L231">        final NormalDistribution standardNormal = new NormalDistribution(0, 1);</span>
+
+<span class="fc" id="L233">        return 2*standardNormal.cumulativeProbability(z);</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @param x
+     *            the first sample
+     * @param y
+     *            the second sample
+     * @param exactPValue
+     *            if the exact p-value is wanted (only for x.length &lt;= 30)
+     * @return p-value
+     * @throws IllegalArgumentException
+     *             if preconditions are not met or exact p-value is wanted for
+     *             when x.length &gt; 30
+     * @throws MathException
+     *             if an error occurs computing the p-value
+     */
+    public double wilcoxonSignedRankTest(final double[] x, final double[] y,
+            boolean exactPValue) throws IllegalArgumentException,
+            MathException {
+
+<span class="fc" id="L256">        ensureDataConformance(x, y);</span>
+
+<span class="fc" id="L258">        final int N = x.length;</span>
+<span class="fc" id="L259">        final double Wmax = wilcoxonSignedRank(x, y);</span>
+
+<span class="fc bfc" id="L261" title="All 4 branches covered.">        if (exactPValue &amp;&amp; N &gt; 30) {</span>
+<span class="fc" id="L262">            throw new IllegalArgumentException(&quot;Exact test can only be made for N &lt;= 30.&quot;);</span>
+        }
+
+<span class="fc bfc" id="L265" title="All 2 branches covered.">        if (exactPValue) {</span>
+<span class="fc" id="L266">            return calculateExactPValue(Wmax, N);</span>
+        } else {
+<span class="fc" id="L268">            final double Wmin = ( (double)(N*(N+1)) / 2.0 ) - Wmax;</span>
+<span class="fc" id="L269">            return calculateAsymptoticPValue(Wmin, N);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

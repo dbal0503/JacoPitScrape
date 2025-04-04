@@ -1,0 +1,1038 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ClassUtils.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Commons Lang</a> &gt; <a href="index.source.html" class="el_package">org.apache.commons.lang</a> &gt; <span class="el_source">ClassUtils.java</span></div><h1>ClassUtils.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.commons.lang;
+
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+
+
+/**
+ * &lt;p&gt;Operates on classes without using reflection.&lt;/p&gt;
+ *
+ * &lt;p&gt;This class handles invalid &lt;code&gt;null&lt;/code&gt; inputs as best it can.
+ * Each method documents its behaviour in more detail.&lt;/p&gt;
+ *
+ * &lt;p&gt;The notion of a &lt;code&gt;canonical name&lt;/code&gt; includes the human
+ * readable name for the type, for example &lt;code&gt;int[]&lt;/code&gt;. The
+ * non-canonical method variants work with the JVM names, such as
+ * &lt;code&gt;[I&lt;/code&gt;. &lt;/p&gt;
+ *
+ * @author Stephen Colebourne
+ * @author Gary Gregory
+ * @author Norm Deane
+ * @author Alban Peignier
+ * @author Tomasz Blachowicz
+ * @since 2.0
+ * @version $Id$
+ */
+public class ClassUtils {
+
+    /**
+     * &lt;p&gt;The package separator character: &lt;code&gt;'&amp;#x2e;' == {@value}&lt;/code&gt;.&lt;/p&gt;
+     */
+    public static final char PACKAGE_SEPARATOR_CHAR = '.';
+
+    /**
+     * &lt;p&gt;The package separator String: &lt;code&gt;&quot;&amp;#x2e;&quot;&lt;/code&gt;.&lt;/p&gt;
+     */
+<span class="fc" id="L58">    public static final String PACKAGE_SEPARATOR = String.valueOf(PACKAGE_SEPARATOR_CHAR);</span>
+
+    /**
+     * &lt;p&gt;The inner class separator character: &lt;code&gt;'$' == {@value}&lt;/code&gt;.&lt;/p&gt;
+     */
+    public static final char INNER_CLASS_SEPARATOR_CHAR = '$';
+
+    /**
+     * &lt;p&gt;The inner class separator String: &lt;code&gt;&quot;$&quot;&lt;/code&gt;.&lt;/p&gt;
+     */
+<span class="fc" id="L68">    public static final String INNER_CLASS_SEPARATOR = String.valueOf(INNER_CLASS_SEPARATOR_CHAR);</span>
+
+    /**
+     * Maps primitive &lt;code&gt;Class&lt;/code&gt;es to their corresponding wrapper &lt;code&gt;Class&lt;/code&gt;.
+     */
+<span class="fc" id="L73">    private static final Map&lt;Class&lt;?&gt;, Class&lt;?&gt;&gt; primitiveWrapperMap = new HashMap&lt;Class&lt;?&gt;, Class&lt;?&gt;&gt;();</span>
+    static {
+<span class="fc" id="L75">         primitiveWrapperMap.put(Boolean.TYPE, Boolean.class);</span>
+<span class="fc" id="L76">         primitiveWrapperMap.put(Byte.TYPE, Byte.class);</span>
+<span class="fc" id="L77">         primitiveWrapperMap.put(Character.TYPE, Character.class);</span>
+<span class="fc" id="L78">         primitiveWrapperMap.put(Short.TYPE, Short.class);</span>
+<span class="fc" id="L79">         primitiveWrapperMap.put(Integer.TYPE, Integer.class);</span>
+<span class="fc" id="L80">         primitiveWrapperMap.put(Long.TYPE, Long.class);</span>
+<span class="fc" id="L81">         primitiveWrapperMap.put(Double.TYPE, Double.class);</span>
+<span class="fc" id="L82">         primitiveWrapperMap.put(Float.TYPE, Float.class);</span>
+<span class="fc" id="L83">         primitiveWrapperMap.put(Void.TYPE, Void.TYPE);</span>
+    }
+
+    /**
+     * Maps wrapper &lt;code&gt;Class&lt;/code&gt;es to their corresponding primitive types.
+     */
+<span class="fc" id="L89">    private static final Map&lt;Class&lt;?&gt;, Class&lt;?&gt;&gt; wrapperPrimitiveMap = new HashMap&lt;Class&lt;?&gt;, Class&lt;?&gt;&gt;();</span>
+    static {
+<span class="fc bfc" id="L91" title="All 2 branches covered.">        for (Class&lt;?&gt; primitiveClass : primitiveWrapperMap.keySet()) {</span>
+<span class="fc" id="L92">            Class&lt;?&gt; wrapperClass = primitiveWrapperMap.get(primitiveClass);</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">            if (!primitiveClass.equals(wrapperClass)) {</span>
+<span class="fc" id="L94">                wrapperPrimitiveMap.put(wrapperClass, primitiveClass);</span>
+            }
+<span class="fc" id="L96">        }</span>
+    }
+
+    /**
+     * Maps a primitive class name to its corresponding abbreviation used in array class names.
+     */
+<span class="fc" id="L102">    private static final Map&lt;String, String&gt; abbreviationMap = new HashMap&lt;String, String&gt;();</span>
+
+    /**
+     * Maps an abbreviation used in array class names to corresponding primitive class name.
+     */
+<span class="fc" id="L107">    private static final Map&lt;String, String&gt; reverseAbbreviationMap = new HashMap&lt;String, String&gt;();</span>
+
+    /**
+     * Add primitive type abbreviation to maps of abbreviations.
+     *
+     * @param primitive Canonical name of primitive type
+     * @param abbreviation Corresponding abbreviation of primitive type
+     */
+    private static void addAbbreviation(String primitive, String abbreviation) {
+<span class="fc" id="L116">        abbreviationMap.put(primitive, abbreviation);</span>
+<span class="fc" id="L117">        reverseAbbreviationMap.put(abbreviation, primitive);</span>
+<span class="fc" id="L118">    }</span>
+
+    /**
+     * Feed abbreviation maps
+     */
+    static {
+<span class="fc" id="L124">        addAbbreviation(&quot;int&quot;, &quot;I&quot;);</span>
+<span class="fc" id="L125">        addAbbreviation(&quot;boolean&quot;, &quot;Z&quot;);</span>
+<span class="fc" id="L126">        addAbbreviation(&quot;float&quot;, &quot;F&quot;);</span>
+<span class="fc" id="L127">        addAbbreviation(&quot;long&quot;, &quot;J&quot;);</span>
+<span class="fc" id="L128">        addAbbreviation(&quot;short&quot;, &quot;S&quot;);</span>
+<span class="fc" id="L129">        addAbbreviation(&quot;byte&quot;, &quot;B&quot;);</span>
+<span class="fc" id="L130">        addAbbreviation(&quot;double&quot;, &quot;D&quot;);</span>
+<span class="fc" id="L131">        addAbbreviation(&quot;char&quot;, &quot;C&quot;);</span>
+<span class="fc" id="L132">    }</span>
+
+    /**
+     * &lt;p&gt;ClassUtils instances should NOT be constructed in standard programming.
+     * Instead, the class should be used as
+     * &lt;code&gt;ClassUtils.getShortClassName(cls)&lt;/code&gt;.&lt;/p&gt;
+     *
+     * &lt;p&gt;This constructor is public to permit tools that require a JavaBean
+     * instance to operate.&lt;/p&gt;
+     */
+    public ClassUtils() {
+<span class="fc" id="L143">      super();</span>
+<span class="fc" id="L144">    }</span>
+
+    // Short class name
+    // ----------------------------------------------------------------------
+    /**
+     * &lt;p&gt;Gets the class name minus the package name for an &lt;code&gt;Object&lt;/code&gt;.&lt;/p&gt;
+     *
+     * @param object  the class to get the short name for, may be null
+     * @param valueIfNull  the value to return if null
+     * @return the class name of the object without the package name, or the null value
+     */
+    public static String getShortClassName(Object object, String valueIfNull) {
+<span class="fc bfc" id="L156" title="All 2 branches covered.">        if (object == null) {</span>
+<span class="fc" id="L157">            return valueIfNull;</span>
+        }
+<span class="fc" id="L159">        return getShortClassName(object.getClass());</span>
+    }
+
+    /**
+     * &lt;p&gt;Gets the class name minus the package name from a &lt;code&gt;Class&lt;/code&gt;.&lt;/p&gt;
+     *
+     * @param cls  the class to get the short name for.
+     * @return the class name without the package name or an empty string
+     */
+    public static String getShortClassName(Class&lt;?&gt; cls) {
+<span class="fc bfc" id="L169" title="All 2 branches covered.">        if (cls == null) {</span>
+<span class="fc" id="L170">            return StringUtils.EMPTY;</span>
+        }
+<span class="fc" id="L172">        return getShortClassName(cls.getName());</span>
+    }
+
+    /**
+     * &lt;p&gt;Gets the class name minus the package name from a String.&lt;/p&gt;
+     *
+     * &lt;p&gt;The string passed in is assumed to be a class name - it is not checked.&lt;/p&gt;
+     *
+     * @param className  the className to get the short name for
+     * @return the class name of the class without the package name or an empty string
+     */
+    public static String getShortClassName(String className) {
+<span class="fc bfc" id="L184" title="All 2 branches covered.">        if (className == null) {</span>
+<span class="fc" id="L185">            return StringUtils.EMPTY;</span>
+        }
+<span class="fc bfc" id="L187" title="All 2 branches covered.">        if (className.length() == 0) {</span>
+<span class="fc" id="L188">            return StringUtils.EMPTY;</span>
+        }
+
+<span class="fc" id="L191">        StringBuilder arrayPrefix = new StringBuilder();</span>
+
+        // Handle array encoding
+<span class="fc bfc" id="L194" title="All 2 branches covered.">        if (className.startsWith(&quot;[&quot;)) {</span>
+<span class="fc bfc" id="L195" title="All 2 branches covered.">            while (className.charAt(0) == '[') {</span>
+<span class="fc" id="L196">                className = className.substring(1);</span>
+<span class="fc" id="L197">                arrayPrefix.append(&quot;[]&quot;);</span>
+            }
+            // Strip Object type encoding
+<span class="pc bpc" id="L200" title="1 of 4 branches missed.">            if (className.charAt(0) == 'L' &amp;&amp; className.charAt(className.length() - 1) == ';') {</span>
+<span class="fc" id="L201">                className = className.substring(1, className.length() - 1);</span>
+            }
+        }
+
+<span class="fc bfc" id="L205" title="All 2 branches covered.">        if (reverseAbbreviationMap.containsKey(className)) {</span>
+<span class="fc" id="L206">            className = reverseAbbreviationMap.get(className);</span>
+        }
+
+<span class="fc" id="L209">        int lastDotIdx = className.lastIndexOf(PACKAGE_SEPARATOR_CHAR);</span>
+<span class="fc" id="L210">        int innerIdx = className.indexOf(</span>
+<span class="fc bfc" id="L211" title="All 2 branches covered.">                INNER_CLASS_SEPARATOR_CHAR, lastDotIdx == -1 ? 0 : lastDotIdx + 1);</span>
+<span class="fc" id="L212">        String out = className.substring(lastDotIdx + 1);</span>
+<span class="fc bfc" id="L213" title="All 2 branches covered.">        if (innerIdx != -1) {</span>
+<span class="fc" id="L214">            out = out.replace(INNER_CLASS_SEPARATOR_CHAR, PACKAGE_SEPARATOR_CHAR);</span>
+        }
+<span class="fc" id="L216">        return out + arrayPrefix;</span>
+    }
+
+    // Package name
+    // ----------------------------------------------------------------------
+    /**
+     * &lt;p&gt;Gets the package name of an &lt;code&gt;Object&lt;/code&gt;.&lt;/p&gt;
+     *
+     * @param object  the class to get the package name for, may be null
+     * @param valueIfNull  the value to return if null
+     * @return the package name of the object, or the null value
+     */
+    public static String getPackageName(Object object, String valueIfNull) {
+<span class="fc bfc" id="L229" title="All 2 branches covered.">        if (object == null) {</span>
+<span class="fc" id="L230">            return valueIfNull;</span>
+        }
+<span class="fc" id="L232">        return getPackageName(object.getClass());</span>
+    }
+
+    /**
+     * &lt;p&gt;Gets the package name of a &lt;code&gt;Class&lt;/code&gt;.&lt;/p&gt;
+     *
+     * @param cls  the class to get the package name for, may be &lt;code&gt;null&lt;/code&gt;.
+     * @return the package name or an empty string
+     */
+    public static String getPackageName(Class&lt;?&gt; cls) {
+<span class="fc bfc" id="L242" title="All 2 branches covered.">        if (cls == null) {</span>
+<span class="fc" id="L243">            return StringUtils.EMPTY;</span>
+        }
+<span class="fc" id="L245">        return getPackageName(cls.getName());</span>
+    }
+
+    /**
+     * &lt;p&gt;Gets the package name from a &lt;code&gt;String&lt;/code&gt;.&lt;/p&gt;
+     *
+     * &lt;p&gt;The string passed in is assumed to be a class name - it is not checked.&lt;/p&gt;
+     * &lt;p&gt;If the class is unpackaged, return an empty string.&lt;/p&gt;
+     *
+     * @param className  the className to get the package name for, may be &lt;code&gt;null&lt;/code&gt;
+     * @return the package name or an empty string
+     */
+    public static String getPackageName(String className) {
+<span class="fc bfc" id="L258" title="All 4 branches covered.">        if (className == null || className.length() == 0) {</span>
+<span class="fc" id="L259">            return StringUtils.EMPTY;</span>
+        }
+
+        // Strip array encoding
+<span class="fc bfc" id="L263" title="All 2 branches covered.">        while (className.charAt(0) == '[') {</span>
+<span class="fc" id="L264">            className = className.substring(1);</span>
+        }
+        // Strip Object type encoding
+<span class="pc bpc" id="L267" title="1 of 4 branches missed.">        if (className.charAt(0) == 'L' &amp;&amp; className.charAt(className.length() - 1) == ';') {</span>
+<span class="fc" id="L268">            className = className.substring(1);</span>
+        }
+
+<span class="fc" id="L271">        int i = className.lastIndexOf(PACKAGE_SEPARATOR_CHAR);</span>
+<span class="fc bfc" id="L272" title="All 2 branches covered.">        if (i == -1) {</span>
+<span class="fc" id="L273">            return StringUtils.EMPTY;</span>
+        }
+<span class="fc" id="L275">        return className.substring(0, i);</span>
+    }
+
+    // Superclasses/Superinterfaces
+    // ----------------------------------------------------------------------
+    /**
+     * &lt;p&gt;Gets a &lt;code&gt;List&lt;/code&gt; of superclasses for the given class.&lt;/p&gt;
+     *
+     * @param cls  the class to look up, may be &lt;code&gt;null&lt;/code&gt;
+     * @return the &lt;code&gt;List&lt;/code&gt; of superclasses in order going up from this one
+     *  &lt;code&gt;null&lt;/code&gt; if null input
+     */
+    public static List&lt;Class&lt;?&gt;&gt; getAllSuperclasses(Class&lt;?&gt; cls) {
+<span class="fc bfc" id="L288" title="All 2 branches covered.">        if (cls == null) {</span>
+<span class="fc" id="L289">            return null;</span>
+        }
+<span class="fc" id="L291">        List&lt;Class&lt;?&gt;&gt; classes = new ArrayList&lt;Class&lt;?&gt;&gt;();</span>
+<span class="fc" id="L292">        Class&lt;?&gt; superclass = cls.getSuperclass();</span>
+<span class="fc bfc" id="L293" title="All 2 branches covered.">        while (superclass != null) {</span>
+<span class="fc" id="L294">            classes.add(superclass);</span>
+<span class="fc" id="L295">            superclass = superclass.getSuperclass();</span>
+        }
+<span class="fc" id="L297">        return classes;</span>
+    }
+
+    /**
+     * &lt;p&gt;Gets a &lt;code&gt;List&lt;/code&gt; of all interfaces implemented by the given
+     * class and its superclasses.&lt;/p&gt;
+     *
+     * &lt;p&gt;The order is determined by looking through each interface in turn as
+     * declared in the source file and following its hierarchy up. Then each
+     * superclass is considered in the same way. Later duplicates are ignored,
+     * so the order is maintained.&lt;/p&gt;
+     *
+     * @param cls  the class to look up, may be &lt;code&gt;null&lt;/code&gt;
+     * @return the &lt;code&gt;List&lt;/code&gt; of interfaces in order,
+     *  &lt;code&gt;null&lt;/code&gt; if null input
+     */
+    public static List&lt;Class&lt;?&gt;&gt; getAllInterfaces(Class&lt;?&gt; cls) {
+<span class="fc bfc" id="L314" title="All 2 branches covered.">        if (cls == null) {</span>
+<span class="fc" id="L315">            return null;</span>
+        }
+
+<span class="fc" id="L318">        LinkedHashSet&lt;Class&lt;?&gt;&gt; interfacesFound = new LinkedHashSet&lt;Class&lt;?&gt;&gt;();</span>
+<span class="fc" id="L319">        getAllInterfaces(cls, interfacesFound);</span>
+
+<span class="fc" id="L321">        return new ArrayList&lt;Class&lt;?&gt;&gt;(interfacesFound);</span>
+    }
+
+    private static void getAllInterfaces(Class&lt;?&gt; cls, HashSet&lt;Class&lt;?&gt;&gt; interfacesFound) {
+<span class="fc bfc" id="L325" title="All 2 branches covered.">        while (cls != null) {</span>
+<span class="fc" id="L326">            Class&lt;?&gt;[] interfaces = cls.getInterfaces();</span>
+
+<span class="fc bfc" id="L328" title="All 2 branches covered.">            for (Class&lt;?&gt; i : interfaces) {</span>
+<span class="fc bfc" id="L329" title="All 2 branches covered.">                if (interfacesFound.add(i)) {</span>
+<span class="fc" id="L330">                    getAllInterfaces(i, interfacesFound);</span>
+                }
+            }
+
+<span class="fc" id="L334">            cls = cls.getSuperclass();</span>
+<span class="fc" id="L335">         }</span>
+<span class="fc" id="L336">     }</span>
+
+    // Convert list
+    // ----------------------------------------------------------------------
+    /**
+     * &lt;p&gt;Given a &lt;code&gt;List&lt;/code&gt; of class names, this method converts them into classes.&lt;/p&gt;
+     *
+     * &lt;p&gt;A new &lt;code&gt;List&lt;/code&gt; is returned. If the class name cannot be found, &lt;code&gt;null&lt;/code&gt;
+     * is stored in the &lt;code&gt;List&lt;/code&gt;. If the class name in the &lt;code&gt;List&lt;/code&gt; is
+     * &lt;code&gt;null&lt;/code&gt;, &lt;code&gt;null&lt;/code&gt; is stored in the output &lt;code&gt;List&lt;/code&gt;.&lt;/p&gt;
+     *
+     * @param classNames  the classNames to change
+     * @return a &lt;code&gt;List&lt;/code&gt; of Class objects corresponding to the class names,
+     *  &lt;code&gt;null&lt;/code&gt; if null input
+     * @throws ClassCastException if classNames contains a non String entry
+     */
+    public static List&lt;Class&lt;?&gt;&gt; convertClassNamesToClasses(List&lt;String&gt; classNames) {
+<span class="fc bfc" id="L353" title="All 2 branches covered.">        if (classNames == null) {</span>
+<span class="fc" id="L354">            return null;</span>
+        }
+<span class="fc" id="L356">        List&lt;Class&lt;?&gt;&gt; classes = new ArrayList&lt;Class&lt;?&gt;&gt;(classNames.size());</span>
+<span class="fc bfc" id="L357" title="All 2 branches covered.">        for (String className : classNames) {</span>
+            try {
+<span class="fc" id="L359">                classes.add(Class.forName(className));</span>
+<span class="fc" id="L360">            } catch (Exception ex) {</span>
+<span class="fc" id="L361">                classes.add(null);</span>
+<span class="fc" id="L362">            }</span>
+<span class="fc" id="L363">        }</span>
+<span class="fc" id="L364">        return classes;</span>
+    }
+
+    /**
+     * &lt;p&gt;Given a &lt;code&gt;List&lt;/code&gt; of &lt;code&gt;Class&lt;/code&gt; objects, this method converts
+     * them into class names.&lt;/p&gt;
+     *
+     * &lt;p&gt;A new &lt;code&gt;List&lt;/code&gt; is returned. &lt;code&gt;null&lt;/code&gt; objects will be copied into
+     * the returned list as &lt;code&gt;null&lt;/code&gt;.&lt;/p&gt;
+     *
+     * @param classes  the classes to change
+     * @return a &lt;code&gt;List&lt;/code&gt; of class names corresponding to the Class objects,
+     *  &lt;code&gt;null&lt;/code&gt; if null input
+     * @throws ClassCastException if &lt;code&gt;classes&lt;/code&gt; contains a non-&lt;code&gt;Class&lt;/code&gt; entry
+     */
+    public static List&lt;String&gt; convertClassesToClassNames(List&lt;Class&lt;?&gt;&gt; classes) {
+<span class="fc bfc" id="L380" title="All 2 branches covered.">        if (classes == null) {</span>
+<span class="fc" id="L381">            return null;</span>
+        }
+<span class="fc" id="L383">        List&lt;String&gt; classNames = new ArrayList&lt;String&gt;(classes.size());</span>
+<span class="fc bfc" id="L384" title="All 2 branches covered.">        for (Class&lt;?&gt; cls : classes) {</span>
+<span class="fc bfc" id="L385" title="All 2 branches covered.">            if (cls == null) {</span>
+<span class="fc" id="L386">                classNames.add(null);</span>
+            } else {
+<span class="fc" id="L388">                classNames.add(cls.getName());</span>
+            }
+<span class="fc" id="L390">        }</span>
+<span class="fc" id="L391">        return classNames;</span>
+    }
+
+    // Is assignable
+    // ----------------------------------------------------------------------
+    /**
+     * &lt;p&gt;Checks if an array of Classes can be assigned to another array of Classes.&lt;/p&gt;
+     *
+     * &lt;p&gt;This method calls {@link #isAssignable(Class, Class) isAssignable} for each
+     * Class pair in the input arrays. It can be used to check if a set of arguments
+     * (the first parameter) are suitably compatible with a set of method parameter types
+     * (the second parameter).&lt;/p&gt;
+     *
+     * &lt;p&gt;Unlike the {@link Class#isAssignableFrom(java.lang.Class)} method, this
+     * method takes into account widenings of primitive classes and
+     * &lt;code&gt;null&lt;/code&gt;s.&lt;/p&gt;
+     *
+     * &lt;p&gt;Primitive widenings allow an int to be assigned to a &lt;code&gt;long&lt;/code&gt;,
+     * &lt;code&gt;float&lt;/code&gt; or &lt;code&gt;double&lt;/code&gt;. This method returns the correct
+     * result for these cases.&lt;/p&gt;
+     *
+     * &lt;p&gt;&lt;code&gt;Null&lt;/code&gt; may be assigned to any reference type. This method will
+     * return &lt;code&gt;true&lt;/code&gt; if &lt;code&gt;null&lt;/code&gt; is passed in and the toClass is
+     * non-primitive.&lt;/p&gt;
+     *
+     * &lt;p&gt;Specifically, this method tests whether the type represented by the
+     * specified &lt;code&gt;Class&lt;/code&gt; parameter can be converted to the type
+     * represented by this &lt;code&gt;Class&lt;/code&gt; object via an identity conversion
+     * widening primitive or widening reference conversion. See
+     * &lt;em&gt;&lt;a href=&quot;http://java.sun.com/docs/books/jls/&quot;&gt;The Java Language Specification&lt;/a&gt;&lt;/em&gt;,
+     * sections 5.1.1, 5.1.2 and 5.1.4 for details.&lt;/p&gt;
+     *
+     * @param classArray  the array of Classes to check, may be &lt;code&gt;null&lt;/code&gt;
+     * @param toClassArray  the array of Classes to try to assign into, may be &lt;code&gt;null&lt;/code&gt;
+     * @return &lt;code&gt;true&lt;/code&gt; if assignment possible
+     */
+    //TODO when we bump the major version we should default autoboxing to true on platforms &gt;= 1.5
+    public static boolean isAssignable(Class&lt;?&gt;[] classArray, Class&lt;?&gt;[] toClassArray) {
+<span class="fc" id="L429">        return isAssignable(classArray, toClassArray, false);</span>
+    }
+
+    /**
+     * &lt;p&gt;Checks if an array of Classes can be assigned to another array of Classes.&lt;/p&gt;
+     *
+     * &lt;p&gt;This method calls {@link #isAssignable(Class, Class) isAssignable} for each
+     * Class pair in the input arrays. It can be used to check if a set of arguments
+     * (the first parameter) are suitably compatible with a set of method parameter types
+     * (the second parameter).&lt;/p&gt;
+     *
+     * &lt;p&gt;Unlike the {@link Class#isAssignableFrom(java.lang.Class)} method, this
+     * method takes into account widenings of primitive classes and
+     * &lt;code&gt;null&lt;/code&gt;s.&lt;/p&gt;
+     *
+     * &lt;p&gt;Primitive widenings allow an int to be assigned to a &lt;code&gt;long&lt;/code&gt;,
+     * &lt;code&gt;float&lt;/code&gt; or &lt;code&gt;double&lt;/code&gt;. This method returns the correct
+     * result for these cases.&lt;/p&gt;
+     *
+     * &lt;p&gt;&lt;code&gt;Null&lt;/code&gt; may be assigned to any reference type. This method will
+     * return &lt;code&gt;true&lt;/code&gt; if &lt;code&gt;null&lt;/code&gt; is passed in and the toClass is
+     * non-primitive.&lt;/p&gt;
+     *
+     * &lt;p&gt;Specifically, this method tests whether the type represented by the
+     * specified &lt;code&gt;Class&lt;/code&gt; parameter can be converted to the type
+     * represented by this &lt;code&gt;Class&lt;/code&gt; object via an identity conversion
+     * widening primitive or widening reference conversion. See
+     * &lt;em&gt;&lt;a href=&quot;http://java.sun.com/docs/books/jls/&quot;&gt;The Java Language Specification&lt;/a&gt;&lt;/em&gt;,
+     * sections 5.1.1, 5.1.2 and 5.1.4 for details.&lt;/p&gt;
+     *
+     * @param classArray  the array of Classes to check, may be &lt;code&gt;null&lt;/code&gt;
+     * @param toClassArray  the array of Classes to try to assign into, may be &lt;code&gt;null&lt;/code&gt;
+     * @param autoboxing  whether to use implicit autoboxing/unboxing between primitives and wrappers
+     * @return &lt;code&gt;true&lt;/code&gt; if assignment possible
+     */
+    public static boolean isAssignable(Class&lt;?&gt;[] classArray, Class&lt;?&gt;[] toClassArray, boolean autoboxing) {
+<span class="fc bfc" id="L465" title="All 2 branches covered.">        if (ArrayUtils.isSameLength(classArray, toClassArray) == false) {</span>
+<span class="fc" id="L466">            return false;</span>
+        }
+<span class="fc bfc" id="L468" title="All 2 branches covered.">        if (classArray == null) {</span>
+<span class="fc" id="L469">            classArray = ArrayUtils.EMPTY_CLASS_ARRAY;</span>
+        }
+<span class="fc bfc" id="L471" title="All 2 branches covered.">        if (toClassArray == null) {</span>
+<span class="fc" id="L472">            toClassArray = ArrayUtils.EMPTY_CLASS_ARRAY;</span>
+        }
+<span class="fc bfc" id="L474" title="All 2 branches covered.">        for (int i = 0; i &lt; classArray.length; i++) {</span>
+<span class="fc bfc" id="L475" title="All 2 branches covered.">            if (isAssignable(classArray[i], toClassArray[i], autoboxing) == false) {</span>
+<span class="fc" id="L476">                return false;</span>
+            }
+        }
+<span class="fc" id="L479">        return true;</span>
+    }
+
+    /**
+     * &lt;p&gt;Checks if one &lt;code&gt;Class&lt;/code&gt; can be assigned to a variable of
+     * another &lt;code&gt;Class&lt;/code&gt;.&lt;/p&gt;
+     *
+     * &lt;p&gt;Unlike the {@link Class#isAssignableFrom(java.lang.Class)} method,
+     * this method takes into account widenings of primitive classes and
+     * &lt;code&gt;null&lt;/code&gt;s.&lt;/p&gt;
+     *
+     * &lt;p&gt;Primitive widenings allow an int to be assigned to a long, float or
+     * double. This method returns the correct result for these cases.&lt;/p&gt;
+     *
+     * &lt;p&gt;&lt;code&gt;Null&lt;/code&gt; may be assigned to any reference type. This method
+     * will return &lt;code&gt;true&lt;/code&gt; if &lt;code&gt;null&lt;/code&gt; is passed in and the
+     * toClass is non-primitive.&lt;/p&gt;
+     *
+     * &lt;p&gt;Specifically, this method tests whether the type represented by the
+     * specified &lt;code&gt;Class&lt;/code&gt; parameter can be converted to the type
+     * represented by this &lt;code&gt;Class&lt;/code&gt; object via an identity conversion
+     * widening primitive or widening reference conversion. See
+     * &lt;em&gt;&lt;a href=&quot;http://java.sun.com/docs/books/jls/&quot;&gt;The Java Language Specification&lt;/a&gt;&lt;/em&gt;,
+     * sections 5.1.1, 5.1.2 and 5.1.4 for details.&lt;/p&gt;
+     *
+     * @param cls  the Class to check, may be null
+     * @param toClass  the Class to try to assign into, returns false if null
+     * @return &lt;code&gt;true&lt;/code&gt; if assignment possible
+     */
+    //TODO when we bump the major version we should default autoboxing to true on platforms &gt;= 1.5
+    public static boolean isAssignable(Class&lt;?&gt; cls, Class&lt;?&gt; toClass) {
+<span class="fc" id="L510">        return isAssignable(cls, toClass, false);</span>
+    }
+
+    /**
+     * &lt;p&gt;Checks if one &lt;code&gt;Class&lt;/code&gt; can be assigned to a variable of
+     * another &lt;code&gt;Class&lt;/code&gt;.&lt;/p&gt;
+     *
+     * &lt;p&gt;Unlike the {@link Class#isAssignableFrom(java.lang.Class)} method,
+     * this method takes into account widenings of primitive classes and
+     * &lt;code&gt;null&lt;/code&gt;s.&lt;/p&gt;
+     *
+     * &lt;p&gt;Primitive widenings allow an int to be assigned to a long, float or
+     * double. This method returns the correct result for these cases.&lt;/p&gt;
+     *
+     * &lt;p&gt;&lt;code&gt;Null&lt;/code&gt; may be assigned to any reference type. This method
+     * will return &lt;code&gt;true&lt;/code&gt; if &lt;code&gt;null&lt;/code&gt; is passed in and the
+     * toClass is non-primitive.&lt;/p&gt;
+     *
+     * &lt;p&gt;Specifically, this method tests whether the type represented by the
+     * specified &lt;code&gt;Class&lt;/code&gt; parameter can be converted to the type
+     * represented by this &lt;code&gt;Class&lt;/code&gt; object via an identity conversion
+     * widening primitive or widening reference conversion. See
+     * &lt;em&gt;&lt;a href=&quot;http://java.sun.com/docs/books/jls/&quot;&gt;The Java Language Specification&lt;/a&gt;&lt;/em&gt;,
+     * sections 5.1.1, 5.1.2 and 5.1.4 for details.&lt;/p&gt;
+     *
+     * @param cls  the Class to check, may be null
+     * @param toClass  the Class to try to assign into, returns false if null
+     * @param autoboxing  whether to use implicit autoboxing/unboxing between primitives and wrappers
+     * @return &lt;code&gt;true&lt;/code&gt; if assignment possible
+     */
+    public static boolean isAssignable(Class&lt;?&gt; cls, Class&lt;?&gt; toClass, boolean autoboxing) {
+<span class="fc bfc" id="L541" title="All 2 branches covered.">        if (toClass == null) {</span>
+<span class="fc" id="L542">            return false;</span>
+        }
+        // have to check for null, as isAssignableFrom doesn't
+<span class="fc bfc" id="L545" title="All 2 branches covered.">        if (cls == null) {</span>
+<span class="fc bfc" id="L546" title="All 2 branches covered.">            return !(toClass.isPrimitive());</span>
+        }
+        //autoboxing:
+<span class="fc bfc" id="L549" title="All 2 branches covered.">        if (autoboxing) {</span>
+<span class="fc bfc" id="L550" title="All 4 branches covered.">            if (cls.isPrimitive() &amp;&amp; !toClass.isPrimitive()) {</span>
+<span class="fc" id="L551">                cls = primitiveToWrapper(cls);</span>
+<span class="pc bpc" id="L552" title="1 of 2 branches missed.">                if (cls == null) {</span>
+<span class="nc" id="L553">                    return false;</span>
+                }
+            }
+<span class="fc bfc" id="L556" title="All 4 branches covered.">            if (toClass.isPrimitive() &amp;&amp; !cls.isPrimitive()) {</span>
+<span class="fc" id="L557">                cls = wrapperToPrimitive(cls);</span>
+<span class="pc bpc" id="L558" title="1 of 2 branches missed.">                if (cls == null) {</span>
+<span class="nc" id="L559">                    return false;</span>
+                }
+            }
+        }
+<span class="fc bfc" id="L563" title="All 2 branches covered.">        if (cls.equals(toClass)) {</span>
+<span class="fc" id="L564">            return true;</span>
+        }
+<span class="fc bfc" id="L566" title="All 2 branches covered.">        if (cls.isPrimitive()) {</span>
+<span class="fc bfc" id="L567" title="All 2 branches covered.">            if (toClass.isPrimitive() == false) {</span>
+<span class="fc" id="L568">                return false;</span>
+            }
+<span class="fc bfc" id="L570" title="All 2 branches covered.">            if (Integer.TYPE.equals(cls)) {</span>
+<span class="fc bfc" id="L571" title="All 2 branches covered.">                return Long.TYPE.equals(toClass)</span>
+<span class="fc bfc" id="L572" title="All 2 branches covered.">                    || Float.TYPE.equals(toClass)</span>
+<span class="fc bfc" id="L573" title="All 2 branches covered.">                    || Double.TYPE.equals(toClass);</span>
+            }
+<span class="fc bfc" id="L575" title="All 2 branches covered.">            if (Long.TYPE.equals(cls)) {</span>
+<span class="fc bfc" id="L576" title="All 2 branches covered.">                return Float.TYPE.equals(toClass)</span>
+<span class="fc bfc" id="L577" title="All 2 branches covered.">                    || Double.TYPE.equals(toClass);</span>
+            }
+<span class="fc bfc" id="L579" title="All 2 branches covered.">            if (Boolean.TYPE.equals(cls)) {</span>
+<span class="fc" id="L580">                return false;</span>
+            }
+<span class="fc bfc" id="L582" title="All 2 branches covered.">            if (Double.TYPE.equals(cls)) {</span>
+<span class="fc" id="L583">                return false;</span>
+            }
+<span class="fc bfc" id="L585" title="All 2 branches covered.">            if (Float.TYPE.equals(cls)) {</span>
+<span class="fc" id="L586">                return Double.TYPE.equals(toClass);</span>
+            }
+<span class="fc bfc" id="L588" title="All 2 branches covered.">            if (Character.TYPE.equals(cls)) {</span>
+<span class="fc bfc" id="L589" title="All 2 branches covered.">                return Integer.TYPE.equals(toClass)</span>
+<span class="fc bfc" id="L590" title="All 2 branches covered.">                    || Long.TYPE.equals(toClass)</span>
+<span class="fc bfc" id="L591" title="All 2 branches covered.">                    || Float.TYPE.equals(toClass)</span>
+<span class="fc bfc" id="L592" title="All 2 branches covered.">                    || Double.TYPE.equals(toClass);</span>
+            }
+<span class="fc bfc" id="L594" title="All 2 branches covered.">            if (Short.TYPE.equals(cls)) {</span>
+<span class="fc bfc" id="L595" title="All 2 branches covered.">                return Integer.TYPE.equals(toClass)</span>
+<span class="fc bfc" id="L596" title="All 2 branches covered.">                    || Long.TYPE.equals(toClass)</span>
+<span class="fc bfc" id="L597" title="All 2 branches covered.">                    || Float.TYPE.equals(toClass)</span>
+<span class="fc bfc" id="L598" title="All 2 branches covered.">                    || Double.TYPE.equals(toClass);</span>
+            }
+<span class="pc bpc" id="L600" title="1 of 2 branches missed.">            if (Byte.TYPE.equals(cls)) {</span>
+<span class="fc bfc" id="L601" title="All 2 branches covered.">                return Short.TYPE.equals(toClass)</span>
+<span class="fc bfc" id="L602" title="All 2 branches covered.">                    || Integer.TYPE.equals(toClass)</span>
+<span class="fc bfc" id="L603" title="All 2 branches covered.">                    || Long.TYPE.equals(toClass)</span>
+<span class="fc bfc" id="L604" title="All 2 branches covered.">                    || Float.TYPE.equals(toClass)</span>
+<span class="fc bfc" id="L605" title="All 2 branches covered.">                    || Double.TYPE.equals(toClass);</span>
+            }
+            // should never get here
+<span class="nc" id="L608">            return false;</span>
+        }
+<span class="fc" id="L610">        return toClass.isAssignableFrom(cls);</span>
+    }
+
+    /**
+     * &lt;p&gt;Converts the specified primitive Class object to its corresponding
+     * wrapper Class object.&lt;/p&gt;
+     *
+     * &lt;p&gt;NOTE: From v2.2, this method handles &lt;code&gt;Void.TYPE&lt;/code&gt;,
+     * returning &lt;code&gt;Void.TYPE&lt;/code&gt;.&lt;/p&gt;
+     *
+     * @param cls  the class to convert, may be null
+     * @return the wrapper class for &lt;code&gt;cls&lt;/code&gt; or &lt;code&gt;cls&lt;/code&gt; if
+     * &lt;code&gt;cls&lt;/code&gt; is not a primitive. &lt;code&gt;null&lt;/code&gt; if null input.
+     * @since 2.1
+     */
+    public static Class&lt;?&gt; primitiveToWrapper(Class&lt;?&gt; cls) {
+<span class="fc" id="L626">        Class&lt;?&gt; convertedClass = cls;</span>
+<span class="fc bfc" id="L627" title="All 4 branches covered.">        if (cls != null &amp;&amp; cls.isPrimitive()) {</span>
+<span class="fc" id="L628">            convertedClass = primitiveWrapperMap.get(cls);</span>
+        }
+<span class="fc" id="L630">        return convertedClass;</span>
+    }
+
+    /**
+     * &lt;p&gt;Converts the specified array of primitive Class objects to an array of
+     * its corresponding wrapper Class objects.&lt;/p&gt;
+     *
+     * @param classes  the class array to convert, may be null or empty
+     * @return an array which contains for each given class, the wrapper class or
+     * the original class if class is not a primitive. &lt;code&gt;null&lt;/code&gt; if null input.
+     * Empty array if an empty array passed in.
+     * @since 2.1
+     */
+    public static Class&lt;?&gt;[] primitivesToWrappers(Class&lt;?&gt;[] classes) {
+<span class="fc bfc" id="L644" title="All 2 branches covered.">        if (classes == null) {</span>
+<span class="fc" id="L645">            return null;</span>
+        }
+
+<span class="fc bfc" id="L648" title="All 2 branches covered.">        if (classes.length == 0) {</span>
+<span class="fc" id="L649">            return classes;</span>
+        }
+
+<span class="fc" id="L652">        Class&lt;?&gt;[] convertedClasses = new Class[classes.length];</span>
+<span class="fc bfc" id="L653" title="All 2 branches covered.">        for (int i = 0; i &lt; classes.length; i++) {</span>
+<span class="fc" id="L654">            convertedClasses[i] = primitiveToWrapper(classes[i]);</span>
+        }
+<span class="fc" id="L656">        return convertedClasses;</span>
+    }
+
+    /**
+     * &lt;p&gt;Converts the specified wrapper class to its corresponding primitive
+     * class.&lt;/p&gt;
+     *
+     * &lt;p&gt;This method is the counter part of &lt;code&gt;primitiveToWrapper()&lt;/code&gt;.
+     * If the passed in class is a wrapper class for a primitive type, this
+     * primitive type will be returned (e.g. &lt;code&gt;Integer.TYPE&lt;/code&gt; for
+     * &lt;code&gt;Integer.class&lt;/code&gt;). For other classes, or if the parameter is
+     * &lt;b&gt;null&lt;/b&gt;, the return value is &lt;b&gt;null&lt;/b&gt;.&lt;/p&gt;
+     *
+     * @param cls the class to convert, may be &lt;b&gt;null&lt;/b&gt;
+     * @return the corresponding primitive type if &lt;code&gt;cls&lt;/code&gt; is a
+     * wrapper class, &lt;b&gt;null&lt;/b&gt; otherwise
+     * @see #primitiveToWrapper(Class)
+     * @since 2.4
+     */
+    public static Class&lt;?&gt; wrapperToPrimitive(Class&lt;?&gt; cls) {
+<span class="fc" id="L676">        return wrapperPrimitiveMap.get(cls);</span>
+    }
+
+    /**
+     * &lt;p&gt;Converts the specified array of wrapper Class objects to an array of
+     * its corresponding primitive Class objects.&lt;/p&gt;
+     *
+     * &lt;p&gt;This method invokes &lt;code&gt;wrapperToPrimitive()&lt;/code&gt; for each element
+     * of the passed in array.&lt;/p&gt;
+     *
+     * @param classes  the class array to convert, may be null or empty
+     * @return an array which contains for each given class, the primitive class or
+     * &lt;b&gt;null&lt;/b&gt; if the original class is not a wrapper class. &lt;code&gt;null&lt;/code&gt; if null input.
+     * Empty array if an empty array passed in.
+     * @see #wrapperToPrimitive(Class)
+     * @since 2.4
+     */
+    public static Class&lt;?&gt;[] wrappersToPrimitives(Class&lt;?&gt;[] classes) {
+<span class="fc bfc" id="L694" title="All 2 branches covered.">        if (classes == null) {</span>
+<span class="fc" id="L695">            return null;</span>
+        }
+
+<span class="fc bfc" id="L698" title="All 2 branches covered.">        if (classes.length == 0) {</span>
+<span class="fc" id="L699">            return classes;</span>
+        }
+
+<span class="fc" id="L702">        Class&lt;?&gt;[] convertedClasses = new Class[classes.length];</span>
+<span class="fc bfc" id="L703" title="All 2 branches covered.">        for (int i = 0; i &lt; classes.length; i++) {</span>
+<span class="fc" id="L704">            convertedClasses[i] = wrapperToPrimitive(classes[i]);</span>
+        }
+<span class="fc" id="L706">        return convertedClasses;</span>
+    }
+
+    // Inner class
+    // ----------------------------------------------------------------------
+    /**
+     * &lt;p&gt;Is the specified class an inner class or static nested class.&lt;/p&gt;
+     *
+     * @param cls  the class to check, may be null
+     * @return &lt;code&gt;true&lt;/code&gt; if the class is an inner or static nested class,
+     *  false if not or &lt;code&gt;null&lt;/code&gt;
+     */
+    public static boolean isInnerClass(Class&lt;?&gt; cls) {
+<span class="fc bfc" id="L719" title="All 2 branches covered.">        if (cls == null) {</span>
+<span class="fc" id="L720">            return false;</span>
+        }
+<span class="fc bfc" id="L722" title="All 2 branches covered.">        return cls.getName().indexOf(INNER_CLASS_SEPARATOR_CHAR) &gt;= 0;</span>
+    }
+
+    // Class loading
+    // ----------------------------------------------------------------------
+    /**
+     * Returns the class represented by &lt;code&gt;className&lt;/code&gt; using the
+     * &lt;code&gt;classLoader&lt;/code&gt;.  This implementation supports names like
+     * &quot;&lt;code&gt;java.lang.String[]&lt;/code&gt;&quot; as well as &quot;&lt;code&gt;[Ljava.lang.String;&lt;/code&gt;&quot;.
+     *
+     * @param classLoader  the class loader to use to load the class
+     * @param className  the class name
+     * @param initialize  whether the class must be initialized
+     * @return the class represented by &lt;code&gt;className&lt;/code&gt; using the &lt;code&gt;classLoader&lt;/code&gt;
+     * @throws ClassNotFoundException if the class is not found
+     */
+    public static Class&lt;?&gt; getClass(
+            ClassLoader classLoader, String className, boolean initialize) throws ClassNotFoundException {
+        Class&lt;?&gt; clazz;
+<span class="fc bfc" id="L741" title="All 2 branches covered.">        if (abbreviationMap.containsKey(className)) {</span>
+<span class="fc" id="L742">            String clsName = &quot;[&quot; + abbreviationMap.get(className);</span>
+<span class="fc" id="L743">            clazz = Class.forName(clsName, initialize, classLoader).getComponentType();</span>
+<span class="fc" id="L744">        } else {</span>
+<span class="fc" id="L745">            clazz = Class.forName(toCanonicalName(className), initialize, classLoader);</span>
+        }
+<span class="fc" id="L747">        return clazz;</span>
+    }
+
+    /**
+     * Returns the (initialized) class represented by &lt;code&gt;className&lt;/code&gt;
+     * using the &lt;code&gt;classLoader&lt;/code&gt;.  This implementation supports names
+     * like &quot;&lt;code&gt;java.lang.String[]&lt;/code&gt;&quot; as well as
+     * &quot;&lt;code&gt;[Ljava.lang.String;&lt;/code&gt;&quot;.
+     *
+     * @param classLoader  the class loader to use to load the class
+     * @param className  the class name
+     * @return the class represented by &lt;code&gt;className&lt;/code&gt; using the &lt;code&gt;classLoader&lt;/code&gt;
+     * @throws ClassNotFoundException if the class is not found
+     */
+    public static Class&lt;?&gt; getClass(ClassLoader classLoader, String className) throws ClassNotFoundException {
+<span class="nc" id="L762">        return getClass(classLoader, className, true);</span>
+    }
+
+    /**
+     * Returns the (initialized) class represented by &lt;code&gt;className&lt;/code&gt;
+     * using the current thread's context class loader. This implementation
+     * supports names like &quot;&lt;code&gt;java.lang.String[]&lt;/code&gt;&quot; as well as
+     * &quot;&lt;code&gt;[Ljava.lang.String;&lt;/code&gt;&quot;.
+     *
+     * @param className  the class name
+     * @return the class represented by &lt;code&gt;className&lt;/code&gt; using the current thread's context class loader
+     * @throws ClassNotFoundException if the class is not found
+     */
+    public static Class&lt;?&gt; getClass(String className) throws ClassNotFoundException {
+<span class="fc" id="L776">        return getClass(className, true);</span>
+    }
+
+    /**
+     * Returns the class represented by &lt;code&gt;className&lt;/code&gt; using the
+     * current thread's context class loader. This implementation supports
+     * names like &quot;&lt;code&gt;java.lang.String[]&lt;/code&gt;&quot; as well as
+     * &quot;&lt;code&gt;[Ljava.lang.String;&lt;/code&gt;&quot;.
+     *
+     * @param className  the class name
+     * @param initialize  whether the class must be initialized
+     * @return the class represented by &lt;code&gt;className&lt;/code&gt; using the current thread's context class loader
+     * @throws ClassNotFoundException if the class is not found
+     */
+    public static Class&lt;?&gt; getClass(String className, boolean initialize) throws ClassNotFoundException {
+<span class="fc" id="L791">        ClassLoader contextCL = Thread.currentThread().getContextClassLoader();</span>
+<span class="pc bpc" id="L792" title="1 of 2 branches missed.">        ClassLoader loader = contextCL == null ? ClassUtils.class.getClassLoader() : contextCL;</span>
+<span class="fc" id="L793">        return getClass(loader, className, initialize );</span>
+    }
+
+    // Public method
+    // ----------------------------------------------------------------------
+    /**
+     * &lt;p&gt;Returns the desired Method much like &lt;code&gt;Class.getMethod&lt;/code&gt;, however
+     * it ensures that the returned Method is from a public class or interface and not
+     * from an anonymous inner class. This means that the Method is invokable and
+     * doesn't fall foul of Java bug
+     * &lt;a href=&quot;http://bugs.sun.com/bugdatabase/view_bug.do?bug_id=4071957&quot;&gt;4071957&lt;/a&gt;).
+     *
+     *  &lt;code&gt;&lt;pre&gt;Set set = Collections.unmodifiableSet(...);
+     *  Method method = ClassUtils.getPublicMethod(set.getClass(), &quot;isEmpty&quot;,  new Class[0]);
+     *  Object result = method.invoke(set, new Object[]);&lt;/pre&gt;&lt;/code&gt;
+     * &lt;/p&gt;
+     *
+     * @param cls  the class to check, not null
+     * @param methodName  the name of the method
+     * @param parameterTypes  the list of parameters
+     * @return the method
+     * @throws NullPointerException if the class is null
+     * @throws SecurityException if a a security violation occured
+     * @throws NoSuchMethodException if the method is not found in the given class
+     *  or if the metothod doen't conform with the requirements
+     */
+    public static Method getPublicMethod(Class&lt;?&gt; cls, String methodName, Class&lt;?&gt; parameterTypes[])
+            throws SecurityException, NoSuchMethodException {
+
+<span class="fc" id="L822">        Method declaredMethod = cls.getMethod(methodName, parameterTypes);</span>
+<span class="fc bfc" id="L823" title="All 2 branches covered.">        if (Modifier.isPublic(declaredMethod.getDeclaringClass().getModifiers())) {</span>
+<span class="fc" id="L824">            return declaredMethod;</span>
+        }
+
+<span class="fc" id="L827">        List&lt;Class&lt;?&gt;&gt; candidateClasses = new ArrayList&lt;Class&lt;?&gt;&gt;();</span>
+<span class="fc" id="L828">        candidateClasses.addAll(getAllInterfaces(cls));</span>
+<span class="fc" id="L829">        candidateClasses.addAll(getAllSuperclasses(cls));</span>
+
+<span class="pc bpc" id="L831" title="1 of 2 branches missed.">        for (Class&lt;?&gt; candidateClass : candidateClasses) {</span>
+<span class="pc bpc" id="L832" title="1 of 2 branches missed.">            if (!Modifier.isPublic(candidateClass.getModifiers())) {</span>
+<span class="nc" id="L833">                continue;</span>
+            }
+            Method candidateMethod;
+            try {
+<span class="fc" id="L837">                candidateMethod = candidateClass.getMethod(methodName, parameterTypes);</span>
+<span class="nc" id="L838">            } catch (NoSuchMethodException ex) {</span>
+<span class="nc" id="L839">                continue;</span>
+<span class="fc" id="L840">            }</span>
+<span class="pc bpc" id="L841" title="1 of 2 branches missed.">            if (Modifier.isPublic(candidateMethod.getDeclaringClass().getModifiers())) {</span>
+<span class="fc" id="L842">                return candidateMethod;</span>
+            }
+<span class="nc" id="L844">        }</span>
+
+<span class="nc" id="L846">        throw new NoSuchMethodException(&quot;Can't find a public method for &quot; +</span>
+<span class="nc" id="L847">                methodName + &quot; &quot; + ArrayUtils.toString(parameterTypes));</span>
+    }
+
+    // ----------------------------------------------------------------------
+    /**
+     * Converts a class name to a JLS style class name.
+     *
+     * @param className  the class name
+     * @return the converted name
+     */
+    private static String toCanonicalName(String className) {
+<span class="fc" id="L858">        className = StringUtils.deleteWhitespace(className);</span>
+<span class="fc bfc" id="L859" title="All 2 branches covered.">        if (className == null) {</span>
+<span class="fc" id="L860">            throw new NullPointerException(&quot;className must not be null.&quot;);</span>
+<span class="fc bfc" id="L861" title="All 2 branches covered.">        } else if (className.endsWith(&quot;[]&quot;)) {</span>
+<span class="fc" id="L862">            StringBuilder classNameBuffer = new StringBuilder();</span>
+<span class="fc bfc" id="L863" title="All 2 branches covered.">            while (className.endsWith(&quot;[]&quot;)) {</span>
+<span class="fc" id="L864">                className = className.substring(0, className.length() - 2);</span>
+<span class="fc" id="L865">                classNameBuffer.append(&quot;[&quot;);</span>
+            }
+<span class="fc" id="L867">            String abbreviation = abbreviationMap.get(className);</span>
+<span class="fc bfc" id="L868" title="All 2 branches covered.">            if (abbreviation != null) {</span>
+<span class="fc" id="L869">                classNameBuffer.append(abbreviation);</span>
+            } else {
+<span class="fc" id="L871">                classNameBuffer.append(&quot;L&quot;).append(className).append(&quot;;&quot;);</span>
+            }
+<span class="fc" id="L873">            className = classNameBuffer.toString();</span>
+        }
+<span class="fc" id="L875">        return className;</span>
+    }
+
+    /**
+     * &lt;p&gt;Converts an array of &lt;code&gt;Object&lt;/code&gt; in to an array of &lt;code&gt;Class&lt;/code&gt; objects.&lt;/p&gt;
+     *
+     * &lt;p&gt;This method returns &lt;code&gt;null&lt;/code&gt; for a &lt;code&gt;null&lt;/code&gt; input array.&lt;/p&gt;
+     *
+     * @param array an &lt;code&gt;Object&lt;/code&gt; array
+     * @return a &lt;code&gt;Class&lt;/code&gt; array, &lt;code&gt;null&lt;/code&gt; if null array input
+     * @since 2.4
+     */
+    public static Class&lt;?&gt;[] toClass(Object[] array) {
+<span class="fc bfc" id="L888" title="All 2 branches covered.">        if (array == null) {</span>
+<span class="fc" id="L889">            return null;</span>
+<span class="fc bfc" id="L890" title="All 2 branches covered.">        } else if (array.length == 0) {</span>
+<span class="fc" id="L891">            return ArrayUtils.EMPTY_CLASS_ARRAY;</span>
+        }
+<span class="fc" id="L893">        Class&lt;?&gt;[] classes = new Class[array.length];</span>
+<span class="fc bfc" id="L894" title="All 2 branches covered.">        for (int i = 0; i &lt; array.length; i++) {</span>
+<span class="fc" id="L895">            classes[i] = array[i].getClass();</span>
+        }
+<span class="fc" id="L897">        return classes;</span>
+    }
+
+    // Short canonical name
+    // ----------------------------------------------------------------------
+    /**
+     * &lt;p&gt;Gets the canonical name minus the package name for an &lt;code&gt;Object&lt;/code&gt;.&lt;/p&gt;
+     *
+     * @param object  the class to get the short name for, may be null
+     * @param valueIfNull  the value to return if null
+     * @return the canonical name of the object without the package name, or the null value
+     * @since 2.4
+     */
+    public static String getShortCanonicalName(Object object, String valueIfNull) {
+<span class="fc bfc" id="L911" title="All 2 branches covered.">        if (object == null) {</span>
+<span class="fc" id="L912">            return valueIfNull;</span>
+        }
+<span class="fc" id="L914">        return getShortCanonicalName(object.getClass().getName());</span>
+    }
+
+    /**
+     * &lt;p&gt;Gets the canonical name minus the package name from a &lt;code&gt;Class&lt;/code&gt;.&lt;/p&gt;
+     *
+     * @param cls  the class to get the short name for.
+     * @return the canonical name without the package name or an empty string
+     * @since 2.4
+     */
+    public static String getShortCanonicalName(Class&lt;?&gt; cls) {
+<span class="pc bpc" id="L925" title="1 of 2 branches missed.">        if (cls == null) {</span>
+<span class="nc" id="L926">            return StringUtils.EMPTY;</span>
+        }
+<span class="fc" id="L928">        return getShortCanonicalName(cls.getName());</span>
+    }
+
+    /**
+     * &lt;p&gt;Gets the canonical name minus the package name from a String.&lt;/p&gt;
+     *
+     * &lt;p&gt;The string passed in is assumed to be a canonical name - it is not checked.&lt;/p&gt;
+     *
+     * @param canonicalName  the class name to get the short name for
+     * @return the canonical name of the class without the package name or an empty string
+     * @since 2.4
+     */
+    public static String getShortCanonicalName(String canonicalName) {
+<span class="fc" id="L941">        return ClassUtils.getShortClassName(getCanonicalName(canonicalName));</span>
+    }
+
+    // Package name
+    // ----------------------------------------------------------------------
+    /**
+     * &lt;p&gt;Gets the package name from the canonical name of an &lt;code&gt;Object&lt;/code&gt;.&lt;/p&gt;
+     *
+     * @param object  the class to get the package name for, may be null
+     * @param valueIfNull  the value to return if null
+     * @return the package name of the object, or the null value
+     * @since 2.4
+     */
+    public static String getPackageCanonicalName(Object object, String valueIfNull) {
+<span class="fc bfc" id="L955" title="All 2 branches covered.">        if (object == null) {</span>
+<span class="fc" id="L956">            return valueIfNull;</span>
+        }
+<span class="fc" id="L958">        return getPackageCanonicalName(object.getClass().getName());</span>
+    }
+
+    /**
+     * &lt;p&gt;Gets the package name from the canonical name of a &lt;code&gt;Class&lt;/code&gt;.&lt;/p&gt;
+     *
+     * @param cls  the class to get the package name for, may be &lt;code&gt;null&lt;/code&gt;.
+     * @return the package name or an empty string
+     * @since 2.4
+     */
+    public static String getPackageCanonicalName(Class&lt;?&gt; cls) {
+<span class="pc bpc" id="L969" title="1 of 2 branches missed.">        if (cls == null) {</span>
+<span class="nc" id="L970">            return StringUtils.EMPTY;</span>
+        }
+<span class="fc" id="L972">        return getPackageCanonicalName(cls.getName());</span>
+    }
+
+    /**
+     * &lt;p&gt;Gets the package name from the canonical name. &lt;/p&gt;
+     *
+     * &lt;p&gt;The string passed in is assumed to be a canonical name - it is not checked.&lt;/p&gt;
+     * &lt;p&gt;If the class is unpackaged, return an empty string.&lt;/p&gt;
+     *
+     * @param canonicalName  the canonical name to get the package name for, may be &lt;code&gt;null&lt;/code&gt;
+     * @return the package name or an empty string
+     * @since 2.4
+     */
+    public static String getPackageCanonicalName(String canonicalName) {
+<span class="fc" id="L986">        return ClassUtils.getPackageName(getCanonicalName(canonicalName));</span>
+    }
+
+    /**
+     * &lt;p&gt;Converts a given name of class into canonical format.
+     * If name of class is not a name of array class it returns
+     * unchanged name.&lt;/p&gt;
+     * &lt;p&gt;Example:
+     * &lt;ul&gt;
+     * &lt;li&gt;&lt;code&gt;getCanonicalName(&quot;[I&quot;) = &quot;int[]&quot;&lt;/code&gt;&lt;/li&gt;
+     * &lt;li&gt;&lt;code&gt;getCanonicalName(&quot;[Ljava.lang.String;&quot;) = &quot;java.lang.String[]&quot;&lt;/code&gt;&lt;/li&gt;
+     * &lt;li&gt;&lt;code&gt;getCanonicalName(&quot;java.lang.String&quot;) = &quot;java.lang.String&quot;&lt;/code&gt;&lt;/li&gt;
+     * &lt;/ul&gt;
+     * &lt;/p&gt;
+     *
+     * @param className the name of class
+     * @return canonical form of class name
+     * @since 2.4
+     */
+    private static String getCanonicalName(String className) {
+<span class="fc" id="L1006">        className = StringUtils.deleteWhitespace(className);</span>
+<span class="pc bpc" id="L1007" title="1 of 2 branches missed.">        if (className == null) {</span>
+<span class="nc" id="L1008">            return null;</span>
+        } else {
+<span class="fc" id="L1010">            int dim = 0;</span>
+<span class="fc bfc" id="L1011" title="All 2 branches covered.">            while (className.startsWith(&quot;[&quot;)) {</span>
+<span class="fc" id="L1012">                dim++;</span>
+<span class="fc" id="L1013">                className = className.substring(1);</span>
+            }
+<span class="fc bfc" id="L1015" title="All 2 branches covered.">            if (dim &lt; 1) {</span>
+<span class="fc" id="L1016">                return className;</span>
+            } else {
+<span class="fc bfc" id="L1018" title="All 2 branches covered.">                if (className.startsWith(&quot;L&quot;)) {</span>
+<span class="fc" id="L1019">                    className = className.substring(</span>
+                        1,
+<span class="pc bpc" id="L1021" title="1 of 2 branches missed.">                        className.endsWith(&quot;;&quot;)</span>
+<span class="fc" id="L1022">                            ? className.length() - 1</span>
+<span class="nc" id="L1023">                            : className.length());</span>
+                } else {
+<span class="pc bpc" id="L1025" title="1 of 2 branches missed.">                    if (className.length() &gt; 0) {</span>
+<span class="fc" id="L1026">                        className = reverseAbbreviationMap.get(className.substring(0, 1));</span>
+                    }
+                }
+<span class="fc" id="L1029">                StringBuilder canonicalClassNameBuffer = new StringBuilder(className);</span>
+<span class="fc bfc" id="L1030" title="All 2 branches covered.">                for (int i = 0; i &lt; dim; i++) {</span>
+<span class="fc" id="L1031">                    canonicalClassNameBuffer.append(&quot;[]&quot;);</span>
+                }
+<span class="fc" id="L1033">                return canonicalClassNameBuffer.toString();</span>
+            }
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

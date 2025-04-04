@@ -1,0 +1,255 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TriDiagonalTransformer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Commons Math</a> &gt; <a href="index.source.html" class="el_package">org.apache.commons.math.linear</a> &gt; <span class="el_source">TriDiagonalTransformer.java</span></div><h1>TriDiagonalTransformer.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.commons.math.linear;
+
+import java.util.Arrays;
+
+import org.apache.commons.math.util.FastMath;
+
+
+/**
+ * Class transforming a symmetrical matrix to tridiagonal shape.
+ * &lt;p&gt;A symmetrical m &amp;times; m matrix A can be written as the product of three matrices:
+ * A = Q &amp;times; T &amp;times; Q&lt;sup&gt;T&lt;/sup&gt; with Q an orthogonal matrix and T a symmetrical
+ * tridiagonal matrix. Both Q and T are m &amp;times; m matrices.&lt;/p&gt;
+ * &lt;p&gt;This implementation only uses the upper part of the matrix, the part below the
+ * diagonal is not accessed at all.&lt;/p&gt;
+ * &lt;p&gt;Transformation to tridiagonal shape is often not a goal by itself, but it is
+ * an intermediate step in more general decomposition algorithms like {@link
+ * EigenDecomposition eigen decomposition}. This class is therefore intended for internal
+ * use by the library and is not public. As a consequence of this explicitly limited scope,
+ * many methods directly returns references to internal arrays, not copies.&lt;/p&gt;
+ * @version $Id$
+ * @since 2.0
+ */
+class TriDiagonalTransformer {
+    /** Householder vectors. */
+    private final double householderVectors[][];
+    /** Main diagonal. */
+    private final double[] main;
+    /** Secondary diagonal. */
+    private final double[] secondary;
+    /** Cached value of Q. */
+    private RealMatrix cachedQ;
+    /** Cached value of Qt. */
+    private RealMatrix cachedQt;
+    /** Cached value of T. */
+    private RealMatrix cachedT;
+
+    /**
+     * Build the transformation to tridiagonal shape of a symmetrical matrix.
+     * &lt;p&gt;The specified matrix is assumed to be symmetrical without any check.
+     * Only the upper triangular part of the matrix is used.&lt;/p&gt;
+     *
+     * @param matrix Symmetrical matrix to transform.
+     * @throws NonSquareMatrixException if the matrix is not square.
+     */
+<span class="fc" id="L62">    public TriDiagonalTransformer(RealMatrix matrix) {</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">        if (!matrix.isSquare()) {</span>
+<span class="fc" id="L64">            throw new NonSquareMatrixException(matrix.getRowDimension(),</span>
+<span class="fc" id="L65">                                               matrix.getColumnDimension());</span>
+        }
+
+<span class="fc" id="L68">        final int m = matrix.getRowDimension();</span>
+<span class="fc" id="L69">        householderVectors = matrix.getData();</span>
+<span class="fc" id="L70">        main      = new double[m];</span>
+<span class="fc" id="L71">        secondary = new double[m - 1];</span>
+<span class="fc" id="L72">        cachedQ   = null;</span>
+<span class="fc" id="L73">        cachedQt  = null;</span>
+<span class="fc" id="L74">        cachedT   = null;</span>
+
+        // transform matrix
+<span class="fc" id="L77">        transform();</span>
+<span class="fc" id="L78">    }</span>
+
+    /**
+     * Returns the matrix Q of the transform.
+     * &lt;p&gt;Q is an orthogonal matrix, i.e. its transpose is also its inverse.&lt;/p&gt;
+     * @return the Q matrix
+     */
+    public RealMatrix getQ() {
+<span class="fc bfc" id="L86" title="All 2 branches covered.">        if (cachedQ == null) {</span>
+<span class="fc" id="L87">            cachedQ = getQT().transpose();</span>
+        }
+<span class="fc" id="L89">        return cachedQ;</span>
+    }
+
+    /**
+     * Returns the transpose of the matrix Q of the transform.
+     * &lt;p&gt;Q is an orthogonal matrix, i.e. its transpose is also its inverse.&lt;/p&gt;
+     * @return the Q matrix
+     */
+    public RealMatrix getQT() {
+<span class="fc bfc" id="L98" title="All 2 branches covered.">        if (cachedQt == null) {</span>
+<span class="fc" id="L99">            final int m = householderVectors.length;</span>
+<span class="fc" id="L100">            double[][] qta = new double[m][m];</span>
+          
+            // build up first part of the matrix by applying Householder transforms
+<span class="fc bfc" id="L103" title="All 2 branches covered.">            for (int k = m - 1; k &gt;= 1; --k) {</span>
+<span class="fc" id="L104">                final double[] hK = householderVectors[k - 1];</span>
+<span class="fc" id="L105">                final double inv = 1.0 / (secondary[k - 1] * hK[k]);</span>
+<span class="fc" id="L106">                qta[k][k] = 1;</span>
+<span class="fc bfc" id="L107" title="All 2 branches covered.">                if (hK[k] != 0.0) {</span>
+<span class="fc" id="L108">                    double beta = 1.0 / secondary[k - 1];</span>
+<span class="fc" id="L109">                    qta[k][k] = 1 + beta * hK[k];</span>
+<span class="fc bfc" id="L110" title="All 2 branches covered.">                    for (int i = k + 1; i &lt; m; ++i) {</span>
+<span class="fc" id="L111">                        qta[k][i] = beta * hK[i];</span>
+                    }
+<span class="fc bfc" id="L113" title="All 2 branches covered.">                    for (int j = k + 1; j &lt; m; ++j) {</span>
+<span class="fc" id="L114">                        beta = 0;</span>
+<span class="fc bfc" id="L115" title="All 2 branches covered.">                        for (int i = k + 1; i &lt; m; ++i) {</span>
+<span class="fc" id="L116">                            beta += qta[j][i] * hK[i];</span>
+                        }
+<span class="fc" id="L118">                        beta *= inv;</span>
+<span class="fc" id="L119">                        qta[j][k] = beta * hK[k];</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">                        for (int i = k + 1; i &lt; m; ++i) {</span>
+<span class="fc" id="L121">                            qta[j][i] += beta * hK[i];</span>
+                        }
+                    }
+                }
+            }
+<span class="fc" id="L126">            qta[0][0] = 1;</span>
+<span class="fc" id="L127">            cachedQt = MatrixUtils.createRealMatrix(qta);</span>
+        }
+
+        // return the cached matrix
+<span class="fc" id="L131">        return cachedQt;</span>
+    }
+
+    /**
+     * Returns the tridiagonal matrix T of the transform.
+     * @return the T matrix
+     */
+    public RealMatrix getT() {
+<span class="fc bfc" id="L139" title="All 2 branches covered.">        if (cachedT == null) {</span>
+<span class="fc" id="L140">            final int m = main.length;</span>
+<span class="fc" id="L141">            double[][] ta = new double[m][m];</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">            for (int i = 0; i &lt; m; ++i) {</span>
+<span class="fc" id="L143">                ta[i][i] = main[i];</span>
+<span class="fc bfc" id="L144" title="All 2 branches covered.">                if (i &gt; 0) {</span>
+<span class="fc" id="L145">                    ta[i][i - 1] = secondary[i - 1];</span>
+                }
+<span class="fc bfc" id="L147" title="All 2 branches covered.">                if (i &lt; main.length - 1) {</span>
+<span class="fc" id="L148">                    ta[i][i + 1] = secondary[i];</span>
+                }
+            }
+<span class="fc" id="L151">            cachedT = MatrixUtils.createRealMatrix(ta);</span>
+        }
+
+        // return the cached matrix
+<span class="fc" id="L155">        return cachedT;</span>
+    }
+
+    /**
+     * Get the Householder vectors of the transform.
+     * &lt;p&gt;Note that since this class is only intended for internal use,
+     * it returns directly a reference to its internal arrays, not a copy.&lt;/p&gt;
+     * @return the main diagonal elements of the B matrix
+     */
+    double[][] getHouseholderVectorsRef() {
+<span class="nc" id="L165">        return householderVectors;</span>
+    }
+
+    /**
+     * Get the main diagonal elements of the matrix T of the transform.
+     * &lt;p&gt;Note that since this class is only intended for internal use,
+     * it returns directly a reference to its internal arrays, not a copy.&lt;/p&gt;
+     * @return the main diagonal elements of the T matrix
+     */
+    double[] getMainDiagonalRef() {
+<span class="fc" id="L175">        return main;</span>
+    }
+
+    /**
+     * Get the secondary diagonal elements of the matrix T of the transform.
+     * &lt;p&gt;Note that since this class is only intended for internal use,
+     * it returns directly a reference to its internal arrays, not a copy.&lt;/p&gt;
+     * @return the secondary diagonal elements of the T matrix
+     */
+    double[] getSecondaryDiagonalRef() {
+<span class="fc" id="L185">        return secondary;</span>
+    }
+
+    /**
+     * Transform original matrix to tridiagonal form.
+     * &lt;p&gt;Transformation is done using Householder transforms.&lt;/p&gt;
+     */
+    private void transform() {
+<span class="fc" id="L193">        final int m = householderVectors.length;</span>
+<span class="fc" id="L194">        final double[] z = new double[m];</span>
+<span class="fc bfc" id="L195" title="All 2 branches covered.">        for (int k = 0; k &lt; m - 1; k++) {</span>
+
+            //zero-out a row and a column simultaneously
+<span class="fc" id="L198">            final double[] hK = householderVectors[k];</span>
+<span class="fc" id="L199">            main[k] = hK[k];</span>
+<span class="fc" id="L200">            double xNormSqr = 0;</span>
+<span class="fc bfc" id="L201" title="All 2 branches covered.">            for (int j = k + 1; j &lt; m; ++j) {</span>
+<span class="fc" id="L202">                final double c = hK[j];</span>
+<span class="fc" id="L203">                xNormSqr += c * c;</span>
+            }
+<span class="fc bfc" id="L205" title="All 2 branches covered.">            final double a = (hK[k + 1] &gt; 0) ? -FastMath.sqrt(xNormSqr) : FastMath.sqrt(xNormSqr);</span>
+<span class="fc" id="L206">            secondary[k] = a;</span>
+<span class="fc bfc" id="L207" title="All 2 branches covered.">            if (a != 0.0) {</span>
+                // apply Householder transform from left and right simultaneously
+
+<span class="fc" id="L210">                hK[k + 1] -= a;</span>
+<span class="fc" id="L211">                final double beta = -1 / (a * hK[k + 1]);</span>
+
+                // compute a = beta A v, where v is the Householder vector
+                // this loop is written in such a way
+                //   1) only the upper triangular part of the matrix is accessed
+                //   2) access is cache-friendly for a matrix stored in rows
+<span class="fc" id="L217">                Arrays.fill(z, k + 1, m, 0);</span>
+<span class="fc bfc" id="L218" title="All 2 branches covered.">                for (int i = k + 1; i &lt; m; ++i) {</span>
+<span class="fc" id="L219">                    final double[] hI = householderVectors[i];</span>
+<span class="fc" id="L220">                    final double hKI = hK[i];</span>
+<span class="fc" id="L221">                    double zI = hI[i] * hKI;</span>
+<span class="fc bfc" id="L222" title="All 2 branches covered.">                    for (int j = i + 1; j &lt; m; ++j) {</span>
+<span class="fc" id="L223">                        final double hIJ = hI[j];</span>
+<span class="fc" id="L224">                        zI   += hIJ * hK[j];</span>
+<span class="fc" id="L225">                        z[j] += hIJ * hKI;</span>
+                    }
+<span class="fc" id="L227">                    z[i] = beta * (z[i] + zI);</span>
+                }
+
+                // compute gamma = beta vT z / 2
+<span class="fc" id="L231">                double gamma = 0;</span>
+<span class="fc bfc" id="L232" title="All 2 branches covered.">                for (int i = k + 1; i &lt; m; ++i) {</span>
+<span class="fc" id="L233">                    gamma += z[i] * hK[i];</span>
+                }
+<span class="fc" id="L235">                gamma *= beta / 2;</span>
+
+                // compute z = z - gamma v
+<span class="fc bfc" id="L238" title="All 2 branches covered.">                for (int i = k + 1; i &lt; m; ++i) {</span>
+<span class="fc" id="L239">                    z[i] -= gamma * hK[i];</span>
+                }
+
+                // update matrix: A = A - v zT - z vT
+                // only the upper triangular part of the matrix is updated
+<span class="fc bfc" id="L244" title="All 2 branches covered.">                for (int i = k + 1; i &lt; m; ++i) {</span>
+<span class="fc" id="L245">                    final double[] hI = householderVectors[i];</span>
+<span class="fc bfc" id="L246" title="All 2 branches covered.">                    for (int j = i; j &lt; m; ++j) {</span>
+<span class="fc" id="L247">                        hI[j] -= hK[i] * z[j] + z[i] * hK[j];</span>
+                    }
+                }
+            }
+        }
+<span class="fc" id="L252">        main[m - 1] = householderVectors[m - 1][m - 1];</span>
+<span class="fc" id="L253">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

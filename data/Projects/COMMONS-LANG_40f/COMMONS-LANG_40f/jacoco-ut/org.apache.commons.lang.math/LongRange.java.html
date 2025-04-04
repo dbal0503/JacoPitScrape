@@ -1,0 +1,431 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LongRange.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Commons Lang</a> &gt; <a href="index.source.html" class="el_package">org.apache.commons.lang.math</a> &gt; <span class="el_source">LongRange.java</span></div><h1>LongRange.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ * 
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.commons.lang.math;
+
+import java.io.Serializable;
+
+/**
+ * &lt;p&gt;&lt;code&gt;LongRange&lt;/code&gt; represents an inclusive range of &lt;code&gt;long&lt;/code&gt;s.&lt;/p&gt;
+ *
+ * @author Stephen Colebourne
+ * @since 2.0
+ * @version $Id$
+ */
+public final class LongRange extends Range implements Serializable {
+    
+    /**
+     * Required for serialization support.
+     * 
+     * @see java.io.Serializable
+     */
+    private static final long serialVersionUID = 71849363892720L;
+
+    /**
+     * The minimum number in this range (inclusive).
+     */
+    private final long min;
+    /**
+     * The maximum number in this range (inclusive).
+     */
+    private final long max;
+    
+    /**
+     * Cached output minObject (class is immutable).
+     */
+<span class="fc" id="L49">    private transient Long minObject = null;</span>
+    /**
+     * Cached output maxObject (class is immutable).
+     */
+<span class="fc" id="L53">    private transient Long maxObject = null;</span>
+    /**
+     * Cached output hashCode (class is immutable).
+     */
+<span class="fc" id="L57">    private transient int hashCode = 0;</span>
+    /**
+     * Cached output toString (class is immutable).
+     */
+<span class="fc" id="L61">    private transient String toString = null;</span>
+    
+    /**
+     * &lt;p&gt;Constructs a new &lt;code&gt;LongRange&lt;/code&gt; using the specified
+     * number as both the minimum and maximum in this range.&lt;/p&gt;
+     *
+     * @param number  the number to use for this range
+     */
+    public LongRange(long number) {
+<span class="fc" id="L70">        super();</span>
+<span class="fc" id="L71">        this.min = number;</span>
+<span class="fc" id="L72">        this.max = number;</span>
+<span class="fc" id="L73">    }</span>
+
+    /**
+     * &lt;p&gt;Constructs a new &lt;code&gt;LongRange&lt;/code&gt; using the specified
+     * number as both the minimum and maximum in this range.&lt;/p&gt;
+     *
+     * @param number  the number to use for this range, must not
+     *  be &lt;code&gt;null&lt;/code&gt;
+     * @throws IllegalArgumentException if the number is &lt;code&gt;null&lt;/code&gt;
+     */
+    public LongRange(Number number) {
+<span class="fc" id="L84">        super();</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">        if (number == null) {</span>
+<span class="fc" id="L86">            throw new IllegalArgumentException(&quot;The number must not be null&quot;);</span>
+        }
+<span class="fc" id="L88">        this.min = number.longValue();</span>
+<span class="fc" id="L89">        this.max = number.longValue();</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">        if (number instanceof Long) {</span>
+<span class="fc" id="L91">            this.minObject = (Long) number;</span>
+<span class="fc" id="L92">            this.maxObject = (Long) number;</span>
+        }
+<span class="fc" id="L94">    }</span>
+
+    /**
+     * &lt;p&gt;Constructs a new &lt;code&gt;LongRange&lt;/code&gt; with the specified
+     * minimum and maximum numbers (both inclusive).&lt;/p&gt;
+     * 
+     * &lt;p&gt;The arguments may be passed in the order (min,max) or (max,min). The
+     * getMinimum and getMaximum methods will return the correct values.&lt;/p&gt;
+     * 
+     * @param number1  first number that defines the edge of the range, inclusive
+     * @param number2  second number that defines the edge of the range, inclusive
+     */
+    public LongRange(long number1, long number2) {
+<span class="fc" id="L107">        super();</span>
+<span class="fc bfc" id="L108" title="All 2 branches covered.">        if (number2 &lt; number1) {</span>
+<span class="fc" id="L109">            this.min = number2;</span>
+<span class="fc" id="L110">            this.max = number1;</span>
+        } else {
+<span class="fc" id="L112">            this.min = number1;</span>
+<span class="fc" id="L113">            this.max = number2;</span>
+        }
+<span class="fc" id="L115">    }</span>
+
+    /**
+     * &lt;p&gt;Constructs a new &lt;code&gt;LongRange&lt;/code&gt; with the specified
+     * minimum and maximum numbers (both inclusive).&lt;/p&gt;
+     * 
+     * &lt;p&gt;The arguments may be passed in the order (min,max) or (max,min). The
+     * getMinimum and getMaximum methods will return the correct values.&lt;/p&gt;
+     *
+     * @param number1  first number that defines the edge of the range, inclusive
+     * @param number2  second number that defines the edge of the range, inclusive
+     * @throws IllegalArgumentException if either number is &lt;code&gt;null&lt;/code&gt;
+     */
+    public LongRange(Number number1, Number number2) {
+<span class="fc" id="L129">        super();</span>
+<span class="fc bfc" id="L130" title="All 4 branches covered.">        if (number1 == null || number2 == null) {</span>
+<span class="fc" id="L131">            throw new IllegalArgumentException(&quot;The numbers must not be null&quot;);</span>
+        }
+<span class="fc" id="L133">        long number1val = number1.longValue();</span>
+<span class="fc" id="L134">        long number2val = number2.longValue();</span>
+<span class="fc bfc" id="L135" title="All 2 branches covered.">        if (number2val &lt; number1val) {</span>
+<span class="fc" id="L136">            this.min = number2val;</span>
+<span class="fc" id="L137">            this.max = number1val;</span>
+<span class="fc bfc" id="L138" title="All 2 branches covered.">            if (number2 instanceof Long) {</span>
+<span class="fc" id="L139">                this.minObject = (Long) number2;</span>
+            }
+<span class="fc bfc" id="L141" title="All 2 branches covered.">            if (number1 instanceof Long) {</span>
+<span class="fc" id="L142">                this.maxObject = (Long) number1;</span>
+            }
+        } else {
+<span class="fc" id="L145">            this.min = number1val;</span>
+<span class="fc" id="L146">            this.max = number2val;</span>
+<span class="fc bfc" id="L147" title="All 2 branches covered.">            if (number1 instanceof Long) {</span>
+<span class="fc" id="L148">                this.minObject = (Long) number1;</span>
+            }
+<span class="fc bfc" id="L150" title="All 2 branches covered.">            if (number2 instanceof Long) {</span>
+<span class="fc" id="L151">                this.maxObject = (Long) number2;</span>
+            }
+        }
+<span class="fc" id="L154">    }</span>
+
+    // Accessors
+    //--------------------------------------------------------------------
+
+    /**
+     * &lt;p&gt;Returns the minimum number in this range.&lt;/p&gt;
+     *
+     * @return the minimum number in this range
+     */
+    @Override
+    public Number getMinimumNumber() {
+<span class="fc bfc" id="L166" title="All 2 branches covered.">        if (minObject == null) {</span>
+<span class="fc" id="L167">            minObject = new Long(min);            </span>
+        }
+<span class="fc" id="L169">        return minObject;</span>
+    }
+
+    /**
+     * &lt;p&gt;Gets the minimum number in this range as a &lt;code&gt;long&lt;/code&gt;.&lt;/p&gt;
+     *
+     * @return the minimum number in this range
+     */
+    @Override
+    public long getMinimumLong() {
+<span class="fc" id="L179">        return min;</span>
+    }
+
+    /**
+     * &lt;p&gt;Gets the minimum number in this range as a &lt;code&gt;int&lt;/code&gt;.&lt;/p&gt;
+     * 
+     * &lt;p&gt;This conversion can lose information for large values.&lt;/p&gt;
+     *
+     * @return the minimum number in this range
+     */
+    @Override
+    public int getMinimumInteger() {
+<span class="fc" id="L191">        return (int) min;</span>
+    }
+
+    /**
+     * &lt;p&gt;Gets the minimum number in this range as a &lt;code&gt;double&lt;/code&gt;.&lt;/p&gt;
+     * 
+     * &lt;p&gt;This conversion can lose information for large values.&lt;/p&gt;
+     *
+     * @return the minimum number in this range
+     */
+    @Override
+    public double getMinimumDouble() {
+<span class="fc" id="L203">        return min;</span>
+    }
+
+    /**
+     * &lt;p&gt;Gets the minimum number in this range as a &lt;code&gt;float&lt;/code&gt;.&lt;/p&gt;
+     * 
+     * &lt;p&gt;This conversion can lose information for large values.&lt;/p&gt;
+     *
+     * @return the minimum number in this range
+     */
+    @Override
+    public float getMinimumFloat() {
+<span class="fc" id="L215">        return min;</span>
+    }
+
+    /**
+     * &lt;p&gt;Returns the maximum number in this range.&lt;/p&gt;
+     *
+     * @return the maximum number in this range
+     */
+    @Override
+    public Number getMaximumNumber() {
+<span class="fc bfc" id="L225" title="All 2 branches covered.">        if (maxObject == null) {</span>
+<span class="fc" id="L226">            maxObject = new Long(max);            </span>
+        }
+<span class="fc" id="L228">        return maxObject;</span>
+    }
+
+    /**
+     * &lt;p&gt;Gets the maximum number in this range as a &lt;code&gt;long&lt;/code&gt;.&lt;/p&gt;
+     *
+     * @return the maximum number in this range
+     */
+    @Override
+    public long getMaximumLong() {
+<span class="fc" id="L238">        return max;</span>
+    }
+
+    /**
+     * &lt;p&gt;Gets the maximum number in this range cast to an &lt;code&gt;int&lt;/code&gt;.&lt;/p&gt;
+     * 
+     * &lt;p&gt;This conversion can lose information for large values.&lt;/p&gt;
+     * 
+     * @return the maximum number in this range cast to an &lt;code&gt;int&lt;/code&gt;.
+     */
+    @Override
+    public int getMaximumInteger() {
+<span class="fc" id="L250">        return (int) max;</span>
+    }
+
+    /**
+     * &lt;p&gt;Gets the maximum number in this range as a &lt;code&gt;double&lt;/code&gt;.&lt;/p&gt;
+     * 
+     * &lt;p&gt;This conversion can lose information for large values.&lt;/p&gt;
+     * 
+     * @return The maximum number in this range as a &lt;code&gt;double&lt;/code&gt;.
+     */
+    @Override
+    public double getMaximumDouble() {
+<span class="fc" id="L262">        return max;</span>
+    }
+
+    /**
+     * &lt;p&gt;Gets the maximum number in this range as a &lt;code&gt;float&lt;/code&gt;.&lt;/p&gt;
+     * 
+     * &lt;p&gt;This conversion can lose information for large values.&lt;/p&gt;
+     * 
+     * @return The maximum number in this range as a &lt;code&gt;float&lt;/code&gt;.
+     */
+    @Override
+    public float getMaximumFloat() {
+<span class="fc" id="L274">        return max;</span>
+    }
+
+    // Tests
+    //--------------------------------------------------------------------
+    
+    /**
+     * &lt;p&gt;Tests whether the specified &lt;code&gt;number&lt;/code&gt; occurs within
+     * this range using &lt;code&gt;long&lt;/code&gt; comparison.&lt;/p&gt;
+     * 
+     * &lt;p&gt;&lt;code&gt;null&lt;/code&gt; is handled and returns &lt;code&gt;false&lt;/code&gt;.&lt;/p&gt;
+     *
+     * @param number  the number to test, may be &lt;code&gt;null&lt;/code&gt;
+     * @return &lt;code&gt;true&lt;/code&gt; if the specified number occurs within this range
+     */
+    @Override
+    public boolean containsNumber(Number number) {
+<span class="fc bfc" id="L291" title="All 2 branches covered.">        if (number == null) {</span>
+<span class="fc" id="L292">            return false;</span>
+        }
+<span class="fc" id="L294">        return containsLong(number.longValue());</span>
+    }
+
+    /**
+     * &lt;p&gt;Tests whether the specified &lt;code&gt;long&lt;/code&gt; occurs within
+     * this range using &lt;code&gt;long&lt;/code&gt; comparison.&lt;/p&gt;
+     * 
+     * &lt;p&gt;This implementation overrides the superclass for performance as it is
+     * the most common case.&lt;/p&gt;
+     * 
+     * @param value  the long to test
+     * @return &lt;code&gt;true&lt;/code&gt; if the specified number occurs within this
+     *  range by &lt;code&gt;long&lt;/code&gt; comparison
+     */
+    @Override
+    public boolean containsLong(long value) {
+<span class="fc bfc" id="L310" title="All 4 branches covered.">        return value &gt;= min &amp;&amp; value &lt;= max;</span>
+    }
+
+    // Range tests
+    //--------------------------------------------------------------------
+
+    /**
+     * &lt;p&gt;Tests whether the specified range occurs entirely within this range
+     * using &lt;code&gt;long&lt;/code&gt; comparison.&lt;/p&gt;
+     * 
+     * &lt;p&gt;&lt;code&gt;null&lt;/code&gt; is handled and returns &lt;code&gt;false&lt;/code&gt;.&lt;/p&gt;
+     *
+     * @param range  the range to test, may be &lt;code&gt;null&lt;/code&gt;
+     * @return &lt;code&gt;true&lt;/code&gt; if the specified range occurs entirely within this range
+     * @throws IllegalArgumentException if the range is not of this type
+     */
+    @Override
+    public boolean containsRange(Range range) {
+<span class="fc bfc" id="L328" title="All 2 branches covered.">        if (range == null) {</span>
+<span class="fc" id="L329">            return false;</span>
+        }
+<span class="fc bfc" id="L331" title="All 2 branches covered.">        return containsLong(range.getMinimumLong()) &amp;&amp;</span>
+<span class="fc bfc" id="L332" title="All 2 branches covered.">               containsLong(range.getMaximumLong());</span>
+    }
+
+    /**
+     * &lt;p&gt;Tests whether the specified range overlaps with this range
+     * using &lt;code&gt;long&lt;/code&gt; comparison.&lt;/p&gt;
+     * 
+     * &lt;p&gt;&lt;code&gt;null&lt;/code&gt; is handled and returns &lt;code&gt;false&lt;/code&gt;.&lt;/p&gt;
+     *
+     * @param range  the range to test, may be &lt;code&gt;null&lt;/code&gt;
+     * @return &lt;code&gt;true&lt;/code&gt; if the specified range overlaps with this range
+     */
+    @Override
+    public boolean overlapsRange(Range range) {
+<span class="fc bfc" id="L346" title="All 2 branches covered.">        if (range == null) {</span>
+<span class="fc" id="L347">            return false;</span>
+        }
+<span class="fc bfc" id="L349" title="All 2 branches covered.">        return range.containsLong(min) ||</span>
+<span class="fc bfc" id="L350" title="All 2 branches covered.">               range.containsLong(max) || </span>
+<span class="fc bfc" id="L351" title="All 2 branches covered.">               containsLong(range.getMinimumLong());</span>
+    }
+
+    // Basics
+    //--------------------------------------------------------------------
+
+    /**
+     * &lt;p&gt;Compares this range to another object to test if they are equal.&lt;/p&gt;.
+     * 
+     * &lt;p&gt;To be equal, the class, minimum and maximum must be equal.&lt;/p&gt;
+     *
+     * @param obj the reference object with which to compare
+     * @return &lt;code&gt;true&lt;/code&gt; if this object is equal
+     */
+    @Override
+    public boolean equals(Object obj) {
+<span class="fc bfc" id="L367" title="All 2 branches covered.">        if (obj == this) {</span>
+<span class="fc" id="L368">            return true;</span>
+        }
+<span class="fc bfc" id="L370" title="All 2 branches covered.">        if (obj instanceof LongRange == false) {</span>
+<span class="fc" id="L371">            return false;</span>
+        }
+<span class="fc" id="L373">        LongRange range = (LongRange) obj;</span>
+<span class="fc bfc" id="L374" title="All 4 branches covered.">        return min == range.min &amp;&amp; max == range.max;</span>
+    }
+
+    /**
+     * &lt;p&gt;Gets a hashCode for the range.&lt;/p&gt;
+     *
+     * @return a hash code value for this object
+     */
+    @Override
+    public int hashCode() {
+<span class="fc" id="L384">        int temp = hashCode;</span>
+<span class="fc bfc" id="L385" title="All 2 branches covered.">        if (temp == 0) {</span>
+<span class="fc" id="L386">            temp = 17;</span>
+<span class="fc" id="L387">            temp = 37 * temp + getClass().hashCode();</span>
+<span class="fc" id="L388">            temp = 37 * temp + ((int) (min ^ (min &gt;&gt; 32)));</span>
+<span class="fc" id="L389">            temp = 37 * temp + ((int) (max ^ (max &gt;&gt; 32)));</span>
+<span class="fc" id="L390">            hashCode = temp;</span>
+        }
+<span class="fc" id="L392">        return hashCode;</span>
+    }
+
+    /**
+     * &lt;p&gt;Gets the range as a &lt;code&gt;String&lt;/code&gt;.&lt;/p&gt;
+     *
+     * &lt;p&gt;The format of the String is 'Range[&lt;i&gt;min&lt;/i&gt;,&lt;i&gt;max&lt;/i&gt;]'.&lt;/p&gt;
+     *
+     * @return the &lt;code&gt;String&lt;/code&gt; representation of this range
+     */
+    @Override
+    public String toString() {
+<span class="fc bfc" id="L404" title="All 2 branches covered.">        if (toString == null) {</span>
+<span class="fc" id="L405">            StringBuilder buf = new StringBuilder(32);</span>
+<span class="fc" id="L406">            buf.append(&quot;Range[&quot;);</span>
+<span class="fc" id="L407">            buf.append(min);</span>
+<span class="fc" id="L408">            buf.append(',');</span>
+<span class="fc" id="L409">            buf.append(max);</span>
+<span class="fc" id="L410">            buf.append(']');</span>
+<span class="fc" id="L411">            toString = buf.toString();</span>
+        }
+<span class="fc" id="L413">        return toString;</span>
+    }
+
+    /**
+     * &lt;p&gt;Returns an array containing all the long values in the range.&lt;/p&gt;
+     *
+     * @return the &lt;code&gt;long[]&lt;/code&gt; representation of this range
+     * @since 2.4
+     */
+    public long[] toArray() {
+<span class="fc" id="L423">        long[] array = new long[(int)(max - min + 1L)];</span>
+<span class="fc bfc" id="L424" title="All 2 branches covered.">        for(int i = 0; i &lt; array.length; i++) {</span>
+<span class="fc" id="L425">            array[i] = min + i;</span>
+        }
+<span class="fc" id="L427">        return array;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

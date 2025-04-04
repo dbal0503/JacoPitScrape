@@ -1,0 +1,952 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AbstractRealMatrix.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Commons Math</a> &gt; <a href="index.source.html" class="el_package">org.apache.commons.math.linear</a> &gt; <span class="el_source">AbstractRealMatrix.java</span></div><h1>AbstractRealMatrix.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.commons.math.linear;
+
+import java.util.ArrayList;
+
+import org.apache.commons.math.exception.NoDataException;
+import org.apache.commons.math.exception.NotStrictlyPositiveException;
+import org.apache.commons.math.exception.DimensionMismatchException;
+import org.apache.commons.math.exception.NullArgumentException;
+import org.apache.commons.math.exception.util.LocalizedFormats;
+import org.apache.commons.math.util.MathUtils;
+import org.apache.commons.math.util.FastMath;
+
+/**
+ * Basic implementation of RealMatrix methods regardless of the underlying storage.
+ * &lt;p&gt;All the methods implemented here use {@link #getEntry(int, int)} to access
+ * matrix elements. Derived class can provide faster implementations. &lt;/p&gt;
+ *
+ * @version $Id$
+ * @since 2.0
+ */
+public abstract class AbstractRealMatrix
+    extends RealLinearOperator
+    implements RealMatrix {
+    /**
+     * Creates a matrix with no data
+     */
+<span class="fc" id="L44">    protected AbstractRealMatrix() {}</span>
+
+    /**
+     * Create a new RealMatrix with the supplied row and column dimensions.
+     *
+     * @param rowDimension  the number of rows in the new matrix
+     * @param columnDimension  the number of columns in the new matrix
+     * @throws NotStrictlyPositiveException if row or column dimension is not positive
+     */
+<span class="fc" id="L53">    protected AbstractRealMatrix(final int rowDimension, final int columnDimension) {</span>
+<span class="fc bfc" id="L54" title="All 2 branches covered.">        if (rowDimension &lt; 1) {</span>
+<span class="fc" id="L55">            throw new NotStrictlyPositiveException(rowDimension);</span>
+        }
+<span class="fc bfc" id="L57" title="All 2 branches covered.">        if (columnDimension &lt; 1) {</span>
+<span class="fc" id="L58">            throw new NotStrictlyPositiveException(columnDimension);</span>
+        }
+<span class="fc" id="L60">    }</span>
+
+    /** {@inheritDoc} */
+    public abstract RealMatrix createMatrix(final int rowDimension, final int columnDimension);
+
+    /** {@inheritDoc} */
+    public abstract RealMatrix copy();
+
+    /** {@inheritDoc} */
+    public RealMatrix add(RealMatrix m) {
+        // Safety check.
+<span class="fc" id="L71">        MatrixUtils.checkAdditionCompatible(this, m);</span>
+
+<span class="fc" id="L73">        final int rowCount    = getRowDimension();</span>
+<span class="fc" id="L74">        final int columnCount = getColumnDimension();</span>
+<span class="fc" id="L75">        final RealMatrix out = createMatrix(rowCount, columnCount);</span>
+<span class="fc bfc" id="L76" title="All 2 branches covered.">        for (int row = 0; row &lt; rowCount; ++row) {</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">            for (int col = 0; col &lt; columnCount; ++col) {</span>
+<span class="fc" id="L78">                out.setEntry(row, col, getEntry(row, col) + m.getEntry(row, col));</span>
+            }
+        }
+
+<span class="fc" id="L82">        return out;</span>
+    }
+
+    /** {@inheritDoc} */
+    public RealMatrix subtract(final RealMatrix m) {
+        // Safety check.
+<span class="fc" id="L88">        MatrixUtils.checkSubtractionCompatible(this, m);</span>
+
+<span class="fc" id="L90">        final int rowCount    = getRowDimension();</span>
+<span class="fc" id="L91">        final int columnCount = getColumnDimension();</span>
+<span class="fc" id="L92">        final RealMatrix out = createMatrix(rowCount, columnCount);</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">        for (int row = 0; row &lt; rowCount; ++row) {</span>
+<span class="fc bfc" id="L94" title="All 2 branches covered.">            for (int col = 0; col &lt; columnCount; ++col) {</span>
+<span class="fc" id="L95">                out.setEntry(row, col, getEntry(row, col) - m.getEntry(row, col));</span>
+            }
+        }
+
+<span class="fc" id="L99">        return out;</span>
+    }
+
+    /** {@inheritDoc} */
+    public RealMatrix scalarAdd(final double d) {
+<span class="fc" id="L104">        final int rowCount    = getRowDimension();</span>
+<span class="fc" id="L105">        final int columnCount = getColumnDimension();</span>
+<span class="fc" id="L106">        final RealMatrix out = createMatrix(rowCount, columnCount);</span>
+<span class="fc bfc" id="L107" title="All 2 branches covered.">        for (int row = 0; row &lt; rowCount; ++row) {</span>
+<span class="fc bfc" id="L108" title="All 2 branches covered.">            for (int col = 0; col &lt; columnCount; ++col) {</span>
+<span class="fc" id="L109">                out.setEntry(row, col, getEntry(row, col) + d);</span>
+            }
+        }
+
+<span class="fc" id="L113">        return out;</span>
+    }
+
+    /** {@inheritDoc} */
+    public RealMatrix scalarMultiply(final double d) {
+<span class="fc" id="L118">        final int rowCount    = getRowDimension();</span>
+<span class="fc" id="L119">        final int columnCount = getColumnDimension();</span>
+<span class="fc" id="L120">        final RealMatrix out = createMatrix(rowCount, columnCount);</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">        for (int row = 0; row &lt; rowCount; ++row) {</span>
+<span class="fc bfc" id="L122" title="All 2 branches covered.">            for (int col = 0; col &lt; columnCount; ++col) {</span>
+<span class="fc" id="L123">                out.setEntry(row, col, getEntry(row, col) * d);</span>
+            }
+        }
+
+<span class="fc" id="L127">        return out;</span>
+    }
+
+    /** {@inheritDoc} */
+    public RealMatrix multiply(final RealMatrix m) {
+        // Safety check.
+<span class="fc" id="L133">        MatrixUtils.checkMultiplicationCompatible(this, m);</span>
+
+<span class="fc" id="L135">        final int nRows = getRowDimension();</span>
+<span class="fc" id="L136">        final int nCols = m.getColumnDimension();</span>
+<span class="fc" id="L137">        final int nSum  = getColumnDimension();</span>
+<span class="fc" id="L138">        final RealMatrix out = createMatrix(nRows, nCols);</span>
+<span class="fc bfc" id="L139" title="All 2 branches covered.">        for (int row = 0; row &lt; nRows; ++row) {</span>
+<span class="fc bfc" id="L140" title="All 2 branches covered.">            for (int col = 0; col &lt; nCols; ++col) {</span>
+<span class="fc" id="L141">                double sum = 0;</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">                for (int i = 0; i &lt; nSum; ++i) {</span>
+<span class="fc" id="L143">                    sum += getEntry(row, i) * m.getEntry(i, col);</span>
+                }
+<span class="fc" id="L145">                out.setEntry(row, col, sum);</span>
+            }
+        }
+
+<span class="fc" id="L149">        return out;</span>
+    }
+
+    /** {@inheritDoc} */
+    public RealMatrix preMultiply(final RealMatrix m) {
+<span class="fc" id="L154">        return m.multiply(this);</span>
+    }
+
+    /** {@inheritDoc} */
+    public RealMatrix power(final int p) {
+<span class="fc bfc" id="L159" title="All 2 branches covered.">        if (p &lt; 0) {</span>
+<span class="fc" id="L160">            throw new IllegalArgumentException(&quot;p must be &gt;= 0&quot;);</span>
+        }
+
+<span class="fc bfc" id="L163" title="All 2 branches covered.">        if (!isSquare()) {</span>
+<span class="fc" id="L164">            throw new NonSquareMatrixException(getRowDimension(), getColumnDimension());</span>
+        }
+
+<span class="fc bfc" id="L167" title="All 2 branches covered.">        if (p == 0) {</span>
+<span class="fc" id="L168">            return MatrixUtils.createRealIdentityMatrix(this.getRowDimension());</span>
+        }
+
+<span class="fc bfc" id="L171" title="All 2 branches covered.">        if (p == 1) {</span>
+<span class="fc" id="L172">            return this.copy();</span>
+        }
+
+<span class="fc" id="L175">        final int power = p - 1;</span>
+
+        /*
+         * Only log_2(p) operations is used by doing as follows:
+         * 5^214 = 5^128 * 5^64 * 5^16 * 5^4 * 5^2
+         *
+         * In general, the same approach is used for A^p.
+         */
+
+<span class="fc" id="L184">        final char[] binaryRepresentation = Integer.toBinaryString(power).toCharArray();</span>
+<span class="fc" id="L185">        final ArrayList&lt;Integer&gt; nonZeroPositions = new ArrayList&lt;Integer&gt;();</span>
+<span class="fc" id="L186">        int maxI = -1;</span>
+
+<span class="fc bfc" id="L188" title="All 2 branches covered.">        for (int i = 0; i &lt; binaryRepresentation.length; ++i) {</span>
+<span class="fc bfc" id="L189" title="All 2 branches covered.">            if (binaryRepresentation[i] == '1') {</span>
+<span class="fc" id="L190">                final int pos = binaryRepresentation.length - i - 1;</span>
+<span class="fc" id="L191">                nonZeroPositions.add(pos);</span>
+
+                // The positions are taken in turn, so maxI is only changed once
+<span class="fc bfc" id="L194" title="All 2 branches covered.">                if (maxI == -1) {</span>
+<span class="fc" id="L195">                    maxI = pos;</span>
+                }
+            }
+        }
+
+<span class="fc" id="L200">        RealMatrix[] results = new RealMatrix[maxI + 1];</span>
+<span class="fc" id="L201">        results[0] = this.copy();</span>
+
+<span class="fc bfc" id="L203" title="All 2 branches covered.">        for (int i = 1; i &lt;= maxI; ++i) {</span>
+<span class="fc" id="L204">            results[i] = results[i-1].multiply(results[i-1]);</span>
+        }
+
+<span class="fc" id="L207">        RealMatrix result = this.copy();</span>
+
+<span class="fc bfc" id="L209" title="All 2 branches covered.">        for (Integer i : nonZeroPositions) {</span>
+<span class="fc" id="L210">            result = result.multiply(results[i]);</span>
+<span class="fc" id="L211">        }</span>
+
+<span class="fc" id="L213">        return result;</span>
+    }
+
+    /** {@inheritDoc} */
+    public double[][] getData() {
+<span class="fc" id="L218">        final double[][] data = new double[getRowDimension()][getColumnDimension()];</span>
+
+<span class="fc bfc" id="L220" title="All 2 branches covered.">        for (int i = 0; i &lt; data.length; ++i) {</span>
+<span class="fc" id="L221">            final double[] dataI = data[i];</span>
+<span class="fc bfc" id="L222" title="All 2 branches covered.">            for (int j = 0; j &lt; dataI.length; ++j) {</span>
+<span class="fc" id="L223">                dataI[j] = getEntry(i, j);</span>
+            }
+        }
+
+<span class="fc" id="L227">        return data;</span>
+    }
+
+    /** {@inheritDoc} */
+    public double getNorm() {
+<span class="fc" id="L232">        return walkInColumnOrder(new RealMatrixPreservingVisitor() {</span>
+
+            /** Last row index. */
+            private double endRow;
+
+            /** Sum of absolute values on one column. */
+            private double columnSum;
+
+            /** Maximal sum across all columns. */
+            private double maxColSum;
+
+            /** {@inheritDoc} */
+            public void start(final int rows, final int columns,
+                              final int startRow, final int endRow,
+                              final int startColumn, final int endColumn) {
+<span class="fc" id="L247">                this.endRow = endRow;</span>
+<span class="fc" id="L248">                columnSum   = 0;</span>
+<span class="fc" id="L249">                maxColSum   = 0;</span>
+<span class="fc" id="L250">            }</span>
+
+            /** {@inheritDoc} */
+            public void visit(final int row, final int column, final double value) {
+<span class="fc" id="L254">                columnSum += FastMath.abs(value);</span>
+<span class="fc bfc" id="L255" title="All 2 branches covered.">                if (row == endRow) {</span>
+<span class="fc" id="L256">                    maxColSum = FastMath.max(maxColSum, columnSum);</span>
+<span class="fc" id="L257">                    columnSum = 0;</span>
+                }
+<span class="fc" id="L259">            }</span>
+
+            /** {@inheritDoc} */
+            public double end() {
+<span class="fc" id="L263">                return maxColSum;</span>
+            }
+        });
+    }
+
+    /** {@inheritDoc} */
+    public double getFrobeniusNorm() {
+<span class="fc" id="L270">        return walkInOptimizedOrder(new RealMatrixPreservingVisitor() {</span>
+
+            /** Sum of squared entries. */
+            private double sum;
+
+            /** {@inheritDoc} */
+            public void start(final int rows, final int columns,
+                              final int startRow, final int endRow,
+                              final int startColumn, final int endColumn) {
+<span class="fc" id="L279">                sum = 0;</span>
+<span class="fc" id="L280">            }</span>
+
+            /** {@inheritDoc} */
+            public void visit(final int row, final int column, final double value) {
+<span class="fc" id="L284">                sum += value * value;</span>
+<span class="fc" id="L285">            }</span>
+
+            /** {@inheritDoc} */
+            public double end() {
+<span class="fc" id="L289">                return FastMath.sqrt(sum);</span>
+            }
+        });
+    }
+
+    /** {@inheritDoc} */
+    public RealMatrix getSubMatrix(final int startRow, final int endRow,
+                                   final int startColumn, final int endColumn) {
+<span class="fc" id="L297">        MatrixUtils.checkSubMatrixIndex(this, startRow, endRow, startColumn, endColumn);</span>
+
+<span class="fc" id="L299">        final RealMatrix subMatrix =</span>
+<span class="fc" id="L300">            createMatrix(endRow - startRow + 1, endColumn - startColumn + 1);</span>
+<span class="fc bfc" id="L301" title="All 2 branches covered.">        for (int i = startRow; i &lt;= endRow; ++i) {</span>
+<span class="fc bfc" id="L302" title="All 2 branches covered.">            for (int j = startColumn; j &lt;= endColumn; ++j) {</span>
+<span class="fc" id="L303">                subMatrix.setEntry(i - startRow, j - startColumn, getEntry(i, j));</span>
+            }
+        }
+
+<span class="fc" id="L307">        return subMatrix;</span>
+    }
+
+    /** {@inheritDoc} */
+    public RealMatrix getSubMatrix(final int[] selectedRows, final int[] selectedColumns) {
+        // safety checks
+<span class="fc" id="L313">        MatrixUtils.checkSubMatrixIndex(this, selectedRows, selectedColumns);</span>
+
+        // copy entries
+<span class="fc" id="L316">        final RealMatrix subMatrix =</span>
+<span class="fc" id="L317">            createMatrix(selectedRows.length, selectedColumns.length);</span>
+<span class="fc" id="L318">        subMatrix.walkInOptimizedOrder(new DefaultRealMatrixChangingVisitor() {</span>
+
+            /** {@inheritDoc} */
+            @Override
+            public double visit(final int row, final int column, final double value) {
+<span class="fc" id="L323">                return getEntry(selectedRows[row], selectedColumns[column]);</span>
+            }
+
+        });
+
+<span class="fc" id="L328">        return subMatrix;</span>
+    }
+
+    /** {@inheritDoc} */
+    public void copySubMatrix(final int startRow, final int endRow,
+                              final int startColumn, final int endColumn,
+                              final double[][] destination) {
+        // safety checks
+<span class="fc" id="L336">        MatrixUtils.checkSubMatrixIndex(this, startRow, endRow, startColumn, endColumn);</span>
+<span class="fc" id="L337">        final int rowsCount    = endRow + 1 - startRow;</span>
+<span class="fc" id="L338">        final int columnsCount = endColumn + 1 - startColumn;</span>
+<span class="pc bpc" id="L339" title="2 of 4 branches missed.">        if ((destination.length &lt; rowsCount) || (destination[0].length &lt; columnsCount)) {</span>
+<span class="nc" id="L340">            throw new MatrixDimensionMismatchException(destination.length, destination[0].length,</span>
+                                                       rowsCount, columnsCount);
+        }
+
+        // copy entries
+<span class="fc" id="L345">        walkInOptimizedOrder(new DefaultRealMatrixPreservingVisitor() {</span>
+
+            /** Initial row index. */
+            private int startRow;
+
+            /** Initial column index. */
+            private int startColumn;
+
+            /** {@inheritDoc} */
+            @Override
+            public void start(final int rows, final int columns,
+                              final int startRow, final int endRow,
+                              final int startColumn, final int endColumn) {
+<span class="fc" id="L358">                this.startRow    = startRow;</span>
+<span class="fc" id="L359">                this.startColumn = startColumn;</span>
+<span class="fc" id="L360">            }</span>
+
+            /** {@inheritDoc} */
+            @Override
+            public void visit(final int row, final int column, final double value) {
+<span class="fc" id="L365">                destination[row - startRow][column - startColumn] = value;</span>
+<span class="fc" id="L366">            }</span>
+
+        }, startRow, endRow, startColumn, endColumn);
+<span class="fc" id="L369">    }</span>
+
+    /** {@inheritDoc} */
+    public void copySubMatrix(int[] selectedRows, int[] selectedColumns, double[][] destination) {
+        // safety checks
+<span class="fc" id="L374">        MatrixUtils.checkSubMatrixIndex(this, selectedRows, selectedColumns);</span>
+<span class="pc bpc" id="L375" title="2 of 4 branches missed.">        if ((destination.length &lt; selectedRows.length) ||</span>
+            (destination[0].length &lt; selectedColumns.length)) {
+<span class="nc" id="L377">            throw new MatrixDimensionMismatchException(destination.length, destination[0].length,</span>
+                                                       selectedRows.length, selectedColumns.length);
+        }
+
+        // copy entries
+<span class="fc bfc" id="L382" title="All 2 branches covered.">        for (int i = 0; i &lt; selectedRows.length; i++) {</span>
+<span class="fc" id="L383">            final double[] destinationI = destination[i];</span>
+<span class="fc bfc" id="L384" title="All 2 branches covered.">            for (int j = 0; j &lt; selectedColumns.length; j++) {</span>
+<span class="fc" id="L385">                destinationI[j] = getEntry(selectedRows[i], selectedColumns[j]);</span>
+            }
+        }
+<span class="fc" id="L388">    }</span>
+
+    /** {@inheritDoc} */
+    public void setSubMatrix(final double[][] subMatrix, final int row, final int column)
+        throws NoDataException, DimensionMismatchException, NullArgumentException {
+<span class="fc" id="L393">        MathUtils.checkNotNull(subMatrix);</span>
+<span class="fc" id="L394">        final int nRows = subMatrix.length;</span>
+<span class="pc bpc" id="L395" title="1 of 2 branches missed.">        if (nRows == 0) {</span>
+<span class="nc" id="L396">            throw new NoDataException(LocalizedFormats.AT_LEAST_ONE_ROW);</span>
+        }
+
+<span class="fc" id="L399">        final int nCols = subMatrix[0].length;</span>
+<span class="fc bfc" id="L400" title="All 2 branches covered.">        if (nCols == 0) {</span>
+<span class="fc" id="L401">            throw new NoDataException(LocalizedFormats.AT_LEAST_ONE_COLUMN);</span>
+        }
+
+<span class="fc bfc" id="L404" title="All 2 branches covered.">        for (int r = 1; r &lt; nRows; ++r) {</span>
+<span class="fc bfc" id="L405" title="All 2 branches covered.">            if (subMatrix[r].length != nCols) {</span>
+<span class="fc" id="L406">                throw new DimensionMismatchException(nCols, subMatrix[r].length);</span>
+            }
+        }
+
+<span class="fc" id="L410">        MatrixUtils.checkRowIndex(this, row);</span>
+<span class="fc" id="L411">        MatrixUtils.checkColumnIndex(this, column);</span>
+<span class="fc" id="L412">        MatrixUtils.checkRowIndex(this, nRows + row - 1);</span>
+<span class="fc" id="L413">        MatrixUtils.checkColumnIndex(this, nCols + column - 1);</span>
+
+<span class="fc bfc" id="L415" title="All 2 branches covered.">        for (int i = 0; i &lt; nRows; ++i) {</span>
+<span class="fc bfc" id="L416" title="All 2 branches covered.">            for (int j = 0; j &lt; nCols; ++j) {</span>
+<span class="fc" id="L417">                setEntry(row + i, column + j, subMatrix[i][j]);</span>
+            }
+        }
+<span class="fc" id="L420">    }</span>
+
+    /** {@inheritDoc} */
+    public RealMatrix getRowMatrix(final int row) {
+<span class="fc" id="L424">        MatrixUtils.checkRowIndex(this, row);</span>
+<span class="fc" id="L425">        final int nCols = getColumnDimension();</span>
+<span class="fc" id="L426">        final RealMatrix out = createMatrix(1, nCols);</span>
+<span class="fc bfc" id="L427" title="All 2 branches covered.">        for (int i = 0; i &lt; nCols; ++i) {</span>
+<span class="fc" id="L428">            out.setEntry(0, i, getEntry(row, i));</span>
+        }
+
+<span class="fc" id="L431">        return out;</span>
+    }
+
+    /** {@inheritDoc} */
+    public void setRowMatrix(final int row, final RealMatrix matrix) {
+<span class="fc" id="L436">        MatrixUtils.checkRowIndex(this, row);</span>
+<span class="fc" id="L437">        final int nCols = getColumnDimension();</span>
+<span class="fc bfc" id="L438" title="All 2 branches covered.">        if ((matrix.getRowDimension() != 1) ||</span>
+<span class="pc bpc" id="L439" title="1 of 2 branches missed.">            (matrix.getColumnDimension() != nCols)) {</span>
+<span class="fc" id="L440">            throw new MatrixDimensionMismatchException(matrix.getRowDimension(),</span>
+<span class="fc" id="L441">                                                       matrix.getColumnDimension(),</span>
+                                                       1, nCols);
+        }
+<span class="fc bfc" id="L444" title="All 2 branches covered.">        for (int i = 0; i &lt; nCols; ++i) {</span>
+<span class="fc" id="L445">            setEntry(row, i, matrix.getEntry(0, i));</span>
+        }
+<span class="fc" id="L447">    }</span>
+
+    /** {@inheritDoc} */
+    public RealMatrix getColumnMatrix(final int column) {
+<span class="fc" id="L451">        MatrixUtils.checkColumnIndex(this, column);</span>
+<span class="fc" id="L452">        final int nRows = getRowDimension();</span>
+<span class="fc" id="L453">        final RealMatrix out = createMatrix(nRows, 1);</span>
+<span class="fc bfc" id="L454" title="All 2 branches covered.">        for (int i = 0; i &lt; nRows; ++i) {</span>
+<span class="fc" id="L455">            out.setEntry(i, 0, getEntry(i, column));</span>
+        }
+
+<span class="fc" id="L458">        return out;</span>
+    }
+
+    /** {@inheritDoc} */
+    public void setColumnMatrix(final int column, final RealMatrix matrix) {
+<span class="fc" id="L463">        MatrixUtils.checkColumnIndex(this, column);</span>
+<span class="fc" id="L464">        final int nRows = getRowDimension();</span>
+<span class="pc bpc" id="L465" title="1 of 2 branches missed.">        if ((matrix.getRowDimension() != nRows) ||</span>
+<span class="fc bfc" id="L466" title="All 2 branches covered.">            (matrix.getColumnDimension() != 1)) {</span>
+<span class="fc" id="L467">            throw new MatrixDimensionMismatchException(matrix.getRowDimension(),</span>
+<span class="fc" id="L468">                                                       matrix.getColumnDimension(),</span>
+                                                       nRows, 1);
+        }
+<span class="fc bfc" id="L471" title="All 2 branches covered.">        for (int i = 0; i &lt; nRows; ++i) {</span>
+<span class="fc" id="L472">            setEntry(i, column, matrix.getEntry(i, 0));</span>
+        }
+<span class="fc" id="L474">    }</span>
+
+    /** {@inheritDoc} */
+    public RealVector getRowVector(final int row) {
+<span class="fc" id="L478">        return new ArrayRealVector(getRow(row), false);</span>
+    }
+
+    /** {@inheritDoc} */
+    public void setRowVector(final int row, final RealVector vector) {
+<span class="fc" id="L483">        MatrixUtils.checkRowIndex(this, row);</span>
+<span class="fc" id="L484">        final int nCols = getColumnDimension();</span>
+<span class="fc bfc" id="L485" title="All 2 branches covered.">        if (vector.getDimension() != nCols) {</span>
+<span class="fc" id="L486">            throw new MatrixDimensionMismatchException(1, vector.getDimension(),</span>
+                                                       1, nCols);
+        }
+<span class="fc bfc" id="L489" title="All 2 branches covered.">        for (int i = 0; i &lt; nCols; ++i) {</span>
+<span class="fc" id="L490">            setEntry(row, i, vector.getEntry(i));</span>
+        }
+<span class="fc" id="L492">    }</span>
+
+    /** {@inheritDoc} */
+    public RealVector getColumnVector(final int column) {
+<span class="fc" id="L496">        return new ArrayRealVector(getColumn(column), false);</span>
+    }
+
+    /** {@inheritDoc} */
+    public void setColumnVector(final int column, final RealVector vector) {
+<span class="fc" id="L501">        MatrixUtils.checkColumnIndex(this, column);</span>
+<span class="fc" id="L502">        final int nRows = getRowDimension();</span>
+<span class="fc bfc" id="L503" title="All 2 branches covered.">        if (vector.getDimension() != nRows) {</span>
+<span class="fc" id="L504">            throw new MatrixDimensionMismatchException(vector.getDimension(), 1,</span>
+                                                       nRows, 1);
+        }
+<span class="fc bfc" id="L507" title="All 2 branches covered.">        for (int i = 0; i &lt; nRows; ++i) {</span>
+<span class="fc" id="L508">            setEntry(i, column, vector.getEntry(i));</span>
+        }
+<span class="fc" id="L510">    }</span>
+
+    /** {@inheritDoc} */
+    public double[] getRow(final int row) {
+<span class="fc" id="L514">        MatrixUtils.checkRowIndex(this, row);</span>
+<span class="fc" id="L515">        final int nCols = getColumnDimension();</span>
+<span class="fc" id="L516">        final double[] out = new double[nCols];</span>
+<span class="fc bfc" id="L517" title="All 2 branches covered.">        for (int i = 0; i &lt; nCols; ++i) {</span>
+<span class="fc" id="L518">            out[i] = getEntry(row, i);</span>
+        }
+
+<span class="fc" id="L521">        return out;</span>
+    }
+
+    /** {@inheritDoc} */
+    public void setRow(final int row, final double[] array) {
+<span class="fc" id="L526">        MatrixUtils.checkRowIndex(this, row);</span>
+<span class="fc" id="L527">        final int nCols = getColumnDimension();</span>
+<span class="fc bfc" id="L528" title="All 2 branches covered.">        if (array.length != nCols) {</span>
+<span class="fc" id="L529">            throw new MatrixDimensionMismatchException(1, array.length, 1, nCols);</span>
+        }
+<span class="fc bfc" id="L531" title="All 2 branches covered.">        for (int i = 0; i &lt; nCols; ++i) {</span>
+<span class="fc" id="L532">            setEntry(row, i, array[i]);</span>
+        }
+<span class="fc" id="L534">    }</span>
+
+    /** {@inheritDoc} */
+    public double[] getColumn(final int column) {
+<span class="fc" id="L538">        MatrixUtils.checkColumnIndex(this, column);</span>
+<span class="fc" id="L539">        final int nRows = getRowDimension();</span>
+<span class="fc" id="L540">        final double[] out = new double[nRows];</span>
+<span class="fc bfc" id="L541" title="All 2 branches covered.">        for (int i = 0; i &lt; nRows; ++i) {</span>
+<span class="fc" id="L542">            out[i] = getEntry(i, column);</span>
+        }
+
+<span class="fc" id="L545">        return out;</span>
+    }
+
+    /** {@inheritDoc} */
+    public void setColumn(final int column, final double[] array) {
+<span class="fc" id="L550">        MatrixUtils.checkColumnIndex(this, column);</span>
+<span class="fc" id="L551">        final int nRows = getRowDimension();</span>
+<span class="fc bfc" id="L552" title="All 2 branches covered.">        if (array.length != nRows) {</span>
+<span class="fc" id="L553">            throw new MatrixDimensionMismatchException(array.length, 1, nRows, 1);</span>
+        }
+<span class="fc bfc" id="L555" title="All 2 branches covered.">        for (int i = 0; i &lt; nRows; ++i) {</span>
+<span class="fc" id="L556">            setEntry(i, column, array[i]);</span>
+        }
+<span class="fc" id="L558">    }</span>
+
+    /** {@inheritDoc} */
+    public abstract double getEntry(int row, int column);
+
+    /** {@inheritDoc} */
+    public abstract void setEntry(int row, int column, double value);
+
+    /** {@inheritDoc} */
+    public void addToEntry(int row, int column, double increment) {
+<span class="nc" id="L568">        MatrixUtils.checkMatrixIndex(this, row, column);</span>
+<span class="nc" id="L569">        setEntry(row, column, getEntry(row, column) + increment);</span>
+<span class="nc" id="L570">    }</span>
+
+    /** {@inheritDoc} */
+    public void multiplyEntry(int row, int column, double factor) {
+<span class="nc" id="L574">        MatrixUtils.checkMatrixIndex(this, row, column);</span>
+<span class="nc" id="L575">        setEntry(row, column, getEntry(row, column) * factor);</span>
+<span class="nc" id="L576">    }</span>
+
+    /** {@inheritDoc} */
+    public RealMatrix transpose() {
+<span class="fc" id="L580">        final int nRows = getRowDimension();</span>
+<span class="fc" id="L581">        final int nCols = getColumnDimension();</span>
+<span class="fc" id="L582">        final RealMatrix out = createMatrix(nCols, nRows);</span>
+<span class="fc" id="L583">        walkInOptimizedOrder(new DefaultRealMatrixPreservingVisitor() {</span>
+
+            /** {@inheritDoc} */
+            @Override
+            public void visit(final int row, final int column, final double value) {
+<span class="fc" id="L588">                out.setEntry(column, row, value);</span>
+<span class="fc" id="L589">            }</span>
+
+        });
+
+<span class="fc" id="L593">        return out;</span>
+    }
+
+    /** {@inheritDoc} */
+    public boolean isSquare() {
+<span class="fc bfc" id="L598" title="All 2 branches covered.">        return getColumnDimension() == getRowDimension();</span>
+    }
+
+    /** {@inheritDoc} */
+
+    /**
+     * Returns the number of rows of this matrix.
+     *
+     * @return the number of rows.
+     */
+    @Override
+    public abstract int getRowDimension();
+
+    /**
+     * Returns the number of columns of this matrix.
+     *
+     * @return the number of columns.
+     */
+    @Override
+    public abstract int getColumnDimension();
+
+    /** {@inheritDoc} */
+    public double getTrace() {
+<span class="fc" id="L621">        final int nRows = getRowDimension();</span>
+<span class="fc" id="L622">        final int nCols = getColumnDimension();</span>
+<span class="fc bfc" id="L623" title="All 2 branches covered.">        if (nRows != nCols) {</span>
+<span class="fc" id="L624">            throw new NonSquareMatrixException(nRows, nCols);</span>
+       }
+<span class="fc" id="L626">        double trace = 0;</span>
+<span class="fc bfc" id="L627" title="All 2 branches covered.">        for (int i = 0; i &lt; nRows; ++i) {</span>
+<span class="fc" id="L628">            trace += getEntry(i, i);</span>
+        }
+<span class="fc" id="L630">        return trace;</span>
+    }
+
+    /** {@inheritDoc} */
+    public double[] operate(final double[] v) {
+<span class="fc" id="L635">        final int nRows = getRowDimension();</span>
+<span class="fc" id="L636">        final int nCols = getColumnDimension();</span>
+<span class="fc bfc" id="L637" title="All 2 branches covered.">        if (v.length != nCols) {</span>
+<span class="fc" id="L638">            throw new DimensionMismatchException(v.length, nCols);</span>
+        }
+
+<span class="fc" id="L641">        final double[] out = new double[nRows];</span>
+<span class="fc bfc" id="L642" title="All 2 branches covered.">        for (int row = 0; row &lt; nRows; ++row) {</span>
+<span class="fc" id="L643">            double sum = 0;</span>
+<span class="fc bfc" id="L644" title="All 2 branches covered.">            for (int i = 0; i &lt; nCols; ++i) {</span>
+<span class="fc" id="L645">                sum += getEntry(row, i) * v[i];</span>
+            }
+<span class="fc" id="L647">            out[row] = sum;</span>
+        }
+
+<span class="fc" id="L650">        return out;</span>
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public RealVector operate(final RealVector v) {
+        try {
+<span class="fc" id="L657">            return new ArrayRealVector(operate(((ArrayRealVector) v).getDataRef()), false);</span>
+<span class="fc" id="L658">        } catch (ClassCastException cce) {</span>
+<span class="fc" id="L659">            final int nRows = getRowDimension();</span>
+<span class="fc" id="L660">            final int nCols = getColumnDimension();</span>
+<span class="fc bfc" id="L661" title="All 2 branches covered.">            if (v.getDimension() != nCols) {</span>
+<span class="fc" id="L662">                throw new DimensionMismatchException(v.getDimension(), nCols);</span>
+            }
+
+<span class="fc" id="L665">            final double[] out = new double[nRows];</span>
+<span class="fc bfc" id="L666" title="All 2 branches covered.">            for (int row = 0; row &lt; nRows; ++row) {</span>
+<span class="fc" id="L667">                double sum = 0;</span>
+<span class="fc bfc" id="L668" title="All 2 branches covered.">                for (int i = 0; i &lt; nCols; ++i) {</span>
+<span class="fc" id="L669">                    sum += getEntry(row, i) * v.getEntry(i);</span>
+                }
+<span class="fc" id="L671">                out[row] = sum;</span>
+            }
+
+<span class="fc" id="L674">            return new ArrayRealVector(out, false);</span>
+        }
+    }
+
+    /** {@inheritDoc} */
+    public double[] preMultiply(final double[] v) {
+
+<span class="fc" id="L681">        final int nRows = getRowDimension();</span>
+<span class="fc" id="L682">        final int nCols = getColumnDimension();</span>
+<span class="fc bfc" id="L683" title="All 2 branches covered.">        if (v.length != nRows) {</span>
+<span class="fc" id="L684">            throw new DimensionMismatchException(v.length, nRows);</span>
+        }
+
+<span class="fc" id="L687">        final double[] out = new double[nCols];</span>
+<span class="fc bfc" id="L688" title="All 2 branches covered.">        for (int col = 0; col &lt; nCols; ++col) {</span>
+<span class="fc" id="L689">            double sum = 0;</span>
+<span class="fc bfc" id="L690" title="All 2 branches covered.">            for (int i = 0; i &lt; nRows; ++i) {</span>
+<span class="fc" id="L691">                sum += getEntry(i, col) * v[i];</span>
+            }
+<span class="fc" id="L693">            out[col] = sum;</span>
+        }
+
+<span class="fc" id="L696">        return out;</span>
+    }
+
+    /** {@inheritDoc} */
+    public RealVector preMultiply(final RealVector v) {
+        try {
+<span class="nc" id="L702">            return new ArrayRealVector(preMultiply(((ArrayRealVector) v).getDataRef()), false);</span>
+<span class="nc" id="L703">        } catch (ClassCastException cce) {</span>
+
+<span class="nc" id="L705">            final int nRows = getRowDimension();</span>
+<span class="nc" id="L706">            final int nCols = getColumnDimension();</span>
+<span class="nc bnc" id="L707" title="All 2 branches missed.">            if (v.getDimension() != nRows) {</span>
+<span class="nc" id="L708">                throw new DimensionMismatchException(v.getDimension(), nRows);</span>
+            }
+
+<span class="nc" id="L711">            final double[] out = new double[nCols];</span>
+<span class="nc bnc" id="L712" title="All 2 branches missed.">            for (int col = 0; col &lt; nCols; ++col) {</span>
+<span class="nc" id="L713">                double sum = 0;</span>
+<span class="nc bnc" id="L714" title="All 2 branches missed.">                for (int i = 0; i &lt; nRows; ++i) {</span>
+<span class="nc" id="L715">                    sum += getEntry(i, col) * v.getEntry(i);</span>
+                }
+<span class="nc" id="L717">                out[col] = sum;</span>
+            }
+
+<span class="nc" id="L720">            return new ArrayRealVector(out, false);</span>
+        }
+    }
+
+    /** {@inheritDoc} */
+    public double walkInRowOrder(final RealMatrixChangingVisitor visitor) {
+<span class="fc" id="L726">        final int rows    = getRowDimension();</span>
+<span class="fc" id="L727">        final int columns = getColumnDimension();</span>
+<span class="fc" id="L728">        visitor.start(rows, columns, 0, rows - 1, 0, columns - 1);</span>
+<span class="fc bfc" id="L729" title="All 2 branches covered.">        for (int row = 0; row &lt; rows; ++row) {</span>
+<span class="fc bfc" id="L730" title="All 2 branches covered.">            for (int column = 0; column &lt; columns; ++column) {</span>
+<span class="fc" id="L731">                final double oldValue = getEntry(row, column);</span>
+<span class="fc" id="L732">                final double newValue = visitor.visit(row, column, oldValue);</span>
+<span class="fc" id="L733">                setEntry(row, column, newValue);</span>
+            }
+        }
+<span class="fc" id="L736">        return visitor.end();</span>
+    }
+
+    /** {@inheritDoc} */
+    public double walkInRowOrder(final RealMatrixPreservingVisitor visitor) {
+<span class="fc" id="L741">        final int rows    = getRowDimension();</span>
+<span class="fc" id="L742">        final int columns = getColumnDimension();</span>
+<span class="fc" id="L743">        visitor.start(rows, columns, 0, rows - 1, 0, columns - 1);</span>
+<span class="fc bfc" id="L744" title="All 2 branches covered.">        for (int row = 0; row &lt; rows; ++row) {</span>
+<span class="fc bfc" id="L745" title="All 2 branches covered.">            for (int column = 0; column &lt; columns; ++column) {</span>
+<span class="fc" id="L746">                visitor.visit(row, column, getEntry(row, column));</span>
+            }
+        }
+<span class="fc" id="L749">        return visitor.end();</span>
+    }
+
+    /** {@inheritDoc} */
+    public double walkInRowOrder(final RealMatrixChangingVisitor visitor,
+                                 final int startRow, final int endRow,
+                                 final int startColumn, final int endColumn) {
+<span class="nc" id="L756">        MatrixUtils.checkSubMatrixIndex(this, startRow, endRow, startColumn, endColumn);</span>
+<span class="nc" id="L757">        visitor.start(getRowDimension(), getColumnDimension(),</span>
+                      startRow, endRow, startColumn, endColumn);
+<span class="nc bnc" id="L759" title="All 2 branches missed.">        for (int row = startRow; row &lt;= endRow; ++row) {</span>
+<span class="nc bnc" id="L760" title="All 2 branches missed.">            for (int column = startColumn; column &lt;= endColumn; ++column) {</span>
+<span class="nc" id="L761">                final double oldValue = getEntry(row, column);</span>
+<span class="nc" id="L762">                final double newValue = visitor.visit(row, column, oldValue);</span>
+<span class="nc" id="L763">                setEntry(row, column, newValue);</span>
+            }
+        }
+<span class="nc" id="L766">        return visitor.end();</span>
+    }
+
+    /** {@inheritDoc} */
+    public double walkInRowOrder(final RealMatrixPreservingVisitor visitor,
+                                 final int startRow, final int endRow,
+                                 final int startColumn, final int endColumn) {
+<span class="nc" id="L773">        MatrixUtils.checkSubMatrixIndex(this, startRow, endRow, startColumn, endColumn);</span>
+<span class="nc" id="L774">        visitor.start(getRowDimension(), getColumnDimension(),</span>
+                      startRow, endRow, startColumn, endColumn);
+<span class="nc bnc" id="L776" title="All 2 branches missed.">        for (int row = startRow; row &lt;= endRow; ++row) {</span>
+<span class="nc bnc" id="L777" title="All 2 branches missed.">            for (int column = startColumn; column &lt;= endColumn; ++column) {</span>
+<span class="nc" id="L778">                visitor.visit(row, column, getEntry(row, column));</span>
+            }
+        }
+<span class="nc" id="L781">        return visitor.end();</span>
+    }
+
+    /** {@inheritDoc} */
+    public double walkInColumnOrder(final RealMatrixChangingVisitor visitor) {
+<span class="fc" id="L786">        final int rows    = getRowDimension();</span>
+<span class="fc" id="L787">        final int columns = getColumnDimension();</span>
+<span class="fc" id="L788">        visitor.start(rows, columns, 0, rows - 1, 0, columns - 1);</span>
+<span class="fc bfc" id="L789" title="All 2 branches covered.">        for (int column = 0; column &lt; columns; ++column) {</span>
+<span class="fc bfc" id="L790" title="All 2 branches covered.">            for (int row = 0; row &lt; rows; ++row) {</span>
+<span class="fc" id="L791">                final double oldValue = getEntry(row, column);</span>
+<span class="fc" id="L792">                final double newValue = visitor.visit(row, column, oldValue);</span>
+<span class="fc" id="L793">                setEntry(row, column, newValue);</span>
+            }
+        }
+<span class="fc" id="L796">        return visitor.end();</span>
+    }
+
+    /** {@inheritDoc} */
+    public double walkInColumnOrder(final RealMatrixPreservingVisitor visitor) {
+<span class="fc" id="L801">        final int rows    = getRowDimension();</span>
+<span class="fc" id="L802">        final int columns = getColumnDimension();</span>
+<span class="fc" id="L803">        visitor.start(rows, columns, 0, rows - 1, 0, columns - 1);</span>
+<span class="fc bfc" id="L804" title="All 2 branches covered.">        for (int column = 0; column &lt; columns; ++column) {</span>
+<span class="fc bfc" id="L805" title="All 2 branches covered.">            for (int row = 0; row &lt; rows; ++row) {</span>
+<span class="fc" id="L806">                visitor.visit(row, column, getEntry(row, column));</span>
+            }
+        }
+<span class="fc" id="L809">        return visitor.end();</span>
+    }
+
+    /** {@inheritDoc} */
+    public double walkInColumnOrder(final RealMatrixChangingVisitor visitor,
+                                    final int startRow, final int endRow,
+                                    final int startColumn, final int endColumn) {
+<span class="fc" id="L816">        MatrixUtils.checkSubMatrixIndex(this, startRow, endRow, startColumn, endColumn);</span>
+<span class="fc" id="L817">        visitor.start(getRowDimension(), getColumnDimension(),</span>
+                      startRow, endRow, startColumn, endColumn);
+<span class="fc bfc" id="L819" title="All 2 branches covered.">        for (int column = startColumn; column &lt;= endColumn; ++column) {</span>
+<span class="fc bfc" id="L820" title="All 2 branches covered.">            for (int row = startRow; row &lt;= endRow; ++row) {</span>
+<span class="fc" id="L821">                final double oldValue = getEntry(row, column);</span>
+<span class="fc" id="L822">                final double newValue = visitor.visit(row, column, oldValue);</span>
+<span class="fc" id="L823">                setEntry(row, column, newValue);</span>
+            }
+        }
+<span class="fc" id="L826">        return visitor.end();</span>
+    }
+
+    /** {@inheritDoc} */
+    public double walkInColumnOrder(final RealMatrixPreservingVisitor visitor,
+                                    final int startRow, final int endRow,
+                                    final int startColumn, final int endColumn) {
+<span class="fc" id="L833">        MatrixUtils.checkSubMatrixIndex(this, startRow, endRow, startColumn, endColumn);</span>
+<span class="fc" id="L834">        visitor.start(getRowDimension(), getColumnDimension(),</span>
+                      startRow, endRow, startColumn, endColumn);
+<span class="fc bfc" id="L836" title="All 2 branches covered.">        for (int column = startColumn; column &lt;= endColumn; ++column) {</span>
+<span class="fc bfc" id="L837" title="All 2 branches covered.">            for (int row = startRow; row &lt;= endRow; ++row) {</span>
+<span class="fc" id="L838">                visitor.visit(row, column, getEntry(row, column));</span>
+            }
+        }
+<span class="fc" id="L841">        return visitor.end();</span>
+    }
+
+    /** {@inheritDoc} */
+    public double walkInOptimizedOrder(final RealMatrixChangingVisitor visitor) {
+<span class="fc" id="L846">        return walkInRowOrder(visitor);</span>
+    }
+
+    /** {@inheritDoc} */
+    public double walkInOptimizedOrder(final RealMatrixPreservingVisitor visitor) {
+<span class="fc" id="L851">        return walkInRowOrder(visitor);</span>
+    }
+
+    /** {@inheritDoc} */
+    public double walkInOptimizedOrder(final RealMatrixChangingVisitor visitor,
+                                       final int startRow, final int endRow,
+                                       final int startColumn, final int endColumn) {
+<span class="fc" id="L858">        return walkInRowOrder(visitor, startRow, endRow, startColumn, endColumn);</span>
+    }
+
+    /** {@inheritDoc} */
+    public double walkInOptimizedOrder(final RealMatrixPreservingVisitor visitor,
+                                       final int startRow, final int endRow,
+                                       final int startColumn, final int endColumn) {
+<span class="fc" id="L865">        return walkInRowOrder(visitor, startRow, endRow, startColumn, endColumn);</span>
+    }
+
+    /**
+     * Get a string representation for this matrix.
+     * @return a string representation for this matrix
+     */
+    @Override
+    public String toString() {
+<span class="fc" id="L874">        final int nRows = getRowDimension();</span>
+<span class="fc" id="L875">        final int nCols = getColumnDimension();</span>
+<span class="fc" id="L876">        final StringBuffer res = new StringBuffer();</span>
+<span class="fc" id="L877">        String fullClassName = getClass().getName();</span>
+<span class="fc" id="L878">        String shortClassName = fullClassName.substring(fullClassName.lastIndexOf('.') + 1);</span>
+<span class="fc" id="L879">        res.append(shortClassName).append(&quot;{&quot;);</span>
+
+<span class="fc bfc" id="L881" title="All 2 branches covered.">        for (int i = 0; i &lt; nRows; ++i) {</span>
+<span class="fc bfc" id="L882" title="All 2 branches covered.">            if (i &gt; 0) {</span>
+<span class="fc" id="L883">                res.append(&quot;,&quot;);</span>
+            }
+<span class="fc" id="L885">            res.append(&quot;{&quot;);</span>
+<span class="fc bfc" id="L886" title="All 2 branches covered.">            for (int j = 0; j &lt; nCols; ++j) {</span>
+<span class="fc bfc" id="L887" title="All 2 branches covered.">                if (j &gt; 0) {</span>
+<span class="fc" id="L888">                    res.append(&quot;,&quot;);</span>
+                }
+<span class="fc" id="L890">                res.append(getEntry(i, j));</span>
+            }
+<span class="fc" id="L892">            res.append(&quot;}&quot;);</span>
+        }
+
+<span class="fc" id="L895">        res.append(&quot;}&quot;);</span>
+<span class="fc" id="L896">        return res.toString();</span>
+    }
+
+    /**
+     * Returns true iff &lt;code&gt;object&lt;/code&gt; is a
+     * &lt;code&gt;RealMatrix&lt;/code&gt; instance with the same dimensions as this
+     * and all corresponding matrix entries are equal.
+     *
+     * @param object the object to test equality against.
+     * @return true if object equals this
+     */
+    @Override
+    public boolean equals(final Object object) {
+<span class="fc bfc" id="L909" title="All 2 branches covered.">        if (object == this ) {</span>
+<span class="fc" id="L910">            return true;</span>
+        }
+<span class="fc bfc" id="L912" title="All 2 branches covered.">        if (object instanceof RealMatrix == false) {</span>
+<span class="fc" id="L913">            return false;</span>
+        }
+<span class="fc" id="L915">        RealMatrix m = (RealMatrix) object;</span>
+<span class="fc" id="L916">        final int nRows = getRowDimension();</span>
+<span class="fc" id="L917">        final int nCols = getColumnDimension();</span>
+<span class="pc bpc" id="L918" title="1 of 4 branches missed.">        if (m.getColumnDimension() != nCols || m.getRowDimension() != nRows) {</span>
+<span class="fc" id="L919">            return false;</span>
+        }
+<span class="fc bfc" id="L921" title="All 2 branches covered.">        for (int row = 0; row &lt; nRows; ++row) {</span>
+<span class="fc bfc" id="L922" title="All 2 branches covered.">            for (int col = 0; col &lt; nCols; ++col) {</span>
+<span class="fc bfc" id="L923" title="All 2 branches covered.">                if (getEntry(row, col) != m.getEntry(row, col)) {</span>
+<span class="fc" id="L924">                    return false;</span>
+                }
+            }
+        }
+<span class="fc" id="L928">        return true;</span>
+    }
+
+    /**
+     * Computes a hashcode for the matrix.
+     *
+     * @return hashcode for matrix
+     */
+    @Override
+    public int hashCode() {
+<span class="fc" id="L938">        int ret = 7;</span>
+<span class="fc" id="L939">        final int nRows = getRowDimension();</span>
+<span class="fc" id="L940">        final int nCols = getColumnDimension();</span>
+<span class="fc" id="L941">        ret = ret * 31 + nRows;</span>
+<span class="fc" id="L942">        ret = ret * 31 + nCols;</span>
+<span class="fc bfc" id="L943" title="All 2 branches covered.">        for (int row = 0; row &lt; nRows; ++row) {</span>
+<span class="fc bfc" id="L944" title="All 2 branches covered.">            for (int col = 0; col &lt; nCols; ++col) {</span>
+<span class="fc" id="L945">               ret = ret * 31 + (11 * (row+1) + 17 * (col+1)) *</span>
+<span class="fc" id="L946">                   MathUtils.hash(getEntry(row, col));</span>
+           }
+        }
+<span class="fc" id="L949">        return ret;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

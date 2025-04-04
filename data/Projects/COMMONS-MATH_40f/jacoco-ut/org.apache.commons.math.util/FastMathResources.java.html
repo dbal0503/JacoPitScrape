@@ -1,0 +1,299 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FastMathResources.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Commons Math</a> &gt; <a href="index.source.html" class="el_package">org.apache.commons.math.util</a> &gt; <span class="el_source">FastMathResources.java</span></div><h1>FastMathResources.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.commons.math.util;
+
+import java.io.File;
+import java.io.DataOutputStream;
+import java.io.InputStream;
+import java.io.DataInputStream;
+import java.io.BufferedOutputStream;
+import java.io.BufferedInputStream;
+import java.io.FileOutputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.DoubleBuffer;
+import org.apache.commons.math.exception.MathInternalError;
+
+/**
+ * Utility class for saving and loading tabulated data used by
+ * {@link FastMath}.
+ *
+ * @version $Id$
+ */
+class FastMathResources {
+    /**
+     * Resource directory. Assuming that this class and the resource files
+     * are located in the same package as &quot;FastMath&quot;.
+     */
+<span class="nc" id="L44">    private static final String RES_DIR = &quot;data/&quot; +</span>
+<span class="nc" id="L45">        FastMath.class.getPackage().getName().replace('.', '/') + &quot;/&quot;;</span>
+    /** File resource prefix. */
+<span class="nc" id="L47">    private static final String RES_PREFIX = RES_DIR + &quot;FastMath__&quot;;</span>
+    /** Resource basename for &quot;EXP_INT_TABLE_A&quot; and &quot;EXP_INT_TABLE_B&quot;. */
+    private static final String EXP_INT = &quot;exp_int&quot;;
+    /** Resource basename for &quot;EXP_FRAC_TABLE_A&quot; and &quot;EXP_FRAC_TABLE_B&quot;. */
+    private static final String EXP_FRAC = &quot;exp_frac&quot;;
+    /** Resource basename for &quot;LN_MANT&quot;. */
+    private static final String LN_MANT = &quot;ln_mant&quot;;
+    /** Number of bytes in a &quot;double&quot;. */
+    private static final int BYTES_IN_DOUBLE = Double.SIZE / Byte.SIZE;
+
+    /**
+     * Class contains only static methods.
+     */
+    private FastMathResources() {}
+
+    /**
+     * Compute and save all the resources.
+     */
+    static void createAll() {
+        // Create resource directory.
+<span class="nc" id="L67">        final File resDir = new File(RES_DIR);</span>
+<span class="nc bnc" id="L68" title="All 2 branches missed.">        if (resDir.exists()) {</span>
+<span class="nc bnc" id="L69" title="All 2 branches missed.">            if (!resDir.isDirectory()) {</span>
+<span class="nc" id="L70">                throw new MathInternalError();</span>
+            }
+        } else {
+            try {
+<span class="nc" id="L74">                resDir.mkdirs();</span>
+<span class="nc" id="L75">            } catch (SecurityException e) {</span>
+<span class="nc" id="L76">                throw new MathInternalError(e);</span>
+<span class="nc" id="L77">            }</span>
+        }
+
+        // &quot;EXP_INT&quot; tables.
+<span class="nc" id="L81">        final double[] expIntA = new double[FastMath.EXP_INT_TABLE_LEN];</span>
+<span class="nc" id="L82">        final double[] expIntB = new double[FastMath.EXP_INT_TABLE_LEN];</span>
+
+<span class="nc" id="L84">        final double tmp[] = new double[2];</span>
+<span class="nc" id="L85">        final double recip[] = new double[2];</span>
+
+<span class="nc bnc" id="L87" title="All 2 branches missed.">        for (int i = 0; i &lt; FastMath.EXP_INT_TABLE_MAX_INDEX; i++) {</span>
+<span class="nc" id="L88">            FastMathCalc.expint(i, tmp);</span>
+<span class="nc" id="L89">            expIntA[i + FastMath.EXP_INT_TABLE_MAX_INDEX] = tmp[0];</span>
+<span class="nc" id="L90">            expIntB[i + FastMath.EXP_INT_TABLE_MAX_INDEX] = tmp[1];</span>
+
+<span class="nc bnc" id="L92" title="All 2 branches missed.">            if (i != 0) {</span>
+                // Negative integer powers.
+<span class="nc" id="L94">                FastMathCalc.splitReciprocal(tmp, recip);</span>
+<span class="nc" id="L95">                expIntA[FastMath.EXP_INT_TABLE_MAX_INDEX - i] = recip[0];</span>
+<span class="nc" id="L96">                expIntB[FastMath.EXP_INT_TABLE_MAX_INDEX - i] = recip[1];</span>
+            }
+        }
+
+<span class="nc" id="L100">        saveTable2d(EXP_INT, new double[][] { expIntA, expIntB });</span>
+
+        // &quot;EXP_FRAC&quot; tables.
+<span class="nc" id="L103">        final double[] expFracA = new double[FastMath.EXP_FRAC_TABLE_LEN];</span>
+<span class="nc" id="L104">        final double[] expFracB = new double[FastMath.EXP_FRAC_TABLE_LEN];</span>
+
+<span class="nc bnc" id="L106" title="All 2 branches missed.">        for (int i = 0; i &lt; FastMath.EXP_FRAC_TABLE_LEN; i++) {</span>
+<span class="nc" id="L107">            FastMathCalc.slowexp(i / 1024d, tmp); // TWO_POWER_10</span>
+<span class="nc" id="L108">            expFracA[i] = tmp[0];</span>
+<span class="nc" id="L109">            expFracB[i] = tmp[1];</span>
+        }
+
+<span class="nc" id="L112">        saveTable2d(EXP_FRAC, new double[][] { expFracA, expFracB });</span>
+
+        // &quot;LN_MANT&quot; table.
+<span class="nc" id="L115">        final double[][] lnMant = new double[FastMath.LN_MANT_LEN][];</span>
+
+<span class="nc bnc" id="L117" title="All 2 branches missed.">        for (int i = 0; i &lt; FastMath.LN_MANT_LEN; i++) {</span>
+<span class="nc" id="L118">            final double d = Double.longBitsToDouble((((long) i) &lt;&lt; 42) |</span>
+                                                     0x3ff0000000000000L);
+<span class="nc" id="L120">            lnMant[i] = FastMathCalc.slowLog(d);</span>
+        }
+
+<span class="nc" id="L123">        saveTable2d(LN_MANT, transpose(lnMant));</span>
+<span class="nc" id="L124">    }</span>
+
+    /**
+     * Load &quot;EXP_INT&quot; tables.
+     * &quot;EXP_INT_TABLE_A&quot; is at index 0.
+     * &quot;EXP_INT_TABLE_B&quot; is at index 1.
+     *
+     * @return the retrieved data.
+     */
+    static double[][] loadExpInt() {
+<span class="nc" id="L134">        return loadTable2d(EXP_INT, 2, FastMath.EXP_INT_TABLE_LEN);</span>
+    }
+
+    /**
+     * Load &quot;EXP_FRAC&quot; tables.
+     * &quot;EXP_FRAC_TABLE_A&quot; is at index 0.
+     * &quot;EXP_FRAC_TABLE_B&quot; is at index 1.
+     *
+     * @return the retrieved data.
+     */
+    static double[][] loadExpFrac() {
+<span class="nc" id="L145">        return loadTable2d(EXP_FRAC, 2, FastMath.EXP_FRAC_TABLE_LEN);</span>
+    }
+
+    /**
+     * Load &quot;LN_MANT&quot;.
+     *
+     * @return the retrieved data.
+     */
+    static double[][] loadLnMant() {
+<span class="nc" id="L154">        return transpose(loadTable2d(LN_MANT, 2, FastMath.LN_MANT_LEN));</span>
+    }
+
+    /**
+     * @param name Basename of the resource.
+     * @return an output stream.
+     * @throws FileNotFoundException if the file cannot be opened.
+     */
+    private static DataOutputStream out(String name)
+        throws FileNotFoundException {
+<span class="nc" id="L164">        final String fullName = RES_PREFIX + name;</span>
+<span class="nc" id="L165">        return new DataOutputStream(new BufferedOutputStream(new FileOutputStream(fullName)));</span>
+    }
+
+    /**
+     * @param name Basename of the resource.
+     * @param data Data to be stored.
+     */
+    private static void saveTable1d(String name,
+                                    double[] data) {
+<span class="nc" id="L174">        final int len = data.length;</span>
+
+        try {
+<span class="nc" id="L177">            final DataOutputStream out = out(name);</span>
+
+<span class="nc bnc" id="L179" title="All 2 branches missed.">            for (int i = 0; i &lt; len; i++) {</span>
+<span class="nc" id="L180">                out.writeDouble(data[i]);</span>
+            }
+
+<span class="nc" id="L183">            out.close();</span>
+<span class="nc" id="L184">        } catch (IOException e) {</span>
+<span class="nc" id="L185">            throw new MathInternalError(e);</span>
+<span class="nc" id="L186">        }</span>
+<span class="nc" id="L187">    }</span>
+
+    /**
+     * @param name Basename of the resource.
+     * @param data Data to be stored.
+     */
+    private static void saveTable2d(String name,
+                                    double[][] data) {
+<span class="nc" id="L195">        final int len = data.length;</span>
+<span class="nc" id="L196">        final int rowLen = data[0].length;</span>
+
+        try {
+<span class="nc" id="L199">            final DataOutputStream out = out(name);</span>
+
+<span class="nc bnc" id="L201" title="All 2 branches missed.">            for (int i = 0; i &lt; len; i++) {</span>
+<span class="nc bnc" id="L202" title="All 2 branches missed.">                for (int j = 0; j &lt; rowLen; j++) {</span>
+<span class="nc" id="L203">                    out.writeDouble(data[i][j]);</span>
+                }
+            }
+
+<span class="nc" id="L207">            out.close();</span>
+<span class="nc" id="L208">        } catch (IOException e) {</span>
+<span class="nc" id="L209">            throw new MathInternalError(e);</span>
+<span class="nc" id="L210">        }</span>
+<span class="nc" id="L211">    }</span>
+
+    /**
+     * @param name Basename of the resource.
+     * @return an input stream.
+     * @throws FileNotFoundException if the resource cannot be accessed.
+     */
+    private static DataInputStream in(String name)
+        throws FileNotFoundException {
+<span class="nc" id="L220">        final String fullName = &quot;/&quot; + RES_PREFIX + name;</span>
+<span class="nc" id="L221">        final InputStream in = FastMathResources.class.getResourceAsStream(fullName);</span>
+<span class="nc" id="L222">        return new DataInputStream(new BufferedInputStream(in));</span>
+    }
+
+    /**
+     * @param name Basename of the resource.
+     * @param len Size of the data.
+     * @return the retrieved data.
+     */
+    private static double[] loadTable1d(String name,
+                                        int len) {
+        try {
+<span class="nc" id="L233">            final DataInputStream in = in(name);</span>
+
+<span class="nc" id="L235">            final double[] data = new double[len];</span>
+<span class="nc bnc" id="L236" title="All 2 branches missed.">            for (int i = 0; i &lt; len; i++) {</span>
+<span class="nc" id="L237">                data[i] = in.readDouble();</span>
+            }
+
+<span class="nc" id="L240">            in.close();</span>
+<span class="nc" id="L241">            return data;</span>
+<span class="nc" id="L242">        } catch (IOException e) {</span>
+<span class="nc" id="L243">            throw new MathInternalError(e);</span>
+        }
+    }
+
+    /**
+     * @param name Basename of the resource.
+     * @param len Size of the table.
+     * @param rowLen Size of each row of the table.
+     * @return the retrieved data.
+     */
+    private static double[][] loadTable2d(String name,
+                                          int len,
+                                          int rowLen) {
+        try {
+<span class="nc" id="L257">            final DataInputStream in = in(name);</span>
+<span class="nc" id="L258">            final byte[] b = new byte[BYTES_IN_DOUBLE * rowLen];</span>
+<span class="nc" id="L259">            final double[][] data = new double[len][rowLen];</span>
+<span class="nc" id="L260">            final ByteBuffer bBuf = ByteBuffer.wrap(b);</span>
+
+<span class="nc bnc" id="L262" title="All 2 branches missed.">            for (int i = 0; i &lt; len; i++) {</span>
+<span class="nc" id="L263">                in.readFully(b);</span>
+<span class="nc" id="L264">                final DoubleBuffer dBuf = bBuf.asDoubleBuffer();</span>
+<span class="nc bnc" id="L265" title="All 2 branches missed.">                for (int j = 0; j &lt; rowLen; j++) {</span>
+<span class="nc" id="L266">                    data[i][j] = dBuf.get();</span>
+                }
+            }
+
+<span class="nc" id="L270">            in.close();</span>
+<span class="nc" id="L271">            return data;</span>
+<span class="nc" id="L272">        } catch (IOException e) {</span>
+<span class="nc" id="L273">            throw new MathInternalError(e);</span>
+        }
+    }
+
+    /**
+     * Transposes a two-dimensional array: The number of rows becomes the
+     * number of columns and vice-versa.
+     * The array must be rectangular (same number of colums in each row).
+     *
+     * @param data Array to be transposed.
+     * @return the transposed array.
+     */
+    private static double[][] transpose(double[][] data) {
+<span class="nc" id="L286">        final int rowLen = data.length;</span>
+<span class="nc" id="L287">        final int len = data[0].length;</span>
+<span class="nc" id="L288">        final double[][] tData = new double[len][rowLen];</span>
+
+<span class="nc bnc" id="L290" title="All 2 branches missed.">        for (int i = 0; i &lt; len; i++) {</span>
+<span class="nc bnc" id="L291" title="All 2 branches missed.">            for (int j = 0; j &lt; rowLen; j++) {</span>
+<span class="nc" id="L292">                tData[i][j] = data[j][i];</span>
+            }
+        }
+
+<span class="nc" id="L296">        return tData;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

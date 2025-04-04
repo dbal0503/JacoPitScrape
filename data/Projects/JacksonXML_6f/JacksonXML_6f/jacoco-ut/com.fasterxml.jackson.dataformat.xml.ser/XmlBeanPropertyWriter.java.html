@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>XmlBeanPropertyWriter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Jackson-dataformat-XML</a> &gt; <a href="index.source.html" class="el_package">com.fasterxml.jackson.dataformat.xml.ser</a> &gt; <span class="el_source">XmlBeanPropertyWriter.java</span></div><h1>XmlBeanPropertyWriter.java</h1><pre class="source lang-java linenums">package com.fasterxml.jackson.dataformat.xml.ser;
+
+import javax.xml.namespace.QName;
+
+import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.databind.*;
+import com.fasterxml.jackson.databind.ser.*;
+import com.fasterxml.jackson.databind.ser.impl.PropertySerializerMap;
+
+/**
+ * Property writer sub-class used for handling element wrapping needed for serializing
+ * collection (array, Collection; possibly Map) types.
+ */
+public class XmlBeanPropertyWriter
+    extends BeanPropertyWriter
+{
+    private static final long serialVersionUID = 1L;
+
+    /*
+    /**********************************************************
+    /* Config settings
+    /**********************************************************
+     */
+
+    /**
+     * Element name used as wrapper for collection.
+     */
+    protected final QName _wrapperQName;
+
+    /**
+     * Element name used for items in the collection
+     */
+    protected final QName _wrappedQName;
+
+    /*
+    /**********************************************************
+    /* Life-cycle: construction, configuration
+    /**********************************************************
+     */
+
+    public XmlBeanPropertyWriter(BeanPropertyWriter wrapped,
+            PropertyName wrapperName, PropertyName wrappedName) {
+<span class="fc" id="L43">        this(wrapped, wrapperName, wrappedName, null);</span>
+<span class="fc" id="L44">    }</span>
+
+    public XmlBeanPropertyWriter(BeanPropertyWriter wrapped,
+            PropertyName wrapperName, PropertyName wrappedName,
+            JsonSerializer&lt;Object&gt; serializer)
+    {
+<span class="fc" id="L50">        super(wrapped);</span>
+<span class="fc" id="L51">        _wrapperQName = _qname(wrapperName);</span>
+<span class="fc" id="L52">        _wrappedQName = _qname(wrappedName);</span>
+
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">        if (serializer != null) {</span>
+<span class="nc" id="L55">            assignSerializer(serializer);</span>
+        }
+<span class="fc" id="L57">    }</span>
+
+    private QName _qname(PropertyName n)
+    {
+<span class="fc" id="L61">        String ns = n.getNamespace();</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">        if (ns == null) {</span>
+<span class="fc" id="L63">            ns = &quot;&quot;;</span>
+        }
+<span class="fc" id="L65">        return new QName(ns, n.getSimpleName());</span>
+    }
+    
+    /*
+    /**********************************************************
+    /* Overridden methods
+    /**********************************************************
+     */
+
+    /**
+     * Overridden version so that we can wrap output within wrapper element if
+     * and as necessary.
+     */
+    @Override
+    public void serializeAsField(Object bean, JsonGenerator jgen, SerializerProvider prov)
+        throws Exception
+    {
+<span class="fc" id="L82">        Object value = get(bean);</span>
+
+        /* 13-Feb-2014, tatu: As per [#103], default handling does not really
+         *   work here. Rather, we need just a wrapping and should NOT call
+         *   null handler, as it does not know what to do...
+         *   
+         *   Question, however, is what should it be serialized as. We have two main
+         *   choices; equivalent empty List, and &quot;nothing&quot; (missing). Let's start with
+         *   empty List? But producing missing entry is non-trivial...
+         */
+<span class="fc bfc" id="L92" title="All 2 branches covered.">        if (value == null) {</span>
+            // if (_nullSerializer != null) { ... }
+
+            // For Empty List, we'd do this:
+            /*
+            @SuppressWarnings(&quot;resource&quot;)
+            final ToXmlGenerator xmlGen = (jgen instanceof ToXmlGenerator) ? (ToXmlGenerator) jgen : null;
+            if (xmlGen != null) {
+                xmlGen.startWrappedValue(_wrapperQName, _wrappedQName);
+                xmlGen.finishWrappedValue(_wrapperQName, _wrappedQName);
+            }
+            */
+            // but for missing thing, well, just output nothing
+            
+<span class="fc" id="L106">            return;</span>
+        }
+
+        // then find serializer to use
+<span class="fc" id="L110">        JsonSerializer&lt;Object&gt; ser = _serializer;</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">        if (ser == null) {</span>
+<span class="fc" id="L112">            Class&lt;?&gt; cls = value.getClass();</span>
+<span class="fc" id="L113">            PropertySerializerMap map = _dynamicSerializers;</span>
+<span class="fc" id="L114">            ser = map.serializerFor(cls);</span>
+<span class="fc bfc" id="L115" title="All 2 branches covered.">            if (ser == null) {</span>
+<span class="fc" id="L116">                ser = _findAndAddDynamic(map, cls, prov);</span>
+            }
+        }
+        // and then see if we must suppress certain values (default, empty)
+<span class="pc bpc" id="L120" title="1 of 2 branches missed.">        if (_suppressableValue != null) {</span>
+<span class="nc bnc" id="L121" title="All 2 branches missed.">            if (MARKER_FOR_EMPTY == _suppressableValue) {</span>
+<span class="nc bnc" id="L122" title="All 2 branches missed.">                if (ser.isEmpty(prov, value)) {</span>
+<span class="nc" id="L123">                    return;</span>
+                }
+<span class="nc bnc" id="L125" title="All 2 branches missed.">            } else if (_suppressableValue.equals(value)) {</span>
+<span class="nc" id="L126">                return;</span>
+            }
+        }
+        // For non-nulls: simple check for direct cycles
+<span class="pc bpc" id="L130" title="1 of 2 branches missed.">        if (value == bean) {</span>
+            // NOTE: method signature here change 2.3-&gt;2.4
+<span class="nc bnc" id="L132" title="All 2 branches missed.">            if (_handleSelfReference(bean, jgen, prov, ser)) {</span>
+<span class="nc" id="L133">                return;</span>
+            }
+        }
+
+<span class="fc bfc" id="L137" title="All 2 branches covered.">        final ToXmlGenerator xmlGen = (jgen instanceof ToXmlGenerator) ? (ToXmlGenerator) jgen : null;</span>
+        // Ok then; addition we want to do is to add wrapper element, and that's what happens here
+        // 19-Aug-2013, tatu: ... except for those nasty 'convertValue()' calls...
+<span class="fc bfc" id="L140" title="All 2 branches covered.">        if (xmlGen != null) {</span>
+<span class="fc" id="L141">            xmlGen.startWrappedValue(_wrapperQName, _wrappedQName);</span>
+        }
+<span class="fc" id="L143">        jgen.writeFieldName(_name);</span>
+<span class="pc bpc" id="L144" title="1 of 2 branches missed.">        if (_typeSerializer == null) {</span>
+<span class="fc" id="L145">            ser.serialize(value, jgen, prov);</span>
+        } else {
+<span class="nc" id="L147">            ser.serializeWithType(value, jgen, prov, _typeSerializer);</span>
+        }
+<span class="fc bfc" id="L149" title="All 2 branches covered.">        if (xmlGen != null) {</span>
+<span class="fc" id="L150">            xmlGen.finishWrappedValue(_wrapperQName, _wrappedQName);</span>
+        }
+<span class="fc" id="L152">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RombergIntegrator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Commons Math</a> &gt; <a href="index.source.html" class="el_package">org.apache.commons.math.analysis.integration</a> &gt; <span class="el_source">RombergIntegrator.java</span></div><h1>RombergIntegrator.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.commons.math.analysis.integration;
+
+import org.apache.commons.math.exception.MaxCountExceededException;
+import org.apache.commons.math.exception.NotStrictlyPositiveException;
+import org.apache.commons.math.exception.NumberIsTooLargeException;
+import org.apache.commons.math.exception.NumberIsTooSmallException;
+import org.apache.commons.math.exception.TooManyEvaluationsException;
+import org.apache.commons.math.util.FastMath;
+
+/**
+ * Implements the &lt;a href=&quot;http://mathworld.wolfram.com/RombergIntegration.html&quot;&gt;
+ * Romberg Algorithm&lt;/a&gt; for integration of real univariate functions. For
+ * reference, see &lt;b&gt;Introduction to Numerical Analysis&lt;/b&gt;, ISBN 038795452X,
+ * chapter 3.
+ * &lt;p&gt;
+ * Romberg integration employs k successive refinements of the trapezoid
+ * rule to remove error terms less than order O(N^(-2k)). Simpson's rule
+ * is a special case of k = 2.&lt;/p&gt;
+ *
+ * @version $Id$
+ * @since 1.2
+ */
+public class RombergIntegrator extends UnivariateRealIntegratorImpl {
+
+    /** Maximal number of iterations for Romberg. */
+    public static final int ROMBERG_MAX_ITERATIONS_COUNT = 32;
+
+    /**
+     * Build a Romberg integrator with given accuracies and iterations counts.
+     * @param relativeAccuracy relative accuracy of the result
+     * @param absoluteAccuracy absolute accuracy of the result
+     * @param minimalIterationCount minimum number of iterations
+     * @param maximalIterationCount maximum number of iterations
+     * (must be less than or equal to {@link #ROMBERG_MAX_ITERATIONS_COUNT})
+     * @exception NotStrictlyPositiveException if minimal number of iterations
+     * is not strictly positive
+     * @exception NumberIsTooSmallException if maximal number of iterations
+     * is lesser than or equal to the minimal number of iterations
+     * @exception NumberIsTooLargeException if maximal number of iterations
+     * is greater than {@link #ROMBERG_MAX_ITERATIONS_COUNT}
+     */
+    public RombergIntegrator(final double relativeAccuracy,
+                             final double absoluteAccuracy,
+                             final int minimalIterationCount,
+                             final int maximalIterationCount)
+        throws NotStrictlyPositiveException, NumberIsTooSmallException, NumberIsTooLargeException {
+<span class="nc" id="L63">        super(relativeAccuracy, absoluteAccuracy, minimalIterationCount, maximalIterationCount);</span>
+<span class="nc bnc" id="L64" title="All 2 branches missed.">        if (maximalIterationCount &gt; ROMBERG_MAX_ITERATIONS_COUNT) {</span>
+<span class="nc" id="L65">            throw new NumberIsTooLargeException(maximalIterationCount,</span>
+<span class="nc" id="L66">                                                ROMBERG_MAX_ITERATIONS_COUNT, false);</span>
+        }
+<span class="nc" id="L68">    }</span>
+
+    /**
+     * Build a Romberg integrator with given iteration counts.
+     * @param minimalIterationCount minimum number of iterations
+     * @param maximalIterationCount maximum number of iterations
+     * (must be less than or equal to {@link #ROMBERG_MAX_ITERATIONS_COUNT})
+     * @exception NotStrictlyPositiveException if minimal number of iterations
+     * is not strictly positive
+     * @exception NumberIsTooSmallException if maximal number of iterations
+     * is lesser than or equal to the minimal number of iterations
+     * @exception NumberIsTooLargeException if maximal number of iterations
+     * is greater than {@link #ROMBERG_MAX_ITERATIONS_COUNT}
+     */
+    public RombergIntegrator(final int minimalIterationCount,
+                             final int maximalIterationCount)
+        throws NotStrictlyPositiveException, NumberIsTooSmallException, NumberIsTooLargeException {
+<span class="fc" id="L85">        super(minimalIterationCount, maximalIterationCount);</span>
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">        if (maximalIterationCount &gt; ROMBERG_MAX_ITERATIONS_COUNT) {</span>
+<span class="fc" id="L87">            throw new NumberIsTooLargeException(maximalIterationCount,</span>
+<span class="fc" id="L88">                                                ROMBERG_MAX_ITERATIONS_COUNT, false);</span>
+        }
+<span class="nc" id="L90">    }</span>
+
+    /**
+     * Construct a Romberg integrator with default settings
+     * (max iteration count set to {@link #ROMBERG_MAX_ITERATIONS_COUNT})
+     */
+    public RombergIntegrator() {
+<span class="fc" id="L97">        super(DEFAULT_MIN_ITERATIONS_COUNT, ROMBERG_MAX_ITERATIONS_COUNT);</span>
+<span class="fc" id="L98">    }</span>
+
+    /** {@inheritDoc} */
+    @Override
+    protected double doIntegrate()
+        throws TooManyEvaluationsException, MaxCountExceededException {
+
+<span class="fc" id="L105">        final int m = iterations.getMaximalCount() + 1;</span>
+<span class="fc" id="L106">        double previousRow[] = new double[m];</span>
+<span class="fc" id="L107">        double currentRow[]  = new double[m];</span>
+
+<span class="fc" id="L109">        TrapezoidIntegrator qtrap = new TrapezoidIntegrator();</span>
+<span class="fc" id="L110">        currentRow[0] = qtrap.stage(this, 0);</span>
+<span class="fc" id="L111">        iterations.incrementCount();</span>
+<span class="fc" id="L112">        double olds = currentRow[0];</span>
+        while (true) {
+
+<span class="fc" id="L115">            final int i = iterations.getCount();</span>
+
+            // switch rows
+<span class="fc" id="L118">            final double[] tmpRow = previousRow;</span>
+<span class="fc" id="L119">            previousRow = currentRow;</span>
+<span class="fc" id="L120">            currentRow = tmpRow;</span>
+
+<span class="fc" id="L122">            currentRow[0] = qtrap.stage(this, i);</span>
+<span class="fc" id="L123">            iterations.incrementCount();</span>
+<span class="fc bfc" id="L124" title="All 2 branches covered.">            for (int j = 1; j &lt;= i; j++) {</span>
+                // Richardson extrapolation coefficient
+<span class="fc" id="L126">                final double r = (1L &lt;&lt; (2 * j)) - 1;</span>
+<span class="fc" id="L127">                final double tIJm1 = currentRow[j - 1];</span>
+<span class="fc" id="L128">                currentRow[j] = tIJm1 + (tIJm1 - previousRow[j - 1]) / r;</span>
+            }
+<span class="fc" id="L130">            final double s = currentRow[i];</span>
+<span class="fc bfc" id="L131" title="All 2 branches covered.">            if (i &gt;= minimalIterationCount) {</span>
+<span class="fc" id="L132">                final double delta  = FastMath.abs(s - olds);</span>
+<span class="fc" id="L133">                final double rLimit = relativeAccuracy * (FastMath.abs(olds) + FastMath.abs(s)) * 0.5;</span>
+<span class="pc bpc" id="L134" title="1 of 4 branches missed.">                if ((delta &lt;= rLimit) || (delta &lt;= absoluteAccuracy)) {</span>
+<span class="fc" id="L135">                    return s;</span>
+                }
+            }
+<span class="fc" id="L138">            olds = s;</span>
+<span class="fc" id="L139">        }</span>
+
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>XmlTypeResolverBuilder.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Jackson-dataformat-XML</a> &gt; <a href="index.source.html" class="el_package">com.fasterxml.jackson.dataformat.xml</a> &gt; <span class="el_source">XmlTypeResolverBuilder.java</span></div><h1>XmlTypeResolverBuilder.java</h1><pre class="source lang-java linenums">package com.fasterxml.jackson.dataformat.xml;
+
+import java.io.IOException;
+import java.util.Collection;
+
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import com.fasterxml.jackson.databind.*;
+import com.fasterxml.jackson.databind.cfg.MapperConfig;
+import com.fasterxml.jackson.databind.jsontype.NamedType;
+import com.fasterxml.jackson.databind.jsontype.TypeIdResolver;
+import com.fasterxml.jackson.databind.jsontype.impl.ClassNameIdResolver;
+import com.fasterxml.jackson.databind.jsontype.impl.MinimalClassNameIdResolver;
+import com.fasterxml.jackson.databind.jsontype.impl.StdTypeResolverBuilder;
+import com.fasterxml.jackson.databind.type.TypeFactory;
+import com.fasterxml.jackson.dataformat.xml.util.StaxUtil;
+
+/**
+ * Custom specialization of {@link StdTypeResolverBuilder}; needed so that
+ * type id property name can be modified as necessary to make it legal
+ * XML element or attribute name.
+ */
+<span class="fc" id="L22">public class XmlTypeResolverBuilder extends StdTypeResolverBuilder</span>
+{
+    @Override
+    public StdTypeResolverBuilder init(JsonTypeInfo.Id idType, TypeIdResolver idRes)
+    {
+<span class="fc" id="L27">        super.init(idType, idRes);</span>
+<span class="pc bpc" id="L28" title="1 of 2 branches missed.">        if (_typeProperty != null) {</span>
+<span class="fc" id="L29">            _typeProperty = StaxUtil.sanitizeXmlTypeName(_typeProperty);</span>
+        }
+<span class="fc" id="L31">        return this;</span>
+    }
+
+    @Override
+    public StdTypeResolverBuilder typeProperty(String typeIdPropName)
+    {
+        // ok to have null/empty; will restore to use defaults
+<span class="pc bpc" id="L38" title="1 of 4 branches missed.">        if (typeIdPropName == null || typeIdPropName.length() == 0) {</span>
+<span class="fc" id="L39">            typeIdPropName = _idType.getDefaultPropertyName();</span>
+        }
+<span class="fc" id="L41">        _typeProperty = StaxUtil.sanitizeXmlTypeName(typeIdPropName);</span>
+<span class="fc" id="L42">        return this;</span>
+    }
+
+    @Override
+    protected TypeIdResolver idResolver(MapperConfig&lt;?&gt; config,
+            JavaType baseType, Collection&lt;NamedType&gt; subtypes,
+            boolean forSer, boolean forDeser)
+    {
+<span class="pc bpc" id="L50" title="1 of 2 branches missed.">        if (_customIdResolver != null) {</span>
+<span class="nc" id="L51">            return _customIdResolver;</span>
+        }
+        // Only override handlings of class, minimal class; name is good as is
+<span class="pc bpc" id="L54" title="1 of 3 branches missed.">        switch (_idType) {</span>
+        case CLASS:
+<span class="fc" id="L56">            return new XmlClassNameIdResolver(baseType, config.getTypeFactory());</span>
+        case MINIMAL_CLASS:
+<span class="nc" id="L58">            return new XmlMinimalClassNameIdResolver(baseType, config.getTypeFactory());</span>
+        default:
+<span class="fc" id="L60">            return super.idResolver(config, baseType, subtypes, forSer, forDeser);</span>
+        }
+    }
+    
+    /*
+    /**********************************************************************
+    /* Internal helper methods
+    /**********************************************************************
+     */
+
+
+    /**
+     * Helper method for encoding regular Java class name in form that
+     * can be used as XML element name.
+     */
+    protected static String encodeXmlClassName(String className)
+    {
+        /* For now, let's just replace '$'s with double dots...
+         * Perhaps make configurable in future?
+         */
+<span class="fc" id="L80">        int ix = className.lastIndexOf('$');</span>
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">        if (ix &gt;= 0) {</span>
+<span class="fc" id="L82">            StringBuilder sb = new StringBuilder(className);</span>
+            do {
+<span class="fc" id="L84">                sb.replace(ix, ix+1, &quot;..&quot;);</span>
+<span class="fc" id="L85">                ix = className.lastIndexOf('$', ix-1);</span>
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">            } while (ix &gt;= 0);</span>
+<span class="fc" id="L87">            className = sb.toString();</span>
+        }
+<span class="fc" id="L89">        return className;</span>
+    }
+
+    /**
+     * Helper method for decoding &quot;XML safe&quot; Java class name back into
+     * actual class name
+     */
+    protected static String decodeXmlClassName(String className)
+    {
+<span class="fc" id="L98">        int ix = className.lastIndexOf(&quot;..&quot;);</span>
+<span class="pc bpc" id="L99" title="1 of 2 branches missed.">        if (ix &gt;= 0) {</span>
+<span class="fc" id="L100">            StringBuilder sb = new StringBuilder(className);</span>
+            do {
+<span class="fc" id="L102">                sb.replace(ix, ix+2, &quot;$&quot;);</span>
+<span class="fc" id="L103">                ix = className.lastIndexOf(&quot;..&quot;, ix-1);</span>
+<span class="pc bpc" id="L104" title="1 of 2 branches missed.">            } while (ix &gt;= 0);</span>
+<span class="fc" id="L105">            className = sb.toString();</span>
+        }
+<span class="fc" id="L107">        return className;</span>
+    }
+    
+    /*
+    /**********************************************************************
+    /* Customized class name handlers
+    /**********************************************************************
+     */
+
+    protected static class XmlClassNameIdResolver
+        extends ClassNameIdResolver
+    {
+        public XmlClassNameIdResolver(JavaType baseType, TypeFactory typeFactory)
+        {
+<span class="fc" id="L121">            super(baseType, typeFactory);</span>
+<span class="fc" id="L122">        }</span>
+
+        @Override
+        public String idFromValue(Object value)
+        {
+<span class="fc" id="L127">            return encodeXmlClassName(super.idFromValue(value));</span>
+        }
+
+        @Override
+        public JavaType typeFromId(DatabindContext context, String id) throws IOException {
+<span class="fc" id="L132">            return super.typeFromId(context, decodeXmlClassName(id));</span>
+        }
+    }
+
+    protected static class XmlMinimalClassNameIdResolver
+        extends MinimalClassNameIdResolver
+    {
+        public XmlMinimalClassNameIdResolver(JavaType baseType, TypeFactory typeFactory)
+        {
+<span class="nc" id="L141">            super(baseType, typeFactory);</span>
+<span class="nc" id="L142">        }</span>
+
+        @Override
+        public String idFromValue(Object value)
+        {
+<span class="nc" id="L147">            return encodeXmlClassName(super.idFromValue(value));</span>
+        }
+
+        @Override
+        public JavaType typeFromId(DatabindContext context, String id) throws IOException {
+<span class="nc" id="L152">            return super.typeFromId(context, decodeXmlClassName(id));</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

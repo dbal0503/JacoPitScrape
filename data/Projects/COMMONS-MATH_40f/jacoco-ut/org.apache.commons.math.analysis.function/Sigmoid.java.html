@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Sigmoid.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Commons Math</a> &gt; <a href="index.source.html" class="el_package">org.apache.commons.math.analysis.function</a> &gt; <span class="el_source">Sigmoid.java</span></div><h1>Sigmoid.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.commons.math.analysis.function;
+
+import org.apache.commons.math.analysis.UnivariateFunction;
+import org.apache.commons.math.analysis.DifferentiableUnivariateFunction;
+import org.apache.commons.math.analysis.ParametricUnivariateFunction;
+import org.apache.commons.math.exception.NullArgumentException;
+import org.apache.commons.math.exception.DimensionMismatchException;
+import org.apache.commons.math.util.FastMath;
+
+/**
+ * &lt;a href=&quot;http://en.wikipedia.org/wiki/Sigmoid_function&quot;&gt;
+ *  Sigmoid&lt;/a&gt; function.
+ * It is the inverse of the {@link Logit logit} function.
+ * A more flexible version, the generalised logistic, is implemented
+ * by the {@link Logistic} class.
+ *
+ * @version $Id$
+ * @since 3.0
+ */
+public class Sigmoid implements DifferentiableUnivariateFunction {
+    /** Lower asymptote. */
+    private final double lo;
+    /** Higher asymptote. */
+    private final double hi;
+
+    /**
+     * Usual sigmoid function, where the lower asymptote is 0 and the higher
+     * asymptote is 1.
+     */
+    public Sigmoid() {
+<span class="fc" id="L48">        this(0, 1);</span>
+<span class="fc" id="L49">    }</span>
+
+    /**
+     * Sigmoid function.
+     *
+     * @param lo Lower asymptote.
+     * @param hi Higher asymptote.
+     */
+    public Sigmoid(double lo,
+<span class="fc" id="L58">                   double hi) {</span>
+<span class="fc" id="L59">        this.lo = lo;</span>
+<span class="fc" id="L60">        this.hi = hi;</span>
+<span class="fc" id="L61">    }</span>
+
+    /** {@inheritDoc} */
+    public UnivariateFunction derivative() {
+<span class="fc" id="L65">        return new UnivariateFunction() {</span>
+            /** {@inheritDoc} */
+            public double value(double x) {
+<span class="fc" id="L68">                final double exp = FastMath.exp(-x);</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">                if (Double.isInfinite(exp)) {</span>
+                    // Avoid returning NaN in case of overflow.
+<span class="fc" id="L71">                    return 0;</span>
+                }
+<span class="fc" id="L73">                final double exp1 = 1 + exp;</span>
+<span class="fc" id="L74">                return (hi - lo) * exp / (exp1 * exp1);</span>
+            }
+        };
+    }
+
+    /** {@inheritDoc} */
+    public double value(double x) {
+<span class="fc" id="L81">        return value(x, lo, hi);</span>
+    }
+
+    /**
+     * Parametric function where the input array contains the parameters of
+     * the logit function, ordered as follows:
+     * &lt;ul&gt;
+     *  &lt;li&gt;Lower asymptote&lt;/li&gt;
+     *  &lt;li&gt;Higher asymptote&lt;/li&gt;
+     * &lt;/ul&gt;
+     */
+<span class="fc" id="L92">    public static class Parametric implements ParametricUnivariateFunction {</span>
+        /**
+         * Computes the value of the sigmoid at {@code x}.
+         *
+         * @param x Value for which the function must be computed.
+         * @param param Values of lower asymptote and higher asymptote.
+         * @return the value of the function.
+         * @throws NullArgumentException if {@code param} is {@code null}.
+         * @throws DimensionMismatchException if the size of {@code param} is
+         * not 2.
+         */
+        public double value(double x, double ... param) {
+<span class="fc" id="L104">            validateParameters(param);</span>
+<span class="fc" id="L105">            return Sigmoid.value(x, param[0], param[1]);</span>
+        }
+
+        /**
+         * Computes the value of the gradient at {@code x}.
+         * The components of the gradient vector are the partial
+         * derivatives of the function with respect to each of the
+         * &lt;em&gt;parameters&lt;/em&gt; (lower asymptote and higher asymptote).
+         *
+         * @param x Value at which the gradient must be computed.
+         * @param param Values for lower asymptote and higher asymptote.
+         * @return the gradient vector at {@code x}.
+         * @throws NullArgumentException if {@code param} is {@code null}.
+         * @throws DimensionMismatchException if the size of {@code param} is
+         * not 2.
+         */
+        public double[] gradient(double x, double ... param) {
+<span class="fc" id="L122">            validateParameters(param);</span>
+
+<span class="fc" id="L124">            final double invExp1 = 1 / (1 + FastMath.exp(-x));</span>
+
+<span class="fc" id="L126">            return new double[] { 1 - invExp1, invExp1 };</span>
+        }
+
+        /**
+         * Validates parameters to ensure they are appropriate for the evaluation of
+         * the {@link #value(double,double[])} and {@link #gradient(double,double[])}
+         * methods.
+         *
+         * @param param Values for lower and higher asymptotes.
+         * @throws NullArgumentException if {@code param} is {@code null}.
+         * @throws DimensionMismatchException if the size of {@code param} is
+         * not 2.
+         */
+        private void validateParameters(double[] param) {
+<span class="fc bfc" id="L140" title="All 2 branches covered.">            if (param == null) {</span>
+<span class="fc" id="L141">                throw new NullArgumentException();</span>
+            }
+<span class="fc bfc" id="L143" title="All 2 branches covered.">            if (param.length != 2) {</span>
+<span class="fc" id="L144">                throw new DimensionMismatchException(param.length, 2);</span>
+            }
+<span class="fc" id="L146">        }</span>
+    }
+
+    /**
+     * @param x Value at which to compute the sigmoid.
+     * @param lo Lower asymptote.
+     * @param hi Higher asymptote.
+     * @return the value of the sigmoid function at {@code x}.
+     */
+    private static double value(double x,
+                                double lo,
+                                double hi) {
+<span class="fc" id="L158">        return lo + (hi - lo) / (1 + FastMath.exp(-x));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

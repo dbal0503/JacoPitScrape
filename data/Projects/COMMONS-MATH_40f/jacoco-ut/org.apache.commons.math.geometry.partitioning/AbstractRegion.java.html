@@ -1,0 +1,642 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AbstractRegion.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Commons Math</a> &gt; <a href="index.source.html" class="el_package">org.apache.commons.math.geometry.partitioning</a> &gt; <span class="el_source">AbstractRegion.java</span></div><h1>AbstractRegion.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.commons.math.geometry.partitioning;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.Iterator;
+import java.util.TreeSet;
+
+import org.apache.commons.math.geometry.Space;
+import org.apache.commons.math.geometry.Vector;
+
+/** Abstract class for all regions, independently of geometry type or dimension.
+
+ * @param &lt;S&gt; Type of the space.
+ * @param &lt;T&gt; Type of the sub-space.
+
+ * @version $Id$
+ * @since 3.0
+ */
+public abstract class AbstractRegion&lt;S extends Space, T extends Space&gt; implements Region&lt;S&gt; {
+
+    /** Inside/Outside BSP tree. */
+    private BSPTree&lt;S&gt; tree;
+
+    /** Size of the instance. */
+    private double size;
+
+    /** Barycenter. */
+    private Vector&lt;S&gt; barycenter;
+
+    /** Build a region representing the whole space.
+     */
+<span class="fc" id="L49">    protected AbstractRegion() {</span>
+<span class="fc" id="L50">        tree = new BSPTree&lt;S&gt;(Boolean.TRUE);</span>
+<span class="fc" id="L51">    }</span>
+
+    /** Build a region from an inside/outside BSP tree.
+     * &lt;p&gt;The leaf nodes of the BSP tree &lt;em&gt;must&lt;/em&gt; have a
+     * {@code Boolean} attribute representing the inside status of
+     * the corresponding cell (true for inside cells, false for outside
+     * cells). In order to avoid building too many small objects, it is
+     * recommended to use the predefined constants
+     * {@code Boolean.TRUE} and {@code Boolean.FALSE}. The
+     * tree also &lt;em&gt;must&lt;/em&gt; have either null internal nodes or
+     * internal nodes representing the boundary as specified in the
+     * {@link #getTree getTree} method).&lt;/p&gt;
+     * @param tree inside/outside BSP tree representing the region
+     */
+<span class="fc" id="L65">    protected AbstractRegion(final BSPTree&lt;S&gt; tree) {</span>
+<span class="fc" id="L66">        this.tree = tree;</span>
+<span class="fc" id="L67">    }</span>
+
+    /** Build a Region from a Boundary REPresentation (B-rep).
+     * &lt;p&gt;The boundary is provided as a collection of {@link
+     * SubHyperplane sub-hyperplanes}. Each sub-hyperplane has the
+     * interior part of the region on its minus side and the exterior on
+     * its plus side.&lt;/p&gt;
+     * &lt;p&gt;The boundary elements can be in any order, and can form
+     * several non-connected sets (like for example polygons with holes
+     * or a set of disjoints polyhedrons considered as a whole). In
+     * fact, the elements do not even need to be connected together
+     * (their topological connections are not used here). However, if the
+     * boundary does not really separate an inside open from an outside
+     * open (open having here its topological meaning), then subsequent
+     * calls to the {@link #checkPoint(Vector) checkPoint} method will not be
+     * meaningful anymore.&lt;/p&gt;
+     * &lt;p&gt;If the boundary is empty, the region will represent the whole
+     * space.&lt;/p&gt;
+     * @param boundary collection of boundary elements, as a
+     * collection of {@link SubHyperplane SubHyperplane} objects
+     */
+<span class="fc" id="L88">    protected AbstractRegion(final Collection&lt;SubHyperplane&lt;S&gt;&gt; boundary) {</span>
+
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">        if (boundary.size() == 0) {</span>
+
+            // the tree represents the whole space
+<span class="nc" id="L93">            tree = new BSPTree&lt;S&gt;(Boolean.TRUE);</span>
+
+        } else {
+
+            // sort the boundary elements in decreasing size order
+            // (we don't want equal size elements to be removed, so
+            // we use a trick to fool the TreeSet)
+<span class="fc" id="L100">            final TreeSet&lt;SubHyperplane&lt;S&gt;&gt; ordered = new TreeSet&lt;SubHyperplane&lt;S&gt;&gt;(new Comparator&lt;SubHyperplane&lt;S&gt;&gt;() {</span>
+                public int compare(final SubHyperplane&lt;S&gt; o1, final SubHyperplane&lt;S&gt; o2) {
+<span class="fc" id="L102">                    final double size1 = o1.getSize();</span>
+<span class="fc" id="L103">                    final double size2 = o2.getSize();</span>
+<span class="fc bfc" id="L104" title="All 4 branches covered.">                    return (size2 &lt; size1) ? -1 : ((o1 == o2) ? 0 : +1);</span>
+                }
+            });
+<span class="fc" id="L107">            ordered.addAll(boundary);</span>
+
+            // build the tree top-down
+<span class="fc" id="L110">            tree = new BSPTree&lt;S&gt;();</span>
+<span class="fc" id="L111">            insertCuts(tree, ordered);</span>
+
+            // set up the inside/outside flags
+<span class="fc" id="L114">            tree.visit(new BSPTreeVisitor&lt;S&gt;() {</span>
+
+                /** {@inheritDoc} */
+                public Order visitOrder(final BSPTree&lt;S&gt; node) {
+<span class="fc" id="L118">                    return Order.PLUS_SUB_MINUS;</span>
+                }
+
+                /** {@inheritDoc} */
+                public void visitInternalNode(final BSPTree&lt;S&gt; node) {
+<span class="fc" id="L123">                }</span>
+
+                /** {@inheritDoc} */
+                public void visitLeafNode(final BSPTree&lt;S&gt; node) {
+<span class="fc bfc" id="L127" title="All 2 branches covered.">                    node.setAttribute((node == node.getParent().getPlus()) ?</span>
+<span class="fc" id="L128">                                                                            Boolean.FALSE : Boolean.TRUE);</span>
+<span class="fc" id="L129">                }</span>
+            });
+
+        }
+
+<span class="fc" id="L134">    }</span>
+
+    /** Build a convex region from an array of bounding hyperplanes.
+     * @param hyperplanes array of bounding hyperplanes (if null, an
+     * empty region will be built)
+     */
+<span class="nc" id="L140">    public AbstractRegion(final Hyperplane&lt;S&gt;[] hyperplanes) {</span>
+<span class="nc bnc" id="L141" title="All 4 branches missed.">        if ((hyperplanes == null) || (hyperplanes.length == 0)) {</span>
+<span class="nc" id="L142">            tree = new BSPTree&lt;S&gt;(Boolean.FALSE);</span>
+        } else {
+
+            // use the first hyperplane to build the right class
+<span class="nc" id="L146">            tree = hyperplanes[0].wholeSpace().getTree(false);</span>
+
+            // chop off parts of the space
+<span class="nc" id="L149">            BSPTree&lt;S&gt; node = tree;</span>
+<span class="nc" id="L150">            node.setAttribute(Boolean.TRUE);</span>
+<span class="nc bnc" id="L151" title="All 2 branches missed.">            for (final Hyperplane&lt;S&gt; hyperplane : hyperplanes) {</span>
+<span class="nc bnc" id="L152" title="All 2 branches missed.">                if (node.insertCut(hyperplane)) {</span>
+<span class="nc" id="L153">                    node.setAttribute(null);</span>
+<span class="nc" id="L154">                    node.getPlus().setAttribute(Boolean.FALSE);</span>
+<span class="nc" id="L155">                    node = node.getMinus();</span>
+<span class="nc" id="L156">                    node.setAttribute(Boolean.TRUE);</span>
+                }
+            }
+
+        }
+
+<span class="nc" id="L162">    }</span>
+
+    /** {@inheritDoc} */
+    public abstract AbstractRegion&lt;S, T&gt; buildNew(BSPTree&lt;S&gt; newTree);
+
+    /** Recursively build a tree by inserting cut sub-hyperplanes.
+     * @param node current tree node (it is a leaf node at the beginning
+     * of the call)
+     * @param boundary collection of edges belonging to the cell defined
+     * by the node
+     */
+    private void insertCuts(final BSPTree&lt;S&gt; node, final Collection&lt;SubHyperplane&lt;S&gt;&gt; boundary) {
+
+<span class="fc" id="L175">        final Iterator&lt;SubHyperplane&lt;S&gt;&gt; iterator = boundary.iterator();</span>
+
+        // build the current level
+<span class="fc" id="L178">        Hyperplane&lt;S&gt; inserted = null;</span>
+<span class="fc bfc" id="L179" title="All 4 branches covered.">        while ((inserted == null) &amp;&amp; iterator.hasNext()) {</span>
+<span class="fc" id="L180">            inserted = iterator.next().getHyperplane();</span>
+<span class="pc bpc" id="L181" title="1 of 2 branches missed.">            if (!node.insertCut(inserted.copySelf())) {</span>
+<span class="nc" id="L182">                inserted = null;</span>
+            }
+        }
+
+<span class="fc bfc" id="L186" title="All 2 branches covered.">        if (!iterator.hasNext()) {</span>
+<span class="fc" id="L187">            return;</span>
+        }
+
+        // distribute the remaining edges in the two sub-trees
+<span class="fc" id="L191">        final ArrayList&lt;SubHyperplane&lt;S&gt;&gt; plusList  = new ArrayList&lt;SubHyperplane&lt;S&gt;&gt;();</span>
+<span class="fc" id="L192">        final ArrayList&lt;SubHyperplane&lt;S&gt;&gt; minusList = new ArrayList&lt;SubHyperplane&lt;S&gt;&gt;();</span>
+<span class="fc bfc" id="L193" title="All 2 branches covered.">        while (iterator.hasNext()) {</span>
+<span class="fc" id="L194">            final SubHyperplane&lt;S&gt; other = iterator.next();</span>
+<span class="fc bfc" id="L195" title="All 4 branches covered.">            switch (other.side(inserted)) {</span>
+            case PLUS:
+<span class="fc" id="L197">                plusList.add(other);</span>
+<span class="fc" id="L198">                break;</span>
+            case MINUS:
+<span class="fc" id="L200">                minusList.add(other);</span>
+<span class="fc" id="L201">                break;</span>
+            case BOTH:
+<span class="fc" id="L203">                final SubHyperplane.SplitSubHyperplane&lt;S&gt; split = other.split(inserted);</span>
+<span class="fc" id="L204">                plusList.add(split.getPlus());</span>
+<span class="fc" id="L205">                minusList.add(split.getMinus());</span>
+<span class="fc" id="L206">                break;</span>
+            default:
+                // ignore the sub-hyperplanes belonging to the cut hyperplane
+            }
+<span class="fc" id="L210">        }</span>
+
+        // recurse through lower levels
+<span class="fc" id="L213">        insertCuts(node.getPlus(),  plusList);</span>
+<span class="fc" id="L214">        insertCuts(node.getMinus(), minusList);</span>
+
+<span class="fc" id="L216">    }</span>
+
+    /** {@inheritDoc} */
+    public AbstractRegion&lt;S, T&gt; copySelf() {
+<span class="fc" id="L220">        return buildNew(tree.copySelf());</span>
+    }
+
+    /** {@inheritDoc} */
+    public boolean isEmpty() {
+<span class="fc" id="L225">        return isEmpty(tree);</span>
+    }
+
+    /** {@inheritDoc} */
+    public boolean isEmpty(final BSPTree&lt;S&gt; node) {
+
+        // we use a recursive function rather than the BSPTreeVisitor
+        // interface because we can stop visiting the tree as soon as we
+        // have found an inside cell
+
+<span class="fc bfc" id="L235" title="All 2 branches covered.">        if (node.getCut() == null) {</span>
+            // if we find an inside node, the region is not empty
+<span class="fc bfc" id="L237" title="All 2 branches covered.">            return !((Boolean) node.getAttribute());</span>
+        }
+
+        // check both sides of the sub-tree
+<span class="pc bpc" id="L241" title="3 of 4 branches missed.">        return isEmpty(node.getMinus()) &amp;&amp; isEmpty(node.getPlus());</span>
+
+    }
+
+    /** {@inheritDoc} */
+    public boolean contains(final Region&lt;S&gt; region) {
+<span class="fc" id="L247">        return new RegionFactory&lt;S&gt;().difference(region, this).isEmpty();</span>
+    }
+
+    /** {@inheritDoc} */
+    public Location checkPoint(final Vector&lt;S&gt; point) {
+<span class="fc" id="L252">        return checkPoint(tree, point);</span>
+    }
+
+    /** Check a point with respect to the region starting at a given node.
+     * @param node root node of the region
+     * @param point point to check
+     * @return a code representing the point status: either {@link
+     * Region.Location#INSIDE INSIDE}, {@link Region.Location#OUTSIDE
+     * OUTSIDE} or {@link Region.Location#BOUNDARY BOUNDARY}
+     */
+    protected Location checkPoint(final BSPTree&lt;S&gt; node, final Vector&lt;S&gt; point) {
+<span class="fc" id="L263">        final BSPTree&lt;S&gt; cell = node.getCell(point);</span>
+<span class="fc bfc" id="L264" title="All 2 branches covered.">        if (cell.getCut() == null) {</span>
+            // the point is in the interior of a cell, just check the attribute
+<span class="fc bfc" id="L266" title="All 2 branches covered.">            return ((Boolean) cell.getAttribute()) ? Location.INSIDE : Location.OUTSIDE;</span>
+        }
+
+        // the point is on a cut-sub-hyperplane, is it on a boundary ?
+<span class="fc" id="L270">        final Location minusCode = checkPoint(cell.getMinus(), point);</span>
+<span class="fc" id="L271">        final Location plusCode  = checkPoint(cell.getPlus(),  point);</span>
+<span class="fc bfc" id="L272" title="All 2 branches covered.">        return (minusCode == plusCode) ? minusCode : Location.BOUNDARY;</span>
+
+    }
+
+    /** {@inheritDoc} */
+    public BSPTree&lt;S&gt; getTree(final boolean includeBoundaryAttributes) {
+<span class="pc bpc" id="L278" title="1 of 6 branches missed.">        if (includeBoundaryAttributes &amp;&amp; (tree.getCut() != null) &amp;&amp; (tree.getAttribute() == null)) {</span>
+            // we need to compute the boundary attributes
+<span class="fc" id="L280">            recurseBuildBoundary(tree);</span>
+        }
+<span class="fc" id="L282">        return tree;</span>
+    }
+
+    /** Recursively build the boundary shell tree.
+     * @param node current node in the inout tree
+     */
+    private void recurseBuildBoundary(final BSPTree&lt;S&gt; node) {
+<span class="fc bfc" id="L289" title="All 2 branches covered.">        if (node.getCut() != null) {</span>
+
+<span class="fc" id="L291">            SubHyperplane&lt;S&gt; plusOutside = null;</span>
+<span class="fc" id="L292">            SubHyperplane&lt;S&gt; plusInside  = null;</span>
+
+            // characterize the cut sub-hyperplane,
+            // first with respect to the plus sub-tree
+<span class="fc" id="L296">            final Characterization&lt;S&gt; plusChar = new Characterization&lt;S&gt;();</span>
+<span class="fc" id="L297">            characterize(node.getPlus(), node.getCut().copySelf(), plusChar);</span>
+
+<span class="fc bfc" id="L299" title="All 2 branches covered.">            if (plusChar.hasOut()) {</span>
+                // plusChar.out corresponds to a subset of the cut
+                // sub-hyperplane known to have outside cells on its plus
+                // side, we want to check if parts of this subset do have
+                // inside cells on their minus side
+<span class="fc" id="L304">                final Characterization&lt;S&gt; minusChar = new Characterization&lt;S&gt;();</span>
+<span class="fc" id="L305">                characterize(node.getMinus(), plusChar.getOut(), minusChar);</span>
+<span class="fc bfc" id="L306" title="All 2 branches covered.">                if (minusChar.hasIn()) {</span>
+<span class="fc" id="L307">                    plusOutside = minusChar.getIn();</span>
+                }
+            }
+
+<span class="fc bfc" id="L311" title="All 2 branches covered.">            if (plusChar.hasIn()) {</span>
+                // plusChar.in corresponds to a subset of the cut
+                // sub-hyperplane known to have inside cells on its plus
+                // side, we want to check if parts of this subset do have
+                // outside cells on their minus side
+<span class="fc" id="L316">                final Characterization&lt;S&gt; minusChar = new Characterization&lt;S&gt;();</span>
+<span class="fc" id="L317">                characterize(node.getMinus(), plusChar.getIn(), minusChar);</span>
+<span class="fc bfc" id="L318" title="All 2 branches covered.">                if (minusChar.hasOut()) {</span>
+<span class="fc" id="L319">                    plusInside = minusChar.getOut();</span>
+                }
+            }
+
+<span class="fc" id="L323">            node.setAttribute(new BoundaryAttribute&lt;S&gt;(plusOutside, plusInside));</span>
+<span class="fc" id="L324">            recurseBuildBoundary(node.getPlus());</span>
+<span class="fc" id="L325">            recurseBuildBoundary(node.getMinus());</span>
+
+        }
+<span class="fc" id="L328">    }</span>
+
+    /** Filter the parts of an hyperplane belonging to the boundary.
+     * &lt;p&gt;The filtering consist in splitting the specified
+     * sub-hyperplane into several parts lying in inside and outside
+     * cells of the tree. The principle is to call this method twice for
+     * each cut sub-hyperplane in the tree, once one the plus node and
+     * once on the minus node. The parts that have the same flag
+     * (inside/inside or outside/outside) do not belong to the boundary
+     * while parts that have different flags (inside/outside or
+     * outside/inside) do belong to the boundary.&lt;/p&gt;
+     * @param node current BSP tree node
+     * @param sub sub-hyperplane to characterize
+     * @param characterization placeholder where to put the characterized parts
+     */
+    private void characterize(final BSPTree&lt;S&gt; node, final SubHyperplane&lt;S&gt; sub,
+                              final Characterization&lt;S&gt; characterization) {
+<span class="fc bfc" id="L345" title="All 2 branches covered.">        if (node.getCut() == null) {</span>
+            // we have reached a leaf node
+<span class="fc" id="L347">            final boolean inside = (Boolean) node.getAttribute();</span>
+<span class="fc" id="L348">            characterization.add(sub, inside);</span>
+<span class="fc" id="L349">        } else {</span>
+<span class="fc" id="L350">            final Hyperplane&lt;S&gt; hyperplane = node.getCut().getHyperplane();</span>
+<span class="pc bpc" id="L351" title="1 of 4 branches missed.">            switch (sub.side(hyperplane)) {</span>
+            case PLUS:
+<span class="fc" id="L353">                characterize(node.getPlus(), sub, characterization);</span>
+<span class="fc" id="L354">                break;</span>
+            case MINUS:
+<span class="fc" id="L356">                characterize(node.getMinus(), sub, characterization);</span>
+<span class="fc" id="L357">                break;</span>
+            case BOTH:
+<span class="fc" id="L359">                final SubHyperplane.SplitSubHyperplane&lt;S&gt; split = sub.split(hyperplane);</span>
+<span class="fc" id="L360">                characterize(node.getPlus(),  split.getPlus(),  characterization);</span>
+<span class="fc" id="L361">                characterize(node.getMinus(), split.getMinus(), characterization);</span>
+<span class="fc" id="L362">                break;</span>
+            default:
+                // this should not happen
+<span class="nc" id="L365">                throw new RuntimeException(&quot;internal error&quot;);</span>
+            }
+        }
+<span class="fc" id="L368">    }</span>
+
+    /** {@inheritDoc} */
+    public double getBoundarySize() {
+<span class="fc" id="L372">        final BoundarySizeVisitor&lt;S&gt; visitor = new BoundarySizeVisitor&lt;S&gt;();</span>
+<span class="fc" id="L373">        getTree(true).visit(visitor);</span>
+<span class="fc" id="L374">        return visitor.getSize();</span>
+    }
+
+    /** {@inheritDoc} */
+    public double getSize() {
+<span class="fc bfc" id="L379" title="All 2 branches covered.">        if (barycenter == null) {</span>
+<span class="fc" id="L380">            computeGeometricalProperties();</span>
+        }
+<span class="fc" id="L382">        return size;</span>
+    }
+
+    /** Set the size of the instance.
+     * @param size size of the instance
+     */
+    protected void setSize(final double size) {
+<span class="fc" id="L389">        this.size = size;</span>
+<span class="fc" id="L390">    }</span>
+
+    /** {@inheritDoc} */
+    public Vector&lt;S&gt; getBarycenter() {
+<span class="fc bfc" id="L394" title="All 2 branches covered.">        if (barycenter == null) {</span>
+<span class="fc" id="L395">            computeGeometricalProperties();</span>
+        }
+<span class="fc" id="L397">        return barycenter;</span>
+    }
+
+    /** Set the barycenter of the instance.
+     * @param barycenter barycenter of the instance
+     */
+    protected void setBarycenter(final Vector&lt;S&gt; barycenter) {
+<span class="fc" id="L404">        this.barycenter = barycenter;</span>
+<span class="fc" id="L405">    }</span>
+
+    /** Compute some geometrical properties.
+     * &lt;p&gt;The properties to compute are the barycenter and the size.&lt;/p&gt;
+     */
+    protected abstract void computeGeometricalProperties();
+
+    /** {@inheritDoc} */
+    public Side side(final Hyperplane&lt;S&gt; hyperplane) {
+<span class="fc" id="L414">        final Sides sides = new Sides();</span>
+<span class="fc" id="L415">        recurseSides(tree, hyperplane.wholeHyperplane(), sides);</span>
+<span class="fc bfc" id="L416" title="All 2 branches covered.">        return sides.plusFound() ?</span>
+<span class="fc bfc" id="L417" title="All 2 branches covered.">              (sides.minusFound() ? Side.BOTH  : Side.PLUS) :</span>
+<span class="pc bpc" id="L418" title="1 of 2 branches missed.">              (sides.minusFound() ? Side.MINUS : Side.HYPER);</span>
+    }
+
+    /** Search recursively for inside leaf nodes on each side of the given hyperplane.
+
+     * &lt;p&gt;The algorithm used here is directly derived from the one
+     * described in section III (&lt;i&gt;Binary Partitioning of a BSP
+     * Tree&lt;/i&gt;) of the Bruce Naylor, John Amanatides and William
+     * Thibault paper &lt;a
+     * href=&quot;http://www.cs.yorku.ca/~amana/research/bsptSetOp.pdf&quot;&gt;Merging
+     * BSP Trees Yields Polyhedral Set Operations&lt;/a&gt; Proc. Siggraph
+     * '90, Computer Graphics 24(4), August 1990, pp 115-124, published
+     * by the Association for Computing Machinery (ACM)..&lt;/p&gt;
+
+     * @param node current BSP tree node
+     * @param sub sub-hyperplane
+     * @param sides object holding the sides found
+     */
+    private void recurseSides(final BSPTree&lt;S&gt; node, final SubHyperplane&lt;S&gt; sub, final Sides sides) {
+
+<span class="fc bfc" id="L438" title="All 2 branches covered.">        if (node.getCut() == null) {</span>
+<span class="fc bfc" id="L439" title="All 2 branches covered.">            if ((Boolean) node.getAttribute()) {</span>
+                // this is an inside cell expanding across the hyperplane
+<span class="fc" id="L441">                sides.rememberPlusFound();</span>
+<span class="fc" id="L442">                sides.rememberMinusFound();</span>
+            }
+<span class="fc" id="L444">            return;</span>
+        }
+
+<span class="fc" id="L447">        final Hyperplane&lt;S&gt; hyperplane = node.getCut().getHyperplane();</span>
+<span class="fc bfc" id="L448" title="All 4 branches covered.">        switch (sub.side(hyperplane)) {</span>
+        case PLUS :
+            // the sub-hyperplane is entirely in the plus sub-tree
+<span class="fc bfc" id="L451" title="All 2 branches covered.">            if (node.getCut().side(sub.getHyperplane()) == Side.PLUS) {</span>
+<span class="pc bpc" id="L452" title="1 of 2 branches missed.">                if (!isEmpty(node.getMinus())) {</span>
+<span class="fc" id="L453">                    sides.rememberPlusFound();</span>
+                }
+            } else {
+<span class="pc bpc" id="L456" title="1 of 2 branches missed.">                if (!isEmpty(node.getMinus())) {</span>
+<span class="fc" id="L457">                    sides.rememberMinusFound();</span>
+                }
+            }
+<span class="fc bfc" id="L460" title="All 4 branches covered.">            if (!(sides.plusFound() &amp;&amp; sides.minusFound())) {</span>
+<span class="fc" id="L461">                recurseSides(node.getPlus(), sub, sides);</span>
+            }
+            break;
+        case MINUS :
+            // the sub-hyperplane is entirely in the minus sub-tree
+<span class="fc bfc" id="L466" title="All 2 branches covered.">            if (node.getCut().side(sub.getHyperplane()) == Side.PLUS) {</span>
+<span class="pc bpc" id="L467" title="1 of 2 branches missed.">                if (!isEmpty(node.getPlus())) {</span>
+<span class="nc" id="L468">                    sides.rememberPlusFound();</span>
+                }
+            } else {
+<span class="fc bfc" id="L471" title="All 2 branches covered.">                if (!isEmpty(node.getPlus())) {</span>
+<span class="fc" id="L472">                    sides.rememberMinusFound();</span>
+                }
+            }
+<span class="fc bfc" id="L475" title="All 4 branches covered.">            if (!(sides.plusFound() &amp;&amp; sides.minusFound())) {</span>
+<span class="fc" id="L476">                recurseSides(node.getMinus(), sub, sides);</span>
+            }
+            break;
+        case BOTH :
+            // the sub-hyperplane extends in both sub-trees
+<span class="fc" id="L481">            final SubHyperplane.SplitSubHyperplane&lt;S&gt; split = sub.split(hyperplane);</span>
+
+            // explore first the plus sub-tree
+<span class="fc" id="L484">            recurseSides(node.getPlus(), split.getPlus(), sides);</span>
+
+            // if needed, explore the minus sub-tree
+<span class="fc bfc" id="L487" title="All 4 branches covered.">            if (!(sides.plusFound() &amp;&amp; sides.minusFound())) {</span>
+<span class="fc" id="L488">                recurseSides(node.getMinus(), split.getMinus(), sides);</span>
+            }
+            break;
+        default :
+            // the sub-hyperplane and the cut sub-hyperplane share the same hyperplane
+<span class="fc bfc" id="L493" title="All 2 branches covered.">            if (node.getCut().getHyperplane().sameOrientationAs(sub.getHyperplane())) {</span>
+<span class="pc bpc" id="L494" title="1 of 4 branches missed.">                if ((node.getPlus().getCut() != null) || ((Boolean) node.getPlus().getAttribute())) {</span>
+<span class="fc" id="L495">                    sides.rememberPlusFound();</span>
+                }
+<span class="pc bpc" id="L497" title="1 of 4 branches missed.">                if ((node.getMinus().getCut() != null) || ((Boolean) node.getMinus().getAttribute())) {</span>
+<span class="fc" id="L498">                    sides.rememberMinusFound();</span>
+                }
+            } else {
+<span class="fc bfc" id="L501" title="All 4 branches covered.">                if ((node.getPlus().getCut() != null) || ((Boolean) node.getPlus().getAttribute())) {</span>
+<span class="fc" id="L502">                    sides.rememberMinusFound();</span>
+                }
+<span class="pc bpc" id="L504" title="1 of 4 branches missed.">                if ((node.getMinus().getCut() != null) || ((Boolean) node.getMinus().getAttribute())) {</span>
+<span class="fc" id="L505">                    sides.rememberPlusFound();</span>
+                }
+            }
+        }
+
+<span class="fc" id="L510">    }</span>
+
+    /** Utility class holding the already found sides. */
+    private static final class Sides {
+
+        /** Indicator of inside leaf nodes found on the plus side. */
+        private boolean plusFound;
+
+        /** Indicator of inside leaf nodes found on the plus side. */
+        private boolean minusFound;
+
+        /** Simple constructor.
+         */
+<span class="fc" id="L523">        public Sides() {</span>
+<span class="fc" id="L524">            plusFound  = false;</span>
+<span class="fc" id="L525">            minusFound = false;</span>
+<span class="fc" id="L526">        }</span>
+
+        /** Remember the fact that inside leaf nodes have been found on the plus side.
+         */
+        public void rememberPlusFound() {
+<span class="fc" id="L531">            plusFound = true;</span>
+<span class="fc" id="L532">        }</span>
+
+        /** Check if inside leaf nodes have been found on the plus side.
+         * @return true if inside leaf nodes have been found on the plus side
+         */
+        public boolean plusFound() {
+<span class="fc" id="L538">            return plusFound;</span>
+        }
+
+        /** Remember the fact that inside leaf nodes have been found on the minus side.
+         */
+        public void rememberMinusFound() {
+<span class="fc" id="L544">            minusFound = true;</span>
+<span class="fc" id="L545">        }</span>
+
+        /** Check if inside leaf nodes have been found on the minus side.
+         * @return true if inside leaf nodes have been found on the minus side
+         */
+        public boolean minusFound() {
+<span class="fc" id="L551">            return minusFound;</span>
+        }
+
+    }
+
+    /** {@inheritDoc} */
+    public SubHyperplane&lt;S&gt; intersection(final SubHyperplane&lt;S&gt; sub) {
+<span class="fc" id="L558">        return recurseIntersection(tree, sub);</span>
+    }
+
+    /** Recursively compute the parts of a sub-hyperplane that are
+     * contained in the region.
+     * @param node current BSP tree node
+     * @param sub sub-hyperplane traversing the region
+     * @return filtered sub-hyperplane
+     */
+    private SubHyperplane&lt;S&gt; recurseIntersection(final BSPTree&lt;S&gt; node, final SubHyperplane&lt;S&gt; sub) {
+
+<span class="fc bfc" id="L569" title="All 2 branches covered.">        if (node.getCut() == null) {</span>
+<span class="fc bfc" id="L570" title="All 2 branches covered.">            return (Boolean) node.getAttribute() ? sub.copySelf() : null;</span>
+        }
+
+<span class="fc" id="L573">        final Hyperplane&lt;S&gt; hyperplane = node.getCut().getHyperplane();</span>
+<span class="pc bpc" id="L574" title="1 of 4 branches missed.">        switch (sub.side(hyperplane)) {</span>
+        case PLUS :
+<span class="nc" id="L576">            return recurseIntersection(node.getPlus(), sub);</span>
+        case MINUS :
+<span class="fc" id="L578">            return recurseIntersection(node.getMinus(), sub);</span>
+        case BOTH :
+<span class="fc" id="L580">            final SubHyperplane.SplitSubHyperplane&lt;S&gt; split = sub.split(hyperplane);</span>
+<span class="fc" id="L581">            final SubHyperplane&lt;S&gt; plus  = recurseIntersection(node.getPlus(),  split.getPlus());</span>
+<span class="fc" id="L582">            final SubHyperplane&lt;S&gt; minus = recurseIntersection(node.getMinus(), split.getMinus());</span>
+<span class="fc bfc" id="L583" title="All 2 branches covered.">            if (plus == null) {</span>
+<span class="fc" id="L584">                return minus;</span>
+<span class="pc bpc" id="L585" title="1 of 2 branches missed.">            } else if (minus == null) {</span>
+<span class="nc" id="L586">                return plus;</span>
+            } else {
+<span class="fc" id="L588">                return plus.reunite(minus);</span>
+            }
+        default :
+<span class="fc" id="L591">            return recurseIntersection(node.getPlus(),</span>
+<span class="fc" id="L592">                                       recurseIntersection(node.getMinus(), sub));</span>
+        }
+
+    }
+
+    /** Transform a region.
+     * &lt;p&gt;Applying a transform to a region consist in applying the
+     * transform to all the hyperplanes of the underlying BSP tree and
+     * of the boundary (and also to the sub-hyperplanes embedded in
+     * these hyperplanes) and to the barycenter. The instance is not
+     * modified, a new instance is built.&lt;/p&gt;
+     * @param transform transform to apply
+     * @return a new region, resulting from the application of the
+     * transform to the instance
+     */
+    public AbstractRegion&lt;S, T&gt; applyTransform(final Transform&lt;S, T&gt; transform) {
+<span class="fc" id="L608">        return buildNew(recurseTransform(getTree(false), transform));</span>
+    }
+
+    /** Recursively transform an inside/outside BSP-tree.
+     * @param node current BSP tree node
+     * @param transform transform to apply
+     * @return a new tree
+     */
+    @SuppressWarnings(&quot;unchecked&quot;)
+    private BSPTree&lt;S&gt; recurseTransform(final BSPTree&lt;S&gt; node, final Transform&lt;S, T&gt; transform) {
+
+<span class="fc bfc" id="L619" title="All 2 branches covered.">        if (node.getCut() == null) {</span>
+<span class="fc" id="L620">            return new BSPTree&lt;S&gt;(node.getAttribute());</span>
+        }
+
+<span class="fc" id="L623">        final SubHyperplane&lt;S&gt;  sub = node.getCut();</span>
+<span class="fc" id="L624">        final SubHyperplane&lt;S&gt; tSub = ((AbstractSubHyperplane&lt;S, T&gt;) sub).applyTransform(transform);</span>
+<span class="fc" id="L625">        BoundaryAttribute&lt;S&gt; attribute = (BoundaryAttribute&lt;S&gt;) node.getAttribute();</span>
+<span class="pc bpc" id="L626" title="1 of 2 branches missed.">        if (attribute != null) {</span>
+<span class="pc bpc" id="L627" title="1 of 2 branches missed.">            final SubHyperplane&lt;S&gt; tPO = (attribute.getPlusOutside() == null) ?</span>
+<span class="pc" id="L628">                null : ((AbstractSubHyperplane&lt;S, T&gt;) attribute.getPlusOutside()).applyTransform(transform);</span>
+<span class="pc bpc" id="L629" title="1 of 2 branches missed.">            final SubHyperplane&lt;S&gt; tPI = (attribute.getPlusInside()  == null) ?</span>
+<span class="pc" id="L630">                null  : ((AbstractSubHyperplane&lt;S, T&gt;) attribute.getPlusInside()).applyTransform(transform);</span>
+<span class="fc" id="L631">            attribute = new BoundaryAttribute&lt;S&gt;(tPO, tPI);</span>
+        }
+
+<span class="fc" id="L634">        return new BSPTree&lt;S&gt;(tSub,</span>
+<span class="fc" id="L635">                                    recurseTransform(node.getPlus(),  transform),</span>
+<span class="fc" id="L636">                                    recurseTransform(node.getMinus(), transform),</span>
+                                    attribute);
+
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

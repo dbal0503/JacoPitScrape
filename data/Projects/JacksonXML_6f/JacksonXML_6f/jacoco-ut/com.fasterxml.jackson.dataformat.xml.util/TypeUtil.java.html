@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TypeUtil.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Jackson-dataformat-XML</a> &gt; <a href="index.source.html" class="el_package">com.fasterxml.jackson.dataformat.xml.util</a> &gt; <span class="el_source">TypeUtil.java</span></div><h1>TypeUtil.java</h1><pre class="source lang-java linenums">package com.fasterxml.jackson.dataformat.xml.util;
+
+import java.util.Collection;
+
+import com.fasterxml.jackson.databind.JavaType;
+
+<span class="nc" id="L7">public class TypeUtil</span>
+{
+    /**
+     * Helper method used for figuring out if given raw type is a collection (&quot;indexed&quot;) type;
+     * in which case a wrapper element is typically added.
+     */
+    public static boolean isIndexedType(JavaType type)
+    {
+<span class="fc bfc" id="L15" title="All 2 branches covered.">        if (type.isContainerType()) {</span>
+<span class="fc" id="L16">            Class&lt;?&gt; cls = type.getRawClass();</span>
+            // One special case; byte[] will be serialized as base64-encoded String, not real array, so:
+            // (actually, ditto for char[]; thought to be a String)
+<span class="pc bpc" id="L19" title="1 of 4 branches missed.">            if (cls == byte[].class || cls == char[].class) {</span>
+<span class="fc" id="L20">                return false;</span>
+            }
+            // Also, should not add wrapping for Maps
+            // [dataformat-xml#220]: nor map-like (Scala Map) types
+<span class="fc bfc" id="L24" title="All 2 branches covered.">            if (type.isMapLikeType()) {</span>
+<span class="fc" id="L25">                return false;</span>
+            }
+<span class="fc" id="L27">            return true;</span>
+        }
+<span class="fc" id="L29">        return false;</span>
+    }    
+
+    public static boolean isIndexedType(Class&lt;?&gt; cls)
+    {
+<span class="pc bpc" id="L34" title="2 of 6 branches missed.">        return (cls.isArray() &amp;&amp; cls != byte[].class &amp;&amp; cls != char[].class)</span>
+<span class="fc bfc" id="L35" title="All 2 branches covered.">                || Collection.class.isAssignableFrom(cls);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

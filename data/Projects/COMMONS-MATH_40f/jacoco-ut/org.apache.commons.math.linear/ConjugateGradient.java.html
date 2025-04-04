@@ -1,0 +1,262 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ConjugateGradient.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Commons Math</a> &gt; <a href="index.source.html" class="el_package">org.apache.commons.math.linear</a> &gt; <span class="el_source">ConjugateGradient.java</span></div><h1>ConjugateGradient.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.commons.math.linear;
+
+import org.apache.commons.math.exception.DimensionMismatchException;
+import org.apache.commons.math.exception.MaxCountExceededException;
+import org.apache.commons.math.exception.NullArgumentException;
+import org.apache.commons.math.exception.util.ExceptionContext;
+import org.apache.commons.math.util.IterationManager;
+
+/**
+ * &lt;p&gt;
+ * This is an implementation of the conjugate gradient method for
+ * {@link RealLinearOperator}. It follows closely the template by &lt;a
+ * href=&quot;#BARR1994&quot;&gt;Barrett et al. (1994)&lt;/a&gt; (figure 2.5). The linear system at
+ * hand is A &amp;middot; x = b, and the residual is r = b - A &amp;middot; x.
+ * &lt;/p&gt;
+ * &lt;h3&gt;&lt;a id=&quot;stopcrit&quot;&gt;Default stopping criterion&lt;/a&gt;&lt;/h3&gt;
+ * &lt;p&gt;
+ * A default stopping criterion is implemented. The iterations stop when || r ||
+ * &amp;le; &amp;delta; || b ||, where b is the right-hand side vector, r the current
+ * estimate of the residual, and &amp;delta; a user-specified tolerance. It should
+ * be noted that r is the so-called &lt;em&gt;updated&lt;/em&gt; residual, which might
+ * differ from the true residual due to rounding-off errors (see e.g. &lt;a
+ * href=&quot;#STRA2002&quot;&gt;Strakos and Tichy, 2002&lt;/a&gt;).
+ * &lt;/p&gt;
+ * &lt;h3&gt;Iteration count&lt;/h3&gt;
+ * &lt;p&gt;
+ * In the present context, an iteration should be understood as one evaluation
+ * of the matrix-vector product A &amp;middot; x. The initialization phase therefore
+ * counts as one iteration.
+ * &lt;/p&gt;
+ * &lt;h3&gt;&lt;a id=&quot;context&quot;&gt;Exception context&lt;/a&gt;&lt;/h3&gt;
+ * &lt;p&gt;
+ * Besides standard {@link DimensionMismatchException}, this class might throw
+ * {@link NonPositiveDefiniteOperatorException} if the linear operator or
+ * the preconditioner are not positive definite. In this case, the
+ * {@link ExceptionContext} provides some more information
+ * &lt;ul&gt;
+ * &lt;li&gt;key {@code &quot;operator&quot;} points to the offending linear operator, say L,&lt;/li&gt;
+ * &lt;li&gt;key {@code &quot;vector&quot;} points to the offending vector, say x, such that
+ * x&lt;sup&gt;T&lt;/sup&gt; &amp;middot; L &amp;middot; x &lt; 0.&lt;/li&gt;
+ * &lt;/ul&gt;
+ * &lt;/p&gt;
+ * &lt;h3&gt;References&lt;/h3&gt;
+ * &lt;dl&gt;
+ * &lt;dt&gt;&lt;a id=&quot;BARR1994&quot;&gt;Barret et al. (1994)&lt;/a&gt;&lt;/dt&gt;
+ * &lt;dd&gt;R. Barrett, M. Berry, T. F. Chan, J. Demmel, J. M. Donato, J. Dongarra,
+ * V. Eijkhout, R. Pozo, C. Romine and H. Van der Vorst,
+ * &lt;a href=&quot;http://www.netlib.org/linalg/html_templates/Templates.html&quot;&gt;&lt;em&gt;
+ * Templates for the Solution of Linear Systems: Building Blocks for Iterative
+ * Methods&lt;/em&gt;&lt;/a&gt;, SIAM&lt;/dd&gt;
+ * &lt;dt&gt;&lt;a id=&quot;STRA2002&quot;&gt;Strakos and Tichy (2002)
+ * &lt;dt&gt;
+ * &lt;dd&gt;Z. Strakos and P. Tichy, &lt;a
+ * href=&quot;http://etna.mcs.kent.edu/vol.13.2002/pp56-80.dir/pp56-80.pdf&quot;&gt;
+ * &lt;em&gt;On error estimation in the conjugate gradient method and why it works
+ * in finite precision computations&lt;/em&gt;&lt;/a&gt;, Electronic Transactions on
+ * Numerical Analysis 13: 56-80, 2002&lt;/dd&gt;
+ * &lt;/dl&gt;
+ *
+ * @version $Id$
+ * @since 3.0
+ */
+public class ConjugateGradient
+    extends PreconditionedIterativeLinearSolver {
+
+    /**
+     * The type of all events fired by this implementation of the Conjugate
+     * Gradient method.
+     *
+     * @version $Id: ConjugateGradient.java 1175404 2011-09-25 14:48:18Z
+     * celestin $
+     */
+    public abstract static class ConjugateGradientEvent
+        extends IterativeLinearSolverEvent
+        implements ProvidesResidual {
+
+        /** */
+        private static final long serialVersionUID = 6461730085343318121L;
+
+        /**
+         * Creates a new instance of this class.
+         *
+         * @param source The iterative algorithm on which the event initially
+         * occurred.
+         */
+        public ConjugateGradientEvent(final Object source) {
+<span class="fc" id="L103">            super(source);</span>
+<span class="fc" id="L104">        }</span>
+    }
+
+    /** Key for the &lt;a href=&quot;#context&quot;&gt;exception context&lt;/a&gt;. */
+    public static final String OPERATOR = &quot;operator&quot;;
+
+    /** Key for the &lt;a href=&quot;#context&quot;&gt;exception context&lt;/a&gt;. */
+    public static final String VECTOR = &quot;vector&quot;;
+
+    /**
+     * {@code true} if positive-definiteness of matrix and preconditioner should
+     * be checked.
+     */
+    private boolean check;
+
+    /** The value of &amp;delta;, for the default stopping criterion. */
+    private final double delta;
+
+    /**
+     * Creates a new instance of this class, with &lt;a href=&quot;#stopcrit&quot;&gt;default
+     * stopping criterion&lt;/a&gt;.
+     *
+     * @param maxIterations Maximum number of iterations.
+     * @param delta &amp;delta; parameter for the default stopping criterion.
+     * @param check {@code true} if positive definiteness of both matrix and
+     * preconditioner should be checked.
+     */
+    public ConjugateGradient(final int maxIterations, final double delta,
+                             final boolean check) {
+<span class="fc" id="L133">        super(maxIterations);</span>
+<span class="fc" id="L134">        this.delta = delta;</span>
+<span class="fc" id="L135">        this.check = check;</span>
+<span class="fc" id="L136">    }</span>
+
+    /**
+     * Creates a new instance of this class, with &lt;a href=&quot;#stopcrit&quot;&gt;default
+     * stopping criterion&lt;/a&gt; and custom iteration manager.
+     *
+     * @param manager Custom iteration manager.
+     * @param delta &amp;delta; parameter for the default stopping criterion.
+     * @param check {@code true} if positive definiteness of both matrix and
+     * preconditioner should be checked.
+     */
+    public ConjugateGradient(final IterationManager manager,
+                             final double delta, final boolean check) {
+<span class="nc" id="L149">        super(manager);</span>
+<span class="nc" id="L150">        this.delta = delta;</span>
+<span class="nc" id="L151">        this.check = check;</span>
+<span class="nc" id="L152">    }</span>
+
+    /**
+     * Returns {@code true} if positive-definiteness should be checked for both
+     * matrix and preconditioner.
+     *
+     * @return {@code true} if the tests are to be performed.
+     */
+    public final boolean getCheck() {
+<span class="nc" id="L161">        return check;</span>
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public RealVector solveInPlace(final RealLinearOperator a,
+                                   final InvertibleRealLinearOperator m,
+                                   final RealVector b, final RealVector x0)
+        throws NullArgumentException, NonSquareOperatorException,
+        DimensionMismatchException, MaxCountExceededException {
+<span class="fc" id="L171">        checkParameters(a, m, b, x0);</span>
+<span class="fc" id="L172">        final IterationManager manager = getIterationManager();</span>
+        // Initialization of default stopping criterion
+<span class="fc" id="L174">        manager.resetIterationCount();</span>
+<span class="fc" id="L175">        final double r2max = delta * delta * b.dotProduct(b);</span>
+
+        // Initialization phase counts as one iteration.
+<span class="fc" id="L178">        manager.incrementIterationCount();</span>
+        // p and x are constructed as copies of x0, since presumably, the type
+        // of x is optimized for the calculation of the matrix-vector product
+        // A.x.
+<span class="fc" id="L182">        final RealVector x = x0;</span>
+<span class="fc" id="L183">        final RealVector p = x.copy();</span>
+<span class="fc" id="L184">        RealVector q = a.operate(p);</span>
+
+<span class="fc" id="L186">        final RealVector r = b.combine(1, -1, q);</span>
+<span class="fc" id="L187">        double r2 = r.dotProduct(r);</span>
+        RealVector z;
+<span class="fc bfc" id="L189" title="All 2 branches covered.">        if (m == null) {</span>
+<span class="fc" id="L190">            z = r;</span>
+        } else {
+<span class="fc" id="L192">            z = null;</span>
+        }
+        final IterativeLinearSolverEvent event;
+<span class="fc" id="L195">        event = new ConjugateGradientEvent(this) {</span>
+
+            private static final long serialVersionUID = 756911840348776676L;
+
+            public RealVector getResidual() {
+<span class="fc" id="L200">                return ArrayRealVector.unmodifiableRealVector(r);</span>
+            }
+
+            @Override
+            public RealVector getRightHandSideVector() {
+<span class="nc" id="L205">                return ArrayRealVector.unmodifiableRealVector(b);</span>
+            }
+
+            @Override
+            public RealVector getSolution() {
+<span class="fc" id="L210">                return ArrayRealVector.unmodifiableRealVector(x);</span>
+            }
+        };
+<span class="fc" id="L213">        manager.fireInitializationEvent(event);</span>
+<span class="pc bpc" id="L214" title="1 of 2 branches missed.">        if (r2 &lt;= r2max) {</span>
+<span class="nc" id="L215">            manager.fireTerminationEvent(event);</span>
+<span class="nc" id="L216">            return x;</span>
+        }
+<span class="fc" id="L218">        double rhoPrev = 0.;</span>
+        while (true) {
+<span class="fc" id="L220">            manager.incrementIterationCount();</span>
+<span class="fc" id="L221">            manager.fireIterationStartedEvent(event);</span>
+<span class="fc bfc" id="L222" title="All 2 branches covered.">            if (m != null) {</span>
+<span class="fc" id="L223">                z = m.solve(r);</span>
+            }
+<span class="fc" id="L225">            final double rhoNext = r.dotProduct(z);</span>
+<span class="pc bpc" id="L226" title="1 of 4 branches missed.">            if (check &amp;&amp; (rhoNext &lt;= 0.)) {</span>
+                final NonPositiveDefiniteOperatorException e;
+<span class="fc" id="L228">                e = new NonPositiveDefiniteOperatorException();</span>
+<span class="fc" id="L229">                final ExceptionContext context = e.getContext();</span>
+<span class="fc" id="L230">                context.setValue(OPERATOR, m);</span>
+<span class="fc" id="L231">                context.setValue(VECTOR, r);</span>
+<span class="fc" id="L232">                throw e;</span>
+            }
+<span class="fc bfc" id="L234" title="All 2 branches covered.">            if (manager.getIterations() == 2) {</span>
+<span class="fc" id="L235">                p.setSubVector(0, z);</span>
+            } else {
+<span class="fc" id="L237">                p.combineToSelf(rhoNext / rhoPrev, 1., z);</span>
+            }
+<span class="fc" id="L239">            q = a.operate(p);</span>
+<span class="fc" id="L240">            final double pq = p.dotProduct(q);</span>
+<span class="pc bpc" id="L241" title="1 of 4 branches missed.">            if (check &amp;&amp; (pq &lt;= 0.)) {</span>
+                final NonPositiveDefiniteOperatorException e;
+<span class="fc" id="L243">                e = new NonPositiveDefiniteOperatorException();</span>
+<span class="fc" id="L244">                final ExceptionContext context = e.getContext();</span>
+<span class="fc" id="L245">                context.setValue(OPERATOR, a);</span>
+<span class="fc" id="L246">                context.setValue(VECTOR, p);</span>
+<span class="fc" id="L247">                throw e;</span>
+            }
+<span class="fc" id="L249">            final double alpha = rhoNext / pq;</span>
+<span class="fc" id="L250">            x.combineToSelf(1., alpha, p);</span>
+<span class="fc" id="L251">            r.combineToSelf(1., -alpha, q);</span>
+<span class="fc" id="L252">            rhoPrev = rhoNext;</span>
+<span class="fc" id="L253">            r2 = r.dotProduct(r);</span>
+<span class="fc" id="L254">            manager.fireIterationPerformedEvent(event);</span>
+<span class="fc bfc" id="L255" title="All 2 branches covered.">            if (r2 &lt;= r2max) {</span>
+<span class="fc" id="L256">                manager.fireTerminationEvent(event);</span>
+<span class="fc" id="L257">                return x;</span>
+            }
+<span class="fc" id="L259">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

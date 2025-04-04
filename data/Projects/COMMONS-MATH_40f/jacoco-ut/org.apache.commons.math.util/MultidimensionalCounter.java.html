@@ -1,0 +1,297 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MultidimensionalCounter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Commons Math</a> &gt; <a href="index.source.html" class="el_package">org.apache.commons.math.util</a> &gt; <span class="el_source">MultidimensionalCounter.java</span></div><h1>MultidimensionalCounter.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.commons.math.util;
+
+import org.apache.commons.math.exception.DimensionMismatchException;
+import org.apache.commons.math.exception.OutOfRangeException;
+import org.apache.commons.math.exception.NotStrictlyPositiveException;
+
+/**
+ * Converter between unidimensional storage structure and multidimensional
+ * conceptual structure.
+ * This utility will convert from indices in a multidimensional structure
+ * to the corresponding index in a one-dimensional array. For example,
+ * assuming that the ranges (in 3 dimensions) of indices are 2, 4 and 3,
+ * the following correspondences, between 3-tuples indices and unidimensional
+ * indices, will hold:
+ * &lt;ul&gt;
+ *  &lt;li&gt;(0, 0, 0) corresponds to 0&lt;/li&gt;
+ *  &lt;li&gt;(0, 0, 1) corresponds to 1&lt;/li&gt;
+ *  &lt;li&gt;(0, 0, 2) corresponds to 2&lt;/li&gt;
+ *  &lt;li&gt;(0, 1, 0) corresponds to 3&lt;/li&gt;
+ *  &lt;li&gt;...&lt;/li&gt;
+ *  &lt;li&gt;(1, 0, 0) corresponds to 12&lt;/li&gt;
+ *  &lt;li&gt;...&lt;/li&gt;
+ *  &lt;li&gt;(1, 3, 2) corresponds to 23&lt;/li&gt;
+ * &lt;/ul&gt;
+ * @version $Id$
+ * @since 2.2
+ */
+public class MultidimensionalCounter implements Iterable&lt;Integer&gt; {
+    /**
+     * Number of dimensions.
+     */
+    private final int dimension;
+    /**
+     * Offset for each dimension.
+     */
+    private final int[] uniCounterOffset;
+    /**
+     * Counter sizes.
+     */
+    private final int[] size;
+    /**
+     * Total number of (one-dimensional) slots.
+     */
+    private final int totalSize;
+    /**
+     * Index of last dimension.
+     */
+    private final int last;
+
+    /**
+     * Perform iteration over the multidimensional counter.
+     */
+    public class Iterator implements java.util.Iterator&lt;Integer&gt; {
+        /**
+         * Multidimensional counter.
+         */
+<span class="fc" id="L74">        private final int[] counter = new int[dimension];</span>
+        /**
+         * Unidimensional counter.
+         */
+<span class="fc" id="L78">        private int count = -1;</span>
+
+        /**
+         * Create an iterator
+         * @see #iterator()
+         */
+<span class="fc" id="L84">        Iterator() {</span>
+<span class="fc" id="L85">            counter[last] = -1;</span>
+<span class="fc" id="L86">        }</span>
+
+        /**
+         * {@inheritDoc}
+         */
+        public boolean hasNext() {
+<span class="fc bfc" id="L92" title="All 2 branches covered.">            for (int i = 0; i &lt; dimension; i++) {</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">                if (counter[i] != size[i] - 1) {</span>
+<span class="fc" id="L94">                    return true;</span>
+                }
+            }
+<span class="fc" id="L97">            return false;</span>
+        }
+
+        /**
+         * @return the unidimensional count after the counter has been
+         * incremented by {@code 1}.
+         */
+        public Integer next() {
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">            for (int i = last; i &gt;= 0; i--) {</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">                if (counter[i] == size[i] - 1) {</span>
+<span class="fc" id="L107">                    counter[i] = 0;</span>
+                } else {
+<span class="fc" id="L109">                    ++counter[i];</span>
+<span class="fc" id="L110">                    break;</span>
+                }
+            }
+
+<span class="fc" id="L114">            return ++count;</span>
+        }
+
+        /**
+         * Get the current unidimensional counter slot.
+         *
+         * @return the index within the unidimensionl counter.
+         */
+        public int getCount() {
+<span class="nc" id="L123">            return count;</span>
+        }
+        /**
+         * Get the current multidimensional counter slots.
+         *
+         * @return the indices within the multidimensional counter.
+         */
+        public int[] getCounts() {
+<span class="nc" id="L131">            return MathArrays.copyOf(counter);</span>
+        }
+
+        /**
+         * Get the current count in the selected dimension.
+         *
+         * @param dim Dimension index.
+         * @return the count at the corresponding index for the current state
+         * of the iterator.
+         * @throws IndexOutOfBoundsException if {@code index} is not in the
+         * correct interval (as defined by the length of the argument in the
+         * {@link MultidimensionalCounter#MultidimensionalCounter(int[])
+         * constructor of the enclosing class}).
+         */
+        public int getCount(int dim) {
+<span class="fc" id="L146">            return counter[dim];</span>
+        }
+
+        /**
+         * @throws UnsupportedOperationException
+         */
+        public void remove() {
+<span class="nc" id="L153">            throw new UnsupportedOperationException();</span>
+        }
+    }
+
+    /**
+     * Create a counter.
+     *
+     * @param size Counter sizes (number of slots in each dimension).
+     * @throws NotStrictlyPositiveException if one of the sizes is
+     * negative or zero.
+     */
+<span class="fc" id="L164">    public MultidimensionalCounter(int ... size) {</span>
+<span class="fc" id="L165">        dimension = size.length;</span>
+<span class="fc" id="L166">        this.size = MathArrays.copyOf(size);</span>
+
+<span class="fc" id="L168">        uniCounterOffset = new int[dimension];</span>
+
+<span class="fc" id="L170">        last = dimension - 1;</span>
+<span class="fc" id="L171">        int tS = size[last];</span>
+<span class="fc bfc" id="L172" title="All 2 branches covered.">        for (int i = 0; i &lt; last; i++) {</span>
+<span class="fc" id="L173">            int count = 1;</span>
+<span class="fc bfc" id="L174" title="All 2 branches covered.">            for (int j = i + 1; j &lt; dimension; j++) {</span>
+<span class="fc" id="L175">                count *= size[j];</span>
+            }
+<span class="fc" id="L177">            uniCounterOffset[i] = count;</span>
+<span class="fc" id="L178">            tS *= size[i];</span>
+        }
+<span class="fc" id="L180">        uniCounterOffset[last] = 0;</span>
+
+<span class="fc bfc" id="L182" title="All 2 branches covered.">        if (tS &lt;= 0) {</span>
+<span class="fc" id="L183">            throw new NotStrictlyPositiveException(tS);</span>
+        }
+
+<span class="fc" id="L186">        totalSize = tS;</span>
+<span class="fc" id="L187">    }</span>
+
+    /**
+     * Create an iterator over this counter.
+     *
+     * @return the iterator.
+     */
+    public Iterator iterator() {
+<span class="fc" id="L195">        return new Iterator();</span>
+    }
+
+    /**
+     * Get the number of dimensions of the multidimensional counter.
+     *
+     * @return the number of dimensions.
+     */
+    public int getDimension() {
+<span class="fc" id="L204">        return dimension;</span>
+    }
+
+    /**
+     * Convert to multidimensional counter.
+     *
+     * @param index Index in unidimensional counter.
+     * @return the multidimensional counts.
+     * @throws OutOfRangeException if {@code index} is not between
+     * {@code 0} and the value returned by {@link #getSize()} (excluded).
+     */
+    public int[] getCounts(int index) {
+<span class="fc bfc" id="L216" title="All 4 branches covered.">        if (index &lt; 0 ||</span>
+            index &gt;= totalSize) {
+<span class="fc" id="L218">            throw new OutOfRangeException(index, 0, totalSize);</span>
+        }
+
+<span class="fc" id="L221">        final int[] indices = new int[dimension];</span>
+
+<span class="fc" id="L223">        int count = 0;</span>
+<span class="fc bfc" id="L224" title="All 2 branches covered.">        for (int i = 0; i &lt; last; i++) {</span>
+<span class="fc" id="L225">            int idx = 0;</span>
+<span class="fc" id="L226">            final int offset = uniCounterOffset[i];</span>
+<span class="fc bfc" id="L227" title="All 2 branches covered.">            while (count &lt;= index) {</span>
+<span class="fc" id="L228">                count += offset;</span>
+<span class="fc" id="L229">                ++idx;</span>
+            }
+<span class="fc" id="L231">            --idx;</span>
+<span class="fc" id="L232">            count -= offset;</span>
+<span class="fc" id="L233">            indices[i] = idx;</span>
+        }
+
+<span class="fc" id="L236">        indices[last] = index - count;</span>
+
+<span class="fc" id="L238">        return indices;</span>
+    }
+
+    /**
+     * Convert to unidimensional counter.
+     *
+     * @param c Indices in multidimensional counter.
+     * @return the index within the unidimensionl counter.
+     * @throws DimensionMismatchException if the size of {@code c}
+     * does not match the size of the array given in the constructor.
+     * @throws OutOfRangeException if a value of {@code c} is not in
+     * the range of the corresponding dimension, as defined in the
+     * {@link MultidimensionalCounter#MultidimensionalCounter(int...) constructor}.
+     */
+    public int getCount(int ... c) throws OutOfRangeException {
+<span class="fc bfc" id="L253" title="All 2 branches covered.">        if (c.length != dimension) {</span>
+<span class="fc" id="L254">            throw new DimensionMismatchException(c.length, dimension);</span>
+        }
+<span class="fc" id="L256">        int count = 0;</span>
+<span class="fc bfc" id="L257" title="All 2 branches covered.">        for (int i = 0; i &lt; dimension; i++) {</span>
+<span class="fc" id="L258">            final int index = c[i];</span>
+<span class="fc bfc" id="L259" title="All 4 branches covered.">            if (index &lt; 0 ||</span>
+                index &gt;= size[i]) {
+<span class="fc" id="L261">                throw new OutOfRangeException(index, 0, size[i] - 1);</span>
+            }
+<span class="fc" id="L263">            count += uniCounterOffset[i] * c[i];</span>
+        }
+<span class="fc" id="L265">        return count + c[last];</span>
+    }
+
+    /**
+     * Get the total number of elements.
+     *
+     * @return the total size of the unidimensional counter.
+     */
+    public int getSize() {
+<span class="fc" id="L274">        return totalSize;</span>
+    }
+    /**
+     * Get the number of multidimensional counter slots in each dimension.
+     *
+     * @return the sizes of the multidimensional counter in each dimension.
+     */
+    public int[] getSizes() {
+<span class="fc" id="L282">        return MathArrays.copyOf(size);</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public String toString() {
+<span class="nc" id="L290">        final StringBuilder sb = new StringBuilder();</span>
+<span class="nc bnc" id="L291" title="All 2 branches missed.">        for (int i = 0; i &lt; dimension; i++) {</span>
+<span class="nc" id="L292">            sb.append(&quot;[&quot;).append(getCount(i)).append(&quot;]&quot;);</span>
+        }
+<span class="nc" id="L294">        return sb.toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

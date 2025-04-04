@@ -1,0 +1,902 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FastFourierTransformer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Commons Math</a> &gt; <a href="index.source.html" class="el_package">org.apache.commons.math.transform</a> &gt; <span class="el_source">FastFourierTransformer.java</span></div><h1>FastFourierTransformer.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.commons.math.transform;
+
+import java.io.Serializable;
+import java.lang.reflect.Array;
+
+import org.apache.commons.math.MathRuntimeException;
+import org.apache.commons.math.analysis.UnivariateFunction;
+import org.apache.commons.math.complex.Complex;
+import org.apache.commons.math.exception.util.LocalizedFormats;
+import org.apache.commons.math.util.FastMath;
+
+/**
+ * Implements the &lt;a href=&quot;http://mathworld.wolfram.com/FastFourierTransform.html&quot;&gt;
+ * Fast Fourier Transform&lt;/a&gt; for transformation of one-dimensional data sets.
+ * For reference, see &lt;b&gt;Applied Numerical Linear Algebra&lt;/b&gt;, ISBN 0898713897,
+ * chapter 6.
+ * &lt;p&gt;
+ * There are several conventions for the definition of FFT and inverse FFT,
+ * mainly on different coefficient and exponent. Here the equations are listed
+ * in the comments of the corresponding methods.&lt;/p&gt;
+ * &lt;p&gt;
+ * We require the length of data set to be power of 2, this greatly simplifies
+ * and speeds up the code. Users can pad the data with zeros to meet this
+ * requirement. There are other flavors of FFT, for reference, see S. Winograd,
+ * &lt;i&gt;On computing the discrete Fourier transform&lt;/i&gt;, Mathematics of Computation,
+ * 32 (1978), 175 - 199.&lt;/p&gt;
+ *
+ * @version $Id$
+ * @since 1.2
+ */
+public class FastFourierTransformer implements Serializable {
+
+    /** Serializable version identifier. */
+    static final long serialVersionUID = 5138259215438106000L;
+
+    /** The roots of unity. */
+<span class="fc" id="L53">    private RootsOfUnity roots = new RootsOfUnity();</span>
+
+    /** Construct a default transformer. */
+    public FastFourierTransformer() {
+<span class="fc" id="L57">        super();</span>
+<span class="fc" id="L58">    }</span>
+
+    /**
+     * Transform the given real data set.
+     * &lt;p&gt;
+     * The formula is $ y_n = \Sigma_{k=0}^{N-1} e^{-2 \pi i nk/N} x_k $
+     * &lt;/p&gt;
+     *
+     * @param f the real data array to be transformed
+     * @return the complex transformed array
+     * @throws IllegalArgumentException if any parameters are invalid
+     */
+    public Complex[] transform(double[] f)
+        throws IllegalArgumentException {
+<span class="fc" id="L72">        return fft(f, false);</span>
+    }
+
+    /**
+     * Transform the given real function, sampled on the given interval.
+     * &lt;p&gt;
+     * The formula is $ y_n = \Sigma_{k=0}^{N-1} e^{-2 \pi i nk/N} x_k $
+     * &lt;/p&gt;
+     *
+     * @param f the function to be sampled and transformed
+     * @param min the lower bound for the interval
+     * @param max the upper bound for the interval
+     * @param n the number of sample points
+     * @return the complex transformed array
+     * @throws IllegalArgumentException if any parameters are invalid
+     */
+    public Complex[] transform(UnivariateFunction f,
+                               double min, double max, int n)
+        throws IllegalArgumentException {
+<span class="fc" id="L91">        double[] data = sample(f, min, max, n);</span>
+<span class="fc" id="L92">        return fft(data, false);</span>
+    }
+
+    /**
+     * Transform the given complex data set.
+     * &lt;p&gt;
+     * The formula is $ y_n = \Sigma_{k=0}^{N-1} e^{-2 \pi i nk/N} x_k $
+     * &lt;/p&gt;
+     *
+     * @param f the complex data array to be transformed
+     * @return the complex transformed array
+     * @throws IllegalArgumentException if any parameters are invalid
+     */
+    public Complex[] transform(Complex[] f)
+        throws IllegalArgumentException {
+<span class="nc" id="L107">        roots.computeOmega(f.length);</span>
+<span class="nc" id="L108">        return fft(f);</span>
+    }
+
+    /**
+     * Transform the given real data set.
+     * &lt;p&gt;
+     * The formula is $y_n = (1/\sqrt{N}) \Sigma_{k=0}^{N-1} e^{-2 \pi i nk/N} x_k$
+     * &lt;/p&gt;
+     *
+     * @param f the real data array to be transformed
+     * @return the complex transformed array
+     * @throws IllegalArgumentException if any parameters are invalid
+     */
+    public Complex[] transform2(double[] f)
+        throws IllegalArgumentException {
+
+<span class="nc" id="L124">        double scalingCoefficient = 1.0 / FastMath.sqrt(f.length);</span>
+<span class="nc" id="L125">        return scaleArray(fft(f, false), scalingCoefficient);</span>
+    }
+
+    /**
+     * Transform the given real function, sampled on the given interval.
+     * &lt;p&gt;
+     * The formula is $y_n = (1/\sqrt{N}) \Sigma_{k=0}^{N-1} e^{-2 \pi i nk/N} x_k$
+     * &lt;/p&gt;
+     *
+     * @param f the function to be sampled and transformed
+     * @param min the lower bound for the interval
+     * @param max the upper bound for the interval
+     * @param n the number of sample points
+     * @return the complex transformed array
+     * @throws IllegalArgumentException if any parameters are invalid
+     */
+    public Complex[] transform2(UnivariateFunction f,
+                                double min, double max, int n)
+        throws IllegalArgumentException {
+
+<span class="nc" id="L145">        double[] data = sample(f, min, max, n);</span>
+<span class="nc" id="L146">        double scalingCoefficient = 1.0 / FastMath.sqrt(n);</span>
+<span class="nc" id="L147">        return scaleArray(fft(data, false), scalingCoefficient);</span>
+    }
+
+    /**
+     * Transform the given complex data set.
+     * &lt;p&gt;
+     * The formula is $y_n = (1/\sqrt{N}) \Sigma_{k=0}^{N-1} e^{-2 \pi i nk/N} x_k$
+     * &lt;/p&gt;
+     *
+     * @param f the complex data array to be transformed
+     * @return the complex transformed array
+     * @throws IllegalArgumentException if any parameters are invalid
+     */
+    public Complex[] transform2(Complex[] f)
+        throws IllegalArgumentException {
+
+<span class="fc" id="L163">        roots.computeOmega(f.length);</span>
+<span class="fc" id="L164">        double scalingCoefficient = 1.0 / FastMath.sqrt(f.length);</span>
+<span class="fc" id="L165">        return scaleArray(fft(f), scalingCoefficient);</span>
+    }
+
+    /**
+     * Inversely transform the given real data set.
+     * &lt;p&gt;
+     * The formula is $ x_k = (1/N) \Sigma_{n=0}^{N-1} e^{2 \pi i nk/N} y_n $
+     * &lt;/p&gt;
+     *
+     * @param f the real data array to be inversely transformed
+     * @return the complex inversely transformed array
+     * @throws IllegalArgumentException if any parameters are invalid
+     */
+    public Complex[] inverseTransform(double[] f)
+        throws IllegalArgumentException {
+
+<span class="nc" id="L181">        double scalingCoefficient = 1.0 / f.length;</span>
+<span class="nc" id="L182">        return scaleArray(fft(f, true), scalingCoefficient);</span>
+    }
+
+    /**
+     * Inversely transform the given real function, sampled on the given interval.
+     * &lt;p&gt;
+     * The formula is $ x_k = (1/N) \Sigma_{n=0}^{N-1} e^{2 \pi i nk/N} y_n $
+     * &lt;/p&gt;
+     *
+     * @param f the function to be sampled and inversely transformed
+     * @param min the lower bound for the interval
+     * @param max the upper bound for the interval
+     * @param n the number of sample points
+     * @return the complex inversely transformed array
+     * @throws IllegalArgumentException if any parameters are invalid
+     */
+    public Complex[] inverseTransform(UnivariateFunction f,
+                                      double min, double max, int n)
+        throws IllegalArgumentException {
+
+<span class="fc" id="L202">        double[] data = sample(f, min, max, n);</span>
+<span class="fc" id="L203">        double scalingCoefficient = 1.0 / n;</span>
+<span class="fc" id="L204">        return scaleArray(fft(data, true), scalingCoefficient);</span>
+    }
+
+    /**
+     * Inversely transform the given complex data set.
+     * &lt;p&gt;
+     * The formula is $ x_k = (1/N) \Sigma_{n=0}^{N-1} e^{2 \pi i nk/N} y_n $
+     * &lt;/p&gt;
+     *
+     * @param f the complex data array to be inversely transformed
+     * @return the complex inversely transformed array
+     * @throws IllegalArgumentException if any parameters are invalid
+     */
+    public Complex[] inverseTransform(Complex[] f)
+        throws IllegalArgumentException {
+
+<span class="fc" id="L220">        roots.computeOmega(-f.length);    // pass negative argument</span>
+<span class="fc" id="L221">        double scalingCoefficient = 1.0 / f.length;</span>
+<span class="fc" id="L222">        return scaleArray(fft(f), scalingCoefficient);</span>
+    }
+
+    /**
+     * Inversely transform the given real data set.
+     * &lt;p&gt;
+     * The formula is $x_k = (1/\sqrt{N}) \Sigma_{n=0}^{N-1} e^{2 \pi i nk/N} y_n$
+     * &lt;/p&gt;
+     *
+     * @param f the real data array to be inversely transformed
+     * @return the complex inversely transformed array
+     * @throws IllegalArgumentException if any parameters are invalid
+     */
+    public Complex[] inverseTransform2(double[] f)
+        throws IllegalArgumentException {
+
+<span class="fc" id="L238">        double scalingCoefficient = 1.0 / FastMath.sqrt(f.length);</span>
+<span class="fc" id="L239">        return scaleArray(fft(f, true), scalingCoefficient);</span>
+    }
+
+    /**
+     * Inversely transform the given real function, sampled on the given interval.
+     * &lt;p&gt;
+     * The formula is $x_k = (1/\sqrt{N}) \Sigma_{n=0}^{N-1} e^{2 \pi i nk/N} y_n$
+     * &lt;/p&gt;
+     *
+     * @param f the function to be sampled and inversely transformed
+     * @param min the lower bound for the interval
+     * @param max the upper bound for the interval
+     * @param n the number of sample points
+     * @return the complex inversely transformed array
+     * @throws IllegalArgumentException if any parameters are invalid
+     */
+    public Complex[] inverseTransform2(UnivariateFunction f,
+                                       double min, double max, int n)
+        throws IllegalArgumentException {
+
+<span class="nc" id="L259">        double[] data = sample(f, min, max, n);</span>
+<span class="nc" id="L260">        double scalingCoefficient = 1.0 / FastMath.sqrt(n);</span>
+<span class="nc" id="L261">        return scaleArray(fft(data, true), scalingCoefficient);</span>
+    }
+
+    /**
+     * Inversely transform the given complex data set.
+     * &lt;p&gt;
+     * The formula is $x_k = (1/\sqrt{N}) \Sigma_{n=0}^{N-1} e^{2 \pi i nk/N} y_n$
+     * &lt;/p&gt;
+     *
+     * @param f the complex data array to be inversely transformed
+     * @return the complex inversely transformed array
+     * @throws IllegalArgumentException if any parameters are invalid
+     */
+    public Complex[] inverseTransform2(Complex[] f)
+        throws IllegalArgumentException {
+
+<span class="fc" id="L277">        roots.computeOmega(-f.length);    // pass negative argument</span>
+<span class="fc" id="L278">        double scalingCoefficient = 1.0 / FastMath.sqrt(f.length);</span>
+<span class="fc" id="L279">        return scaleArray(fft(f), scalingCoefficient);</span>
+    }
+
+    /**
+     * Perform the base-4 Cooley-Tukey FFT algorithm (including inverse).
+     *
+     * @param f the real data array to be transformed
+     * @param isInverse the indicator of forward or inverse transform
+     * @return the complex transformed array
+     * @throws IllegalArgumentException if any parameters are invalid
+     */
+    protected Complex[] fft(double[] f, boolean isInverse)
+        throws IllegalArgumentException {
+
+<span class="fc" id="L293">        verifyDataSet(f);</span>
+<span class="fc" id="L294">        Complex[] transformed = new Complex[f.length];</span>
+<span class="pc bpc" id="L295" title="1 of 2 branches missed.">        if (f.length == 1) {</span>
+<span class="nc" id="L296">            transformed[0] = new Complex(f[0], 0.0);</span>
+<span class="nc" id="L297">            return transformed;</span>
+        }
+
+        // Rather than the naive real to complex conversion, pack 2N
+        // real numbers into N complex numbers for better performance.
+<span class="fc" id="L302">        int n = f.length &gt;&gt; 1;</span>
+<span class="fc" id="L303">        Complex[] repacked = new Complex[n];</span>
+<span class="fc bfc" id="L304" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L305">            repacked[i] = new Complex(f[2 * i], f[2 * i + 1]);</span>
+        }
+<span class="fc bfc" id="L307" title="All 2 branches covered.">        roots.computeOmega(isInverse ? -n : n);</span>
+<span class="fc" id="L308">        Complex[] z = fft(repacked);</span>
+
+        // reconstruct the FFT result for the original array
+<span class="fc bfc" id="L311" title="All 2 branches covered.">        roots.computeOmega(isInverse ? -2 * n : 2 * n);</span>
+<span class="fc" id="L312">        transformed[0] = new Complex(2 * (z[0].getReal() + z[0].getImaginary()), 0.0);</span>
+<span class="fc" id="L313">        transformed[n] = new Complex(2 * (z[0].getReal() - z[0].getImaginary()), 0.0);</span>
+<span class="fc bfc" id="L314" title="All 2 branches covered.">        for (int i = 1; i &lt; n; i++) {</span>
+<span class="fc" id="L315">            Complex a = z[n - i].conjugate();</span>
+<span class="fc" id="L316">            Complex b = z[i].add(a);</span>
+<span class="fc" id="L317">            Complex c = z[i].subtract(a);</span>
+            //Complex D = roots.getOmega(i).multiply(Complex.I);
+<span class="fc" id="L319">            Complex d = new Complex(-roots.getOmegaImaginary(i),</span>
+<span class="fc" id="L320">                                    roots.getOmegaReal(i));</span>
+<span class="fc" id="L321">            transformed[i] = b.subtract(c.multiply(d));</span>
+<span class="fc" id="L322">            transformed[2 * n - i] = transformed[i].conjugate();</span>
+        }
+
+<span class="fc" id="L325">        return scaleArray(transformed, 0.5);</span>
+    }
+
+    /**
+     * Perform the base-4 Cooley-Tukey FFT algorithm (including inverse).
+     *
+     * @param data the complex data array to be transformed
+     * @return the complex transformed array
+     * @throws IllegalArgumentException if any parameters are invalid
+     */
+    protected Complex[] fft(Complex[] data)
+        throws IllegalArgumentException {
+
+<span class="fc" id="L338">        final int n = data.length;</span>
+<span class="fc" id="L339">        final Complex[] f = new Complex[n];</span>
+
+        // initial simple cases
+<span class="fc" id="L342">        verifyDataSet(data);</span>
+<span class="pc bpc" id="L343" title="1 of 2 branches missed.">        if (n == 1) {</span>
+<span class="nc" id="L344">            f[0] = data[0];</span>
+<span class="nc" id="L345">            return f;</span>
+        }
+<span class="fc bfc" id="L347" title="All 2 branches covered.">        if (n == 2) {</span>
+<span class="fc" id="L348">            f[0] = data[0].add(data[1]);</span>
+<span class="fc" id="L349">            f[1] = data[0].subtract(data[1]);</span>
+<span class="fc" id="L350">            return f;</span>
+        }
+
+        // permute original data array in bit-reversal order
+<span class="fc" id="L354">        int ii = 0;</span>
+<span class="fc bfc" id="L355" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L356">            f[i] = data[ii];</span>
+<span class="fc" id="L357">            int k = n &gt;&gt; 1;</span>
+<span class="fc bfc" id="L358" title="All 4 branches covered.">            while (ii &gt;= k &amp;&amp; k &gt; 0) {</span>
+<span class="fc" id="L359">                ii -= k; k &gt;&gt;= 1;</span>
+            }
+<span class="fc" id="L361">            ii += k;</span>
+        }
+
+        // the bottom base-4 round
+<span class="fc bfc" id="L365" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i += 4) {</span>
+<span class="fc" id="L366">            final Complex a = f[i].add(f[i + 1]);</span>
+<span class="fc" id="L367">            final Complex b = f[i + 2].add(f[i + 3]);</span>
+<span class="fc" id="L368">            final Complex c = f[i].subtract(f[i + 1]);</span>
+<span class="fc" id="L369">            final Complex d = f[i + 2].subtract(f[i + 3]);</span>
+<span class="fc" id="L370">            final Complex e1 = c.add(d.multiply(Complex.I));</span>
+<span class="fc" id="L371">            final Complex e2 = c.subtract(d.multiply(Complex.I));</span>
+<span class="fc" id="L372">            f[i] = a.add(b);</span>
+<span class="fc" id="L373">            f[i + 2] = a.subtract(b);</span>
+            // omegaCount indicates forward or inverse transform
+<span class="fc bfc" id="L375" title="All 2 branches covered.">            f[i + 1] = roots.isForward() ? e2 : e1;</span>
+<span class="fc bfc" id="L376" title="All 2 branches covered.">            f[i + 3] = roots.isForward() ? e1 : e2;</span>
+        }
+
+        // iterations from bottom to top take O(N*logN) time
+<span class="fc bfc" id="L380" title="All 2 branches covered.">        for (int i = 4; i &lt; n; i &lt;&lt;= 1) {</span>
+<span class="fc" id="L381">            final int m = n / (i &lt;&lt; 1);</span>
+<span class="fc bfc" id="L382" title="All 2 branches covered.">            for (int j = 0; j &lt; n; j += i &lt;&lt; 1) {</span>
+<span class="fc bfc" id="L383" title="All 2 branches covered.">                for (int k = 0; k &lt; i; k++) {</span>
+                    //z = f[i+j+k].multiply(roots.getOmega(k*m));
+<span class="fc" id="L385">                    final int km = k * m;</span>
+<span class="fc" id="L386">                    final double omegaKmReal = roots.getOmegaReal(km);</span>
+<span class="fc" id="L387">                    final double omegaKmImag = roots.getOmegaImaginary(km);</span>
+                    //z = f[i+j+k].multiply(omega[k*m]);
+<span class="fc" id="L389">                    final Complex z = new Complex(</span>
+<span class="fc" id="L390">                        f[i + j + k].getReal() * omegaKmReal</span>
+<span class="fc" id="L391">                        - f[i + j + k].getImaginary() * omegaKmImag,</span>
+<span class="fc" id="L392">                        f[i + j + k].getReal() * omegaKmImag</span>
+<span class="fc" id="L393">                        + f[i + j + k].getImaginary() * omegaKmReal);</span>
+
+<span class="fc" id="L395">                    f[i + j + k] = f[j + k].subtract(z);</span>
+<span class="fc" id="L396">                    f[j + k] = f[j + k].add(z);</span>
+                }
+            }
+        }
+<span class="fc" id="L400">        return f;</span>
+    }
+
+    /**
+     * Sample the given univariate real function on the given interval.
+     * &lt;p&gt;
+     * The interval is divided equally into N sections and sample points
+     * are taken from min to max-(max-min)/N. Usually f(x) is periodic
+     * such that f(min) = f(max) (note max is not sampled), but we don't
+     * require that.&lt;/p&gt;
+     *
+     * @param f the function to be sampled
+     * @param min the lower bound for the interval
+     * @param max the upper bound for the interval
+     * @param n the number of sample points
+     * @return the samples array
+     * @throws IllegalArgumentException if any parameters are invalid
+     */
+    public static double[] sample(UnivariateFunction f, double min, double max, int n)
+        throws IllegalArgumentException {
+
+<span class="fc bfc" id="L421" title="All 2 branches covered.">        if (n &lt;= 0) {</span>
+<span class="fc" id="L422">            throw MathRuntimeException.createIllegalArgumentException(</span>
+                    LocalizedFormats.NOT_POSITIVE_NUMBER_OF_SAMPLES,
+<span class="fc" id="L424">                    n);</span>
+        }
+<span class="fc" id="L426">        verifyInterval(min, max);</span>
+
+<span class="fc" id="L428">        double[] s = new double[n];</span>
+<span class="fc" id="L429">        double h = (max - min) / n;</span>
+<span class="fc bfc" id="L430" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L431">            s[i] = f.value(min + i * h);</span>
+        }
+<span class="fc" id="L433">        return s;</span>
+    }
+
+    /**
+     * Multiply every component in the given real array by the
+     * given real number. The change is made in place.
+     *
+     * @param f the real array to be scaled
+     * @param d the real scaling coefficient
+     * @return a reference to the scaled array
+     */
+    public static double[] scaleArray(double[] f, double d) {
+<span class="fc bfc" id="L445" title="All 2 branches covered.">        for (int i = 0; i &lt; f.length; i++) {</span>
+<span class="fc" id="L446">            f[i] *= d;</span>
+        }
+<span class="fc" id="L448">        return f;</span>
+    }
+
+    /**
+     * Multiply every component in the given complex array by the
+     * given real number. The change is made in place.
+     *
+     * @param f the complex array to be scaled
+     * @param d the real scaling coefficient
+     * @return a reference to the scaled array
+     */
+    public static Complex[] scaleArray(Complex[] f, double d) {
+<span class="fc bfc" id="L460" title="All 2 branches covered.">        for (int i = 0; i &lt; f.length; i++) {</span>
+<span class="fc" id="L461">            f[i] = new Complex(d * f[i].getReal(), d * f[i].getImaginary());</span>
+        }
+<span class="fc" id="L463">        return f;</span>
+    }
+
+    /**
+     * Returns true if the argument is power of 2.
+     *
+     * @param n the number to test
+     * @return true if the argument is power of 2
+     */
+    public static boolean isPowerOf2(long n) {
+<span class="fc bfc" id="L473" title="All 4 branches covered.">        return (n &gt; 0) &amp;&amp; ((n &amp; (n - 1)) == 0);</span>
+    }
+
+    /**
+     * Verifies that the data set has length of power of 2.
+     *
+     * @param d the data array
+     * @throws IllegalArgumentException if array length is not power of 2
+     */
+    public static void verifyDataSet(double[] d) throws IllegalArgumentException {
+<span class="fc bfc" id="L483" title="All 2 branches covered.">        if (!isPowerOf2(d.length)) {</span>
+<span class="fc" id="L484">            throw MathRuntimeException.createIllegalArgumentException(</span>
+<span class="fc" id="L485">                    LocalizedFormats.NOT_POWER_OF_TWO_CONSIDER_PADDING, d.length);</span>
+        }
+<span class="fc" id="L487">    }</span>
+
+    /**
+     * Verifies that the data set has length of power of 2.
+     *
+     * @param o the data array
+     * @throws IllegalArgumentException if array length is not power of 2
+     */
+    public static void verifyDataSet(Object[] o) throws IllegalArgumentException {
+<span class="pc bpc" id="L496" title="1 of 2 branches missed.">        if (!isPowerOf2(o.length)) {</span>
+<span class="nc" id="L497">            throw MathRuntimeException.createIllegalArgumentException(</span>
+<span class="nc" id="L498">                    LocalizedFormats.NOT_POWER_OF_TWO_CONSIDER_PADDING, o.length);</span>
+        }
+<span class="fc" id="L500">    }</span>
+
+    /**
+     * Verifies that the endpoints specify an interval.
+     *
+     * @param lower lower endpoint
+     * @param upper upper endpoint
+     * @throws IllegalArgumentException if not interval
+     */
+    public static void verifyInterval(double lower, double upper)
+        throws IllegalArgumentException {
+
+<span class="fc bfc" id="L512" title="All 2 branches covered.">        if (lower &gt;= upper) {</span>
+<span class="fc" id="L513">            throw MathRuntimeException.createIllegalArgumentException(</span>
+                    LocalizedFormats.ENDPOINTS_NOT_AN_INTERVAL,
+<span class="fc" id="L515">                    lower, upper);</span>
+        }
+<span class="fc" id="L517">    }</span>
+
+    /**
+     * Performs a multi-dimensional Fourier transform on a given array.
+     * Use {@link #inverseTransform2(Complex[])} and
+     * {@link #transform2(Complex[])} in a row-column implementation
+     * in any number of dimensions with O(N&amp;times;log(N)) complexity with
+     * N=n&lt;sub&gt;1&lt;/sub&gt;&amp;times;n&lt;sub&gt;2&lt;/sub&gt;&amp;times;n&lt;sub&gt;3&lt;/sub&gt;&amp;times;...&amp;times;n&lt;sub&gt;d&lt;/sub&gt;,
+     * n&lt;sub&gt;x&lt;/sub&gt;=number of elements in dimension x,
+     * and d=total number of dimensions.
+     *
+     * @param mdca Multi-Dimensional Complex Array id est Complex[][][][]
+     * @param forward inverseTransform2 is preformed if this is false
+     * @return transform of mdca as a Multi-Dimensional Complex Array id est Complex[][][][]
+     * @throws IllegalArgumentException if any dimension is not a power of two
+     */
+    public Object mdfft(Object mdca, boolean forward)
+        throws IllegalArgumentException {
+<span class="fc" id="L535">        MultiDimensionalComplexMatrix mdcm = (MultiDimensionalComplexMatrix)</span>
+<span class="fc" id="L536">                new MultiDimensionalComplexMatrix(mdca).clone();</span>
+<span class="fc" id="L537">        int[] dimensionSize = mdcm.getDimensionSizes();</span>
+        //cycle through each dimension
+<span class="fc bfc" id="L539" title="All 2 branches covered.">        for (int i = 0; i &lt; dimensionSize.length; i++) {</span>
+<span class="fc" id="L540">            mdfft(mdcm, forward, i, new int[0]);</span>
+        }
+<span class="fc" id="L542">        return mdcm.getArray();</span>
+    }
+
+    /**
+     * Performs one dimension of a multi-dimensional Fourier transform.
+     *
+     * @param mdcm input matrix
+     * @param forward inverseTransform2 is preformed if this is false
+     * @param d index of the dimension to process
+     * @param subVector recursion subvector
+     * @throws IllegalArgumentException if any dimension is not a power of two
+     */
+    private void mdfft(MultiDimensionalComplexMatrix mdcm, boolean forward,
+                       int d, int[] subVector)
+        throws IllegalArgumentException {
+<span class="fc" id="L557">        int[] dimensionSize = mdcm.getDimensionSizes();</span>
+        //if done
+<span class="fc bfc" id="L559" title="All 2 branches covered.">        if (subVector.length == dimensionSize.length) {</span>
+<span class="fc" id="L560">            Complex[] temp = new Complex[dimensionSize[d]];</span>
+<span class="fc bfc" id="L561" title="All 2 branches covered.">            for (int i = 0; i &lt; dimensionSize[d]; i++) {</span>
+                //fft along dimension d
+<span class="fc" id="L563">                subVector[d] = i;</span>
+<span class="fc" id="L564">                temp[i] = mdcm.get(subVector);</span>
+            }
+
+<span class="fc bfc" id="L567" title="All 2 branches covered.">            if (forward) {</span>
+<span class="fc" id="L568">                temp = transform2(temp);</span>
+            } else {
+<span class="fc" id="L570">                temp = inverseTransform2(temp);</span>
+            }
+
+<span class="fc bfc" id="L573" title="All 2 branches covered.">            for (int i = 0; i &lt; dimensionSize[d]; i++) {</span>
+<span class="fc" id="L574">                subVector[d] = i;</span>
+<span class="fc" id="L575">                mdcm.set(temp[i], subVector);</span>
+            }
+<span class="fc" id="L577">        } else {</span>
+<span class="fc" id="L578">            int[] vector = new int[subVector.length + 1];</span>
+<span class="fc" id="L579">            System.arraycopy(subVector, 0, vector, 0, subVector.length);</span>
+<span class="fc bfc" id="L580" title="All 2 branches covered.">            if (subVector.length == d) {</span>
+                //value is not important once the recursion is done.
+                //then an fft will be applied along the dimension d.
+<span class="fc" id="L583">                vector[d] = 0;</span>
+<span class="fc" id="L584">                mdfft(mdcm, forward, d, vector);</span>
+            } else {
+<span class="fc bfc" id="L586" title="All 2 branches covered.">                for (int i = 0; i &lt; dimensionSize[subVector.length]; i++) {</span>
+<span class="fc" id="L587">                    vector[subVector.length] = i;</span>
+                    //further split along the next dimension
+<span class="fc" id="L589">                    mdfft(mdcm, forward, d, vector);</span>
+                }
+            }
+        }
+<span class="fc" id="L593">        return;</span>
+    }
+
+    /**
+     * Complex matrix implementation.
+     * Not designed for synchronized access
+     * may eventually be replaced by jsr-83 of the java community process
+     * http://jcp.org/en/jsr/detail?id=83
+     * may require additional exception throws for other basic requirements.
+     */
+    private static class MultiDimensionalComplexMatrix
+        implements Cloneable {
+
+        /** Size in all dimensions. */
+        protected int[] dimensionSize;
+
+        /** Storage array. */
+        protected Object multiDimensionalComplexArray;
+
+        /** Simple constructor.
+         * @param multiDimensionalComplexArray array containing the matrix elements
+         */
+<span class="fc" id="L615">        public MultiDimensionalComplexMatrix(Object multiDimensionalComplexArray) {</span>
+
+<span class="fc" id="L617">            this.multiDimensionalComplexArray = multiDimensionalComplexArray;</span>
+
+            // count dimensions
+<span class="fc" id="L620">            int numOfDimensions = 0;</span>
+<span class="fc" id="L621">            for (Object lastDimension = multiDimensionalComplexArray;</span>
+<span class="fc bfc" id="L622" title="All 2 branches covered.">                 lastDimension instanceof Object[];) {</span>
+<span class="fc" id="L623">                final Object[] array = (Object[]) lastDimension;</span>
+<span class="fc" id="L624">                numOfDimensions++;</span>
+<span class="fc" id="L625">                lastDimension = array[0];</span>
+<span class="fc" id="L626">            }</span>
+
+            // allocate array with exact count
+<span class="fc" id="L629">            dimensionSize = new int[numOfDimensions];</span>
+
+            // fill array
+<span class="fc" id="L632">            numOfDimensions = 0;</span>
+<span class="fc" id="L633">            for (Object lastDimension = multiDimensionalComplexArray;</span>
+<span class="fc bfc" id="L634" title="All 2 branches covered.">                 lastDimension instanceof Object[];) {</span>
+<span class="fc" id="L635">                final Object[] array = (Object[]) lastDimension;</span>
+<span class="fc" id="L636">                dimensionSize[numOfDimensions++] = array.length;</span>
+<span class="fc" id="L637">                lastDimension = array[0];</span>
+<span class="fc" id="L638">            }</span>
+
+<span class="fc" id="L640">        }</span>
+
+        /**
+         * Get a matrix element.
+         * @param vector indices of the element
+         * @return matrix element
+         * @exception IllegalArgumentException if dimensions do not match
+         */
+        public Complex get(int... vector)
+            throws IllegalArgumentException {
+<span class="pc bpc" id="L650" title="1 of 2 branches missed.">            if (vector == null) {</span>
+<span class="nc bnc" id="L651" title="All 2 branches missed.">                if (dimensionSize.length &gt; 0) {</span>
+<span class="nc" id="L652">                    throw MathRuntimeException.createIllegalArgumentException(</span>
+<span class="nc" id="L653">                            LocalizedFormats.DIMENSIONS_MISMATCH_SIMPLE, 0, dimensionSize.length);</span>
+                }
+<span class="nc" id="L655">                return null;</span>
+            }
+<span class="pc bpc" id="L657" title="1 of 2 branches missed.">            if (vector.length != dimensionSize.length) {</span>
+<span class="nc" id="L658">                throw MathRuntimeException.createIllegalArgumentException(</span>
+<span class="nc" id="L659">                        LocalizedFormats.DIMENSIONS_MISMATCH_SIMPLE, vector.length, dimensionSize.length);</span>
+            }
+
+<span class="fc" id="L662">            Object lastDimension = multiDimensionalComplexArray;</span>
+
+<span class="fc bfc" id="L664" title="All 2 branches covered.">            for (int i = 0; i &lt; dimensionSize.length; i++) {</span>
+<span class="fc" id="L665">                lastDimension = ((Object[]) lastDimension)[vector[i]];</span>
+            }
+<span class="fc" id="L667">            return (Complex) lastDimension;</span>
+        }
+
+        /**
+         * Set a matrix element.
+         * @param magnitude magnitude of the element
+         * @param vector indices of the element
+         * @return the previous value
+         * @exception IllegalArgumentException if dimensions do not match
+         */
+        public Complex set(Complex magnitude, int... vector)
+            throws IllegalArgumentException {
+<span class="pc bpc" id="L679" title="1 of 2 branches missed.">            if (vector == null) {</span>
+<span class="nc bnc" id="L680" title="All 2 branches missed.">                if (dimensionSize.length &gt; 0) {</span>
+<span class="nc" id="L681">                    throw MathRuntimeException.createIllegalArgumentException(</span>
+<span class="nc" id="L682">                            LocalizedFormats.DIMENSIONS_MISMATCH_SIMPLE, 0, dimensionSize.length);</span>
+                }
+<span class="nc" id="L684">                return null;</span>
+            }
+<span class="pc bpc" id="L686" title="1 of 2 branches missed.">            if (vector.length != dimensionSize.length) {</span>
+<span class="nc" id="L687">                throw MathRuntimeException.createIllegalArgumentException(</span>
+<span class="nc" id="L688">                        LocalizedFormats.DIMENSIONS_MISMATCH_SIMPLE, vector.length, dimensionSize.length);</span>
+            }
+
+<span class="fc" id="L691">            Object[] lastDimension = (Object[]) multiDimensionalComplexArray;</span>
+<span class="fc bfc" id="L692" title="All 2 branches covered.">            for (int i = 0; i &lt; dimensionSize.length - 1; i++) {</span>
+<span class="fc" id="L693">                lastDimension = (Object[]) lastDimension[vector[i]];</span>
+            }
+
+<span class="fc" id="L696">            Complex lastValue = (Complex) lastDimension[vector[dimensionSize.length - 1]];</span>
+<span class="fc" id="L697">            lastDimension[vector[dimensionSize.length - 1]] = magnitude;</span>
+
+<span class="fc" id="L699">            return lastValue;</span>
+        }
+
+        /**
+         * Get the size in all dimensions.
+         * @return size in all dimensions
+         */
+        public int[] getDimensionSizes() {
+<span class="fc" id="L707">            return dimensionSize.clone();</span>
+        }
+
+        /**
+         * Get the underlying storage array.
+         * @return underlying storage array
+         */
+        public Object getArray() {
+<span class="fc" id="L715">            return multiDimensionalComplexArray;</span>
+        }
+
+        /** {@inheritDoc} */
+        @Override
+        public Object clone() {
+<span class="fc" id="L721">            MultiDimensionalComplexMatrix mdcm =</span>
+<span class="fc" id="L722">                    new MultiDimensionalComplexMatrix(Array.newInstance(</span>
+                    Complex.class, dimensionSize));
+<span class="fc" id="L724">            clone(mdcm);</span>
+<span class="fc" id="L725">            return mdcm;</span>
+        }
+
+        /**
+         * Copy contents of current array into mdcm.
+         * @param mdcm array where to copy data
+         */
+        private void clone(MultiDimensionalComplexMatrix mdcm) {
+<span class="fc" id="L733">            int[] vector = new int[dimensionSize.length];</span>
+<span class="fc" id="L734">            int size = 1;</span>
+<span class="fc bfc" id="L735" title="All 2 branches covered.">            for (int i = 0; i &lt; dimensionSize.length; i++) {</span>
+<span class="fc" id="L736">                size *= dimensionSize[i];</span>
+            }
+<span class="fc" id="L738">            int[][] vectorList = new int[size][dimensionSize.length];</span>
+<span class="fc bfc" id="L739" title="All 2 branches covered.">            for (int[] nextVector : vectorList) {</span>
+<span class="fc" id="L740">                System.arraycopy(vector, 0, nextVector, 0,</span>
+                                 dimensionSize.length);
+<span class="fc bfc" id="L742" title="All 2 branches covered.">                for (int i = 0; i &lt; dimensionSize.length; i++) {</span>
+<span class="fc" id="L743">                    vector[i]++;</span>
+<span class="fc bfc" id="L744" title="All 2 branches covered.">                    if (vector[i] &lt; dimensionSize[i]) {</span>
+<span class="fc" id="L745">                        break;</span>
+                    } else {
+<span class="fc" id="L747">                        vector[i] = 0;</span>
+                    }
+                }
+            }
+
+<span class="fc bfc" id="L752" title="All 2 branches covered.">            for (int[] nextVector : vectorList) {</span>
+<span class="fc" id="L753">                mdcm.set(get(nextVector), nextVector);</span>
+            }
+<span class="fc" id="L755">        }</span>
+    }
+
+
+    /** Computes the n&lt;sup&gt;th&lt;/sup&gt; roots of unity.
+     * A cache of already computed values is maintained.
+     */
+    private static class RootsOfUnity implements Serializable {
+
+      /** Serializable version id. */
+      private static final long serialVersionUID = 6404784357747329667L;
+
+      /** Number of roots of unity. */
+      private int      omegaCount;
+
+      /** Real part of the roots. */
+      private double[] omegaReal;
+
+      /** Imaginary part of the roots for forward transform. */
+      private double[] omegaImaginaryForward;
+
+      /** Imaginary part of the roots for reverse transform. */
+      private double[] omegaImaginaryInverse;
+
+      /** Forward/reverse indicator. */
+      private boolean  isForward;
+
+      /**
+       * Build an engine for computing then &lt;sup&gt;th&lt;/sup&gt; roots of unity.
+       */
+<span class="fc" id="L785">      public RootsOfUnity() {</span>
+
+<span class="fc" id="L787">        omegaCount = 0;</span>
+<span class="fc" id="L788">        omegaReal = null;</span>
+<span class="fc" id="L789">        omegaImaginaryForward = null;</span>
+<span class="fc" id="L790">        omegaImaginaryInverse = null;</span>
+<span class="fc" id="L791">        isForward = true;</span>
+
+<span class="fc" id="L793">      }</span>
+
+      /**
+       * Check if computation has been done for forward or reverse transform.
+       * @return true if computation has been done for forward transform
+       * @throws IllegalStateException if no roots of unity have been computed yet
+       */
+      public synchronized boolean isForward() throws IllegalStateException {
+
+<span class="pc bpc" id="L802" title="1 of 2 branches missed.">        if (omegaCount == 0) {</span>
+<span class="nc" id="L803">          throw MathRuntimeException.createIllegalStateException(LocalizedFormats.ROOTS_OF_UNITY_NOT_COMPUTED_YET);</span>
+        }
+<span class="fc" id="L805">        return isForward;</span>
+
+      }
+
+      /** Computes the n&lt;sup&gt;th&lt;/sup&gt; roots of unity.
+       * &lt;p&gt;The computed omega[] = { 1, w, w&lt;sup&gt;2&lt;/sup&gt;, ... w&lt;sup&gt;(n-1)&lt;/sup&gt; } where
+       * w = exp(-2 &amp;pi; i / n), i = &amp;sqrt;(-1).&lt;/p&gt;
+       * &lt;p&gt;Note that n is positive for
+       * forward transform and negative for inverse transform.&lt;/p&gt;
+       * @param n number of roots of unity to compute,
+       * positive for forward transform, negative for inverse transform
+       * @throws IllegalArgumentException if n = 0
+       */
+      public synchronized void computeOmega(int n) throws IllegalArgumentException {
+
+<span class="pc bpc" id="L820" title="1 of 2 branches missed.">        if (n == 0) {</span>
+<span class="nc" id="L821">          throw MathRuntimeException.createIllegalArgumentException(</span>
+                  LocalizedFormats.CANNOT_COMPUTE_0TH_ROOT_OF_UNITY);
+        }
+
+<span class="fc bfc" id="L825" title="All 2 branches covered.">        isForward = n &gt; 0;</span>
+
+        // avoid repetitive calculations
+<span class="fc" id="L828">        final int absN = FastMath.abs(n);</span>
+
+<span class="fc bfc" id="L830" title="All 2 branches covered.">        if (absN == omegaCount) {</span>
+<span class="fc" id="L831">            return;</span>
+        }
+
+        // calculate everything from scratch, for both forward and inverse versions
+<span class="fc" id="L835">        final double t    = 2.0 * FastMath.PI / absN;</span>
+<span class="fc" id="L836">        final double cosT = FastMath.cos(t);</span>
+<span class="fc" id="L837">        final double sinT = FastMath.sin(t);</span>
+<span class="fc" id="L838">        omegaReal             = new double[absN];</span>
+<span class="fc" id="L839">        omegaImaginaryForward = new double[absN];</span>
+<span class="fc" id="L840">        omegaImaginaryInverse = new double[absN];</span>
+<span class="fc" id="L841">        omegaReal[0]             = 1.0;</span>
+<span class="fc" id="L842">        omegaImaginaryForward[0] = 0.0;</span>
+<span class="fc" id="L843">        omegaImaginaryInverse[0] = 0.0;</span>
+<span class="fc bfc" id="L844" title="All 2 branches covered.">        for (int i = 1; i &lt; absN; i++) {</span>
+<span class="fc" id="L845">          omegaReal[i] = omegaReal[i - 1] * cosT</span>
+                         + omegaImaginaryForward[i - 1] * sinT;
+<span class="fc" id="L847">          omegaImaginaryForward[i] = omegaImaginaryForward[i - 1] * cosT</span>
+                                     - omegaReal[i - 1] * sinT;
+<span class="fc" id="L849">          omegaImaginaryInverse[i] = -omegaImaginaryForward[i];</span>
+        }
+<span class="fc" id="L851">        omegaCount = absN;</span>
+
+<span class="fc" id="L853">      }</span>
+
+      /**
+       * Get the real part of the k&lt;sup&gt;th&lt;/sup&gt; n&lt;sup&gt;th&lt;/sup&gt; root of unity.
+       * @param k index of the n&lt;sup&gt;th&lt;/sup&gt; root of unity
+       * @return real part of the k&lt;sup&gt;th&lt;/sup&gt; n&lt;sup&gt;th&lt;/sup&gt; root of unity
+       * @throws IllegalStateException if no roots of unity have been computed yet
+       * @throws IllegalArgumentException if k is out of range
+       */
+      public synchronized double getOmegaReal(int k)
+        throws IllegalStateException, IllegalArgumentException {
+
+<span class="pc bpc" id="L865" title="1 of 2 branches missed.">        if (omegaCount == 0) {</span>
+<span class="nc" id="L866">            throw MathRuntimeException.createIllegalStateException(LocalizedFormats.ROOTS_OF_UNITY_NOT_COMPUTED_YET);</span>
+        }
+<span class="pc bpc" id="L868" title="2 of 4 branches missed.">        if ((k &lt; 0) || (k &gt;= omegaCount)) {</span>
+<span class="nc" id="L869">            throw MathRuntimeException.createIllegalArgumentException(</span>
+<span class="nc" id="L870">                    LocalizedFormats.OUT_OF_RANGE_ROOT_OF_UNITY_INDEX, k, 0, omegaCount - 1);</span>
+        }
+
+<span class="fc" id="L873">        return omegaReal[k];</span>
+
+      }
+
+      /**
+       * Get the imaginary part of the k&lt;sup&gt;th&lt;/sup&gt; n&lt;sup&gt;th&lt;/sup&gt; root of unity.
+       * @param k index of the n&lt;sup&gt;th&lt;/sup&gt; root of unity
+       * @return imaginary part of the k&lt;sup&gt;th&lt;/sup&gt; n&lt;sup&gt;th&lt;/sup&gt; root of unity
+       * @throws IllegalStateException if no roots of unity have been computed yet
+       * @throws IllegalArgumentException if k is out of range
+       */
+      public synchronized double getOmegaImaginary(int k)
+        throws IllegalStateException, IllegalArgumentException {
+
+<span class="pc bpc" id="L887" title="1 of 2 branches missed.">        if (omegaCount == 0) {</span>
+<span class="nc" id="L888">            throw MathRuntimeException.createIllegalStateException(LocalizedFormats.ROOTS_OF_UNITY_NOT_COMPUTED_YET);</span>
+        }
+<span class="pc bpc" id="L890" title="2 of 4 branches missed.">        if ((k &lt; 0) || (k &gt;= omegaCount)) {</span>
+<span class="nc" id="L891">          throw MathRuntimeException.createIllegalArgumentException(</span>
+<span class="nc" id="L892">                  LocalizedFormats.OUT_OF_RANGE_ROOT_OF_UNITY_INDEX, k, 0, omegaCount - 1);</span>
+        }
+
+<span class="fc bfc" id="L895" title="All 2 branches covered.">        return isForward ? omegaImaginaryForward[k] : omegaImaginaryInverse[k];</span>
+
+      }
+
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

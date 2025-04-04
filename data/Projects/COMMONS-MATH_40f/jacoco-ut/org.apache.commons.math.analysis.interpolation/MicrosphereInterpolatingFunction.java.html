@@ -1,0 +1,248 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MicrosphereInterpolatingFunction.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Commons Math</a> &gt; <a href="index.source.html" class="el_package">org.apache.commons.math.analysis.interpolation</a> &gt; <span class="el_source">MicrosphereInterpolatingFunction.java</span></div><h1>MicrosphereInterpolatingFunction.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.commons.math.analysis.interpolation;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.apache.commons.math.analysis.MultivariateFunction;
+import org.apache.commons.math.exception.DimensionMismatchException;
+import org.apache.commons.math.exception.NoDataException;
+import org.apache.commons.math.exception.NullArgumentException;
+import org.apache.commons.math.linear.ArrayRealVector;
+import org.apache.commons.math.linear.RealVector;
+import org.apache.commons.math.random.UnitSphereRandomVectorGenerator;
+import org.apache.commons.math.util.FastMath;
+
+/**
+ * Interpolating function that implements the
+ * &lt;a href=&quot;http://www.dudziak.com/microsphere.php&quot;&gt;Microsphere Projection&lt;/a&gt;.
+ *
+ * @version $Id$
+ */
+public class MicrosphereInterpolatingFunction
+    implements MultivariateFunction {
+    /**
+     * Space dimension.
+     */
+    private final int dimension;
+    /**
+     * Internal accounting data for the interpolation algorithm.
+     * Each element of the list corresponds to one surface element of
+     * the microsphere.
+     */
+    private final List&lt;MicrosphereSurfaceElement&gt; microsphere;
+    /**
+     * Exponent used in the power law that computes the weights of the
+     * sample data.
+     */
+    private final double brightnessExponent;
+    /**
+     * Sample data.
+     */
+    private final Map&lt;RealVector, Double&gt; samples;
+
+    /**
+     * Class for storing the accounting data needed to perform the
+     * microsphere projection.
+     */
+    private static class MicrosphereSurfaceElement {
+        /** Normal vector characterizing a surface element. */
+        private final RealVector normal;
+        /** Illumination received from the brightest sample. */
+        private double brightestIllumination;
+        /** Brightest sample. */
+        private Map.Entry&lt;RealVector, Double&gt; brightestSample;
+
+        /**
+         * @param n Normal vector characterizing a surface element
+         * of the microsphere.
+         */
+<span class="fc" id="L77">        MicrosphereSurfaceElement(double[] n) {</span>
+<span class="fc" id="L78">            normal = new ArrayRealVector(n);</span>
+<span class="fc" id="L79">        }</span>
+
+        /**
+         * Return the normal vector.
+         * @return the normal vector
+         */
+        RealVector normal() {
+<span class="fc" id="L86">            return normal;</span>
+        }
+
+        /**
+         * Reset &quot;illumination&quot; and &quot;sampleIndex&quot;.
+         */
+        void reset() {
+<span class="fc" id="L93">            brightestIllumination = 0;</span>
+<span class="fc" id="L94">            brightestSample = null;</span>
+<span class="fc" id="L95">        }</span>
+
+        /**
+         * Store the illumination and index of the brightest sample.
+         * @param illuminationFromSample illumination received from sample
+         * @param sample current sample illuminating the element
+         */
+        void store(final double illuminationFromSample,
+                   final Map.Entry&lt;RealVector, Double&gt; sample) {
+<span class="fc bfc" id="L104" title="All 2 branches covered.">            if (illuminationFromSample &gt; this.brightestIllumination) {</span>
+<span class="fc" id="L105">                this.brightestIllumination = illuminationFromSample;</span>
+<span class="fc" id="L106">                this.brightestSample = sample;</span>
+            }
+<span class="fc" id="L108">        }</span>
+
+        /**
+         * Get the illumination of the element.
+         * @return the illumination.
+         */
+        double illumination() {
+<span class="fc" id="L115">            return brightestIllumination;</span>
+        }
+
+        /**
+         * Get the sample illuminating the element the most.
+         * @return the sample.
+         */
+        Map.Entry&lt;RealVector, Double&gt; sample() {
+<span class="fc" id="L123">            return brightestSample;</span>
+        }
+    }
+
+    /**
+     * @param xval the arguments for the interpolation points.
+     * {@code xval[i][0]} is the first component of interpolation point
+     * {@code i}, {@code xval[i][1]} is the second component, and so on
+     * until {@code xval[i][d-1]}, the last component of that interpolation
+     * point (where {@code dimension} is thus the dimension of the sampled
+     * space).
+     * @param yval the values for the interpolation points
+     * @param brightnessExponent Brightness dimming factor.
+     * @param microsphereElements Number of surface elements of the
+     * microsphere.
+     * @param rand Unit vector generator for creating the microsphere.
+     * @throws DimensionMismatchException if the lengths of {@code yval} and
+     * {@code xval} (equal to {@code n}, the number of interpolation points)
+     * do not match, or the the arrays {@code xval[0]} ... {@code xval[n]},
+     * have lengths different from {@code dimension}.
+     * @throws NoDataException if there an array has zero-length.
+     * @throws NullArgumentException if an argument is {@code null}.
+     */
+    public MicrosphereInterpolatingFunction(double[][] xval,
+                                            double[] yval,
+                                            int brightnessExponent,
+                                            int microsphereElements,
+<span class="fc" id="L150">                                            UnitSphereRandomVectorGenerator rand) {</span>
+<span class="pc bpc" id="L151" title="2 of 4 branches missed.">        if (xval == null ||</span>
+            yval == null) {
+<span class="nc" id="L153">            throw new NullArgumentException();</span>
+        }
+<span class="pc bpc" id="L155" title="1 of 2 branches missed.">        if (xval.length == 0) {</span>
+<span class="nc" id="L156">            throw new NoDataException();</span>
+        }
+<span class="pc bpc" id="L158" title="1 of 2 branches missed.">        if (xval.length != yval.length) {</span>
+<span class="nc" id="L159">            throw new DimensionMismatchException(xval.length, yval.length);</span>
+        }
+<span class="pc bpc" id="L161" title="1 of 2 branches missed.">        if (xval[0] == null) {</span>
+<span class="nc" id="L162">            throw new NullArgumentException();</span>
+        }
+
+<span class="fc" id="L165">        dimension = xval[0].length;</span>
+<span class="fc" id="L166">        this.brightnessExponent = brightnessExponent;</span>
+
+        // Copy data samples.
+<span class="fc" id="L169">        samples = new HashMap&lt;RealVector, Double&gt;(yval.length);</span>
+<span class="fc bfc" id="L170" title="All 2 branches covered.">        for (int i = 0; i &lt; xval.length; ++i) {</span>
+<span class="fc" id="L171">            final double[] xvalI = xval[i];</span>
+<span class="pc bpc" id="L172" title="1 of 2 branches missed.">            if (xvalI == null) {</span>
+<span class="nc" id="L173">                throw new NullArgumentException();</span>
+            }
+<span class="pc bpc" id="L175" title="1 of 2 branches missed.">            if (xvalI.length != dimension) {</span>
+<span class="nc" id="L176">                throw new DimensionMismatchException(xvalI.length, dimension);</span>
+            }
+
+<span class="fc" id="L179">            samples.put(new ArrayRealVector(xvalI), yval[i]);</span>
+        }
+
+<span class="fc" id="L182">        microsphere = new ArrayList&lt;MicrosphereSurfaceElement&gt;(microsphereElements);</span>
+        // Generate the microsphere, assuming that a fairly large number of
+        // randomly generated normals will represent a sphere.
+<span class="fc bfc" id="L185" title="All 2 branches covered.">        for (int i = 0; i &lt; microsphereElements; i++) {</span>
+<span class="fc" id="L186">            microsphere.add(new MicrosphereSurfaceElement(rand.nextVector()));</span>
+        }
+<span class="fc" id="L188">    }</span>
+
+    /**
+     * @param point Interpolation point.
+     * @return the interpolated value.
+     */
+    public double value(double[] point) {
+<span class="fc" id="L195">        final RealVector p = new ArrayRealVector(point);</span>
+
+        // Reset.
+<span class="fc bfc" id="L198" title="All 2 branches covered.">        for (MicrosphereSurfaceElement md : microsphere) {</span>
+<span class="fc" id="L199">            md.reset();</span>
+<span class="fc" id="L200">        }</span>
+
+        // Compute contribution of each sample points to the microsphere elements illumination
+<span class="fc bfc" id="L203" title="All 2 branches covered.">        for (Map.Entry&lt;RealVector, Double&gt; sd : samples.entrySet()) {</span>
+
+            // Vector between interpolation point and current sample point.
+<span class="fc" id="L206">            final RealVector diff = sd.getKey().subtract(p);</span>
+<span class="fc" id="L207">            final double diffNorm = diff.getNorm();</span>
+
+<span class="fc bfc" id="L209" title="All 2 branches covered.">            if (FastMath.abs(diffNorm) &lt; FastMath.ulp(1d)) {</span>
+                // No need to interpolate, as the interpolation point is
+                // actually (very close to) one of the sampled points.
+<span class="fc" id="L212">                return sd.getValue();</span>
+            }
+
+<span class="fc bfc" id="L215" title="All 2 branches covered.">            for (MicrosphereSurfaceElement md : microsphere) {</span>
+<span class="fc" id="L216">                final double w = FastMath.pow(diffNorm, -brightnessExponent);</span>
+<span class="fc" id="L217">                md.store(cosAngle(diff, md.normal()) * w, sd);</span>
+<span class="fc" id="L218">            }</span>
+
+<span class="fc" id="L220">        }</span>
+
+        // Interpolation calculation.
+<span class="fc" id="L223">        double value = 0;</span>
+<span class="fc" id="L224">        double totalWeight = 0;</span>
+<span class="fc bfc" id="L225" title="All 2 branches covered.">        for (MicrosphereSurfaceElement md : microsphere) {</span>
+<span class="fc" id="L226">            final double iV = md.illumination();</span>
+<span class="fc" id="L227">            final Map.Entry&lt;RealVector, Double&gt; sd = md.sample();</span>
+<span class="pc bpc" id="L228" title="1 of 2 branches missed.">            if (sd != null) {</span>
+<span class="fc" id="L229">                value += iV * sd.getValue();</span>
+<span class="fc" id="L230">                totalWeight += iV;</span>
+            }
+<span class="fc" id="L232">        }</span>
+
+<span class="fc" id="L234">        return value / totalWeight;</span>
+    }
+
+    /**
+     * Compute the cosine of the angle between 2 vectors.
+     *
+     * @param v Vector.
+     * @param w Vector.
+     * @return the cosine of the angle between {@code v} and {@code w}.
+     */
+    private double cosAngle(final RealVector v, final RealVector w) {
+<span class="fc" id="L245">        return v.dotProduct(w) / (v.getNorm() * w.getNorm());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

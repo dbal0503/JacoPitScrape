@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EuclideanIntegerPoint.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Commons Math</a> &gt; <a href="index.source.html" class="el_package">org.apache.commons.math.stat.clustering</a> &gt; <span class="el_source">EuclideanIntegerPoint.java</span></div><h1>EuclideanIntegerPoint.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.commons.math.stat.clustering;
+
+import java.io.Serializable;
+import java.util.Collection;
+
+import org.apache.commons.math.util.MathArrays;
+
+/**
+ * A simple implementation of {@link Clusterable} for points with integer coordinates.
+ * @version $Id$
+ * @since 2.0
+ */
+public class EuclideanIntegerPoint implements Clusterable&lt;EuclideanIntegerPoint&gt;, Serializable {
+
+    /** Serializable version identifier. */
+    private static final long serialVersionUID = 3946024775784901369L;
+
+    /** Point coordinates. */
+    private final int[] point;
+
+    /**
+     * Build an instance wrapping an integer array.
+     * &lt;p&gt;The wrapped array is referenced, it is &lt;em&gt;not&lt;/em&gt; copied.&lt;/p&gt;
+     * @param point the n-dimensional point in integer space
+     */
+<span class="fc" id="L43">    public EuclideanIntegerPoint(final int[] point) {</span>
+<span class="fc" id="L44">        this.point = point;</span>
+<span class="fc" id="L45">    }</span>
+
+    /**
+     * Get the n-dimensional point in integer space.
+     * @return a reference (not a copy!) to the wrapped array
+     */
+    public int[] getPoint() {
+<span class="fc" id="L52">        return point;</span>
+    }
+
+    /** {@inheritDoc} */
+    public double distanceFrom(final EuclideanIntegerPoint p) {
+<span class="fc" id="L57">        return MathArrays.distance(point, p.getPoint());</span>
+    }
+
+    /** {@inheritDoc} */
+    public EuclideanIntegerPoint centroidOf(final Collection&lt;EuclideanIntegerPoint&gt; points) {
+<span class="fc" id="L62">        int[] centroid = new int[getPoint().length];</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">        for (EuclideanIntegerPoint p : points) {</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">            for (int i = 0; i &lt; centroid.length; i++) {</span>
+<span class="fc" id="L65">                centroid[i] += p.getPoint()[i];</span>
+            }
+<span class="fc" id="L67">        }</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">        for (int i = 0; i &lt; centroid.length; i++) {</span>
+<span class="fc" id="L69">            centroid[i] /= points.size();</span>
+        }
+<span class="fc" id="L71">        return new EuclideanIntegerPoint(centroid);</span>
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public boolean equals(final Object other) {
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">        if (!(other instanceof EuclideanIntegerPoint)) {</span>
+<span class="nc" id="L78">            return false;</span>
+        }
+<span class="fc" id="L80">        final int[] otherPoint = ((EuclideanIntegerPoint) other).getPoint();</span>
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">        if (point.length != otherPoint.length) {</span>
+<span class="nc" id="L82">            return false;</span>
+        }
+<span class="fc bfc" id="L84" title="All 2 branches covered.">        for (int i = 0; i &lt; point.length; i++) {</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">            if (point[i] != otherPoint[i]) {</span>
+<span class="fc" id="L86">                return false;</span>
+            }
+        }
+<span class="fc" id="L89">        return true;</span>
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public int hashCode() {
+<span class="nc" id="L95">        int hashCode = 0;</span>
+<span class="nc bnc" id="L96" title="All 2 branches missed.">        for (Integer i : point) {</span>
+<span class="nc" id="L97">            hashCode += i.hashCode() * 13 + 7;</span>
+        }
+<span class="nc" id="L99">        return hashCode;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     * @since 2.1
+     */
+    @Override
+    public String toString() {
+<span class="nc" id="L108">        final StringBuilder buff = new StringBuilder(&quot;(&quot;);</span>
+<span class="nc" id="L109">        final int[] coordinates = getPoint();</span>
+<span class="nc bnc" id="L110" title="All 2 branches missed.">        for (int i = 0; i &lt; coordinates.length; i++) {</span>
+<span class="nc" id="L111">            buff.append(coordinates[i]);</span>
+<span class="nc bnc" id="L112" title="All 2 branches missed.">            if (i &lt; coordinates.length - 1) {</span>
+<span class="nc" id="L113">                buff.append(&quot;,&quot;);</span>
+            }
+        }
+<span class="nc" id="L116">        buff.append(&quot;)&quot;);</span>
+<span class="nc" id="L117">        return buff.toString();</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

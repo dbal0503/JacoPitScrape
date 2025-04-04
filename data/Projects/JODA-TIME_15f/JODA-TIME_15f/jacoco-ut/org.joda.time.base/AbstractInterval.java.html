@@ -1,0 +1,495 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AbstractInterval.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Joda time</a> &gt; <a href="index.source.html" class="el_package">org.joda.time.base</a> &gt; <span class="el_source">AbstractInterval.java</span></div><h1>AbstractInterval.java</h1><pre class="source lang-java linenums">/*
+ *  Copyright 2001-2011 Stephen Colebourne
+ *
+ *  Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+package org.joda.time.base;
+
+import org.joda.time.DateTime;
+import org.joda.time.DateTimeUtils;
+import org.joda.time.Duration;
+import org.joda.time.Interval;
+import org.joda.time.MutableInterval;
+import org.joda.time.Period;
+import org.joda.time.PeriodType;
+import org.joda.time.ReadableInstant;
+import org.joda.time.ReadableInterval;
+import org.joda.time.field.FieldUtils;
+import org.joda.time.format.DateTimeFormatter;
+import org.joda.time.format.ISODateTimeFormat;
+
+/**
+ * AbstractInterval provides the common behaviour for time intervals.
+ * &lt;p&gt;
+ * This class should generally not be used directly by API users. The 
+ * {@link ReadableInterval} interface should be used when different 
+ * kinds of intervals are to be referenced.
+ * &lt;p&gt;
+ * AbstractInterval subclasses may be mutable and not thread-safe.
+ *
+ * @author Brian S O'Neill
+ * @author Stephen Colebourne
+ * @since 1.0
+ */
+public abstract class AbstractInterval implements ReadableInterval {
+
+    /**
+     * Constructor.
+     */
+    protected AbstractInterval() {
+<span class="fc" id="L50">        super();</span>
+<span class="fc" id="L51">    }</span>
+
+    //-----------------------------------------------------------------------
+    /**
+     * Validates an interval.
+     * 
+     * @param start  the start instant in milliseconds
+     * @param end  the end instant in milliseconds
+     * @throws IllegalArgumentException if the interval is invalid
+     */
+    protected void checkInterval(long start, long end) {
+<span class="fc bfc" id="L62" title="All 2 branches covered.">        if (end &lt; start) {</span>
+<span class="fc" id="L63">            throw new IllegalArgumentException(&quot;The end instant must be greater or equal to the start&quot;);</span>
+        }
+<span class="fc" id="L65">    }</span>
+
+    //-----------------------------------------------------------------------
+    /**
+     * Gets the start of this time interval, which is inclusive, as a DateTime.
+     *
+     * @return the start of the time interval
+     */
+    public DateTime getStart() {
+<span class="fc" id="L74">        return new DateTime(getStartMillis(), getChronology());</span>
+    }
+
+    /** 
+     * Gets the end of this time interval, which is exclusive, as a DateTime.
+     *
+     * @return the end of the time interval
+     */
+    public DateTime getEnd() {
+<span class="fc" id="L83">        return new DateTime(getEndMillis(), getChronology());</span>
+    }
+
+    //-----------------------------------------------------------------------
+    /**
+     * Does this time interval contain the specified millisecond instant.
+     * &lt;p&gt;
+     * Non-zero duration intervals are inclusive of the start instant and
+     * exclusive of the end. A zero duration interval cannot contain anything.
+     *
+     * @param millisInstant  the instant to compare to,
+     *  millisecond instant from 1970-01-01T00:00:00Z
+     * @return true if this time interval contains the millisecond
+     */
+    public boolean contains(long millisInstant) {
+<span class="fc" id="L98">        long thisStart = getStartMillis();</span>
+<span class="fc" id="L99">        long thisEnd = getEndMillis();</span>
+<span class="fc bfc" id="L100" title="All 4 branches covered.">        return (millisInstant &gt;= thisStart &amp;&amp; millisInstant &lt; thisEnd);</span>
+    }
+
+    /**
+     * Does this time interval contain the current instant.
+     * &lt;p&gt;
+     * Non-zero duration intervals are inclusive of the start instant and
+     * exclusive of the end. A zero duration interval cannot contain anything.
+     *
+     * @return true if this time interval contains the current instant
+     */
+    public boolean containsNow() {
+<span class="fc" id="L112">        return contains(DateTimeUtils.currentTimeMillis());</span>
+    }
+
+    /**
+     * Does this time interval contain the specified instant.
+     * &lt;p&gt;
+     * Non-zero duration intervals are inclusive of the start instant and
+     * exclusive of the end. A zero duration interval cannot contain anything.
+     * &lt;p&gt;
+     * For example:
+     * &lt;pre&gt;
+     * [09:00 to 10:00) contains 08:59  = false (before start)
+     * [09:00 to 10:00) contains 09:00  = true
+     * [09:00 to 10:00) contains 09:59  = true
+     * [09:00 to 10:00) contains 10:00  = false (equals end)
+     * [09:00 to 10:00) contains 10:01  = false (after end)
+     * 
+     * [14:00 to 14:00) contains 14:00  = false (zero duration contains nothing)
+     * &lt;/pre&gt;
+     * Passing in a &lt;code&gt;null&lt;/code&gt; parameter will have the same effect as
+     * calling {@link #containsNow()}.
+     *
+     * @param instant  the instant, null means now
+     * @return true if this time interval contains the instant
+     */
+    public boolean contains(ReadableInstant instant) {
+<span class="fc bfc" id="L138" title="All 2 branches covered.">        if (instant == null) {</span>
+<span class="fc" id="L139">            return containsNow();</span>
+        }
+<span class="fc" id="L141">        return contains(instant.getMillis());</span>
+    }
+
+    /**
+     * Does this time interval contain the specified time interval.
+     * &lt;p&gt;
+     * Non-zero duration intervals are inclusive of the start instant and
+     * exclusive of the end. The other interval is contained if this interval
+     * wholly contains, starts, finishes or equals it.
+     * A zero duration interval cannot contain anything.
+     * &lt;p&gt;
+     * When two intervals are compared the result is one of three states:
+     * (a) they abut, (b) there is a gap between them, (c) they overlap.
+     * The &lt;code&gt;contains&lt;/code&gt; method is not related to these states.
+     * In particular, a zero duration interval is contained at the start of
+     * a larger interval, but does not overlap (it abuts instead).
+     * &lt;p&gt;
+     * For example:
+     * &lt;pre&gt;
+     * [09:00 to 10:00) contains [09:00 to 10:00)  = true
+     * [09:00 to 10:00) contains [09:00 to 09:30)  = true
+     * [09:00 to 10:00) contains [09:30 to 10:00)  = true
+     * [09:00 to 10:00) contains [09:15 to 09:45)  = true
+     * [09:00 to 10:00) contains [09:00 to 09:00)  = true
+     * 
+     * [09:00 to 10:00) contains [08:59 to 10:00)  = false (otherStart before thisStart)
+     * [09:00 to 10:00) contains [09:00 to 10:01)  = false (otherEnd after thisEnd)
+     * [09:00 to 10:00) contains [10:00 to 10:00)  = false (otherStart equals thisEnd)
+     * 
+     * [14:00 to 14:00) contains [14:00 to 14:00)  = false (zero duration contains nothing)
+     * &lt;/pre&gt;
+     * Passing in a &lt;code&gt;null&lt;/code&gt; parameter will have the same effect as
+     * calling {@link #containsNow()}.
+     *
+     * @param interval  the time interval to compare to, null means a zero duration interval now
+     * @return true if this time interval contains the time interval
+     */
+    public boolean contains(ReadableInterval interval) {
+<span class="fc bfc" id="L179" title="All 2 branches covered.">        if (interval == null) {</span>
+<span class="fc" id="L180">            return containsNow();</span>
+        }
+<span class="fc" id="L182">        long otherStart = interval.getStartMillis();</span>
+<span class="fc" id="L183">        long otherEnd = interval.getEndMillis();</span>
+<span class="fc" id="L184">        long thisStart = getStartMillis();</span>
+<span class="fc" id="L185">        long thisEnd = getEndMillis();</span>
+<span class="fc bfc" id="L186" title="All 6 branches covered.">        return (thisStart &lt;= otherStart &amp;&amp; otherStart &lt; thisEnd &amp;&amp; otherEnd &lt;= thisEnd);</span>
+    }
+
+    /**
+     * Does this time interval overlap the specified time interval.
+     * &lt;p&gt;
+     * Intervals are inclusive of the start instant and exclusive of the end.
+     * An interval overlaps another if it shares some common part of the
+     * datetime continuum. 
+     * &lt;p&gt;
+     * When two intervals are compared the result is one of three states:
+     * (a) they abut, (b) there is a gap between them, (c) they overlap.
+     * The abuts state takes precedence over the other two, thus a zero duration
+     * interval at the start of a larger interval abuts and does not overlap.
+     * &lt;p&gt;
+     * For example:
+     * &lt;pre&gt;
+     * [09:00 to 10:00) overlaps [08:00 to 08:30)  = false (completely before)
+     * [09:00 to 10:00) overlaps [08:00 to 09:00)  = false (abuts before)
+     * [09:00 to 10:00) overlaps [08:00 to 09:30)  = true
+     * [09:00 to 10:00) overlaps [08:00 to 10:00)  = true
+     * [09:00 to 10:00) overlaps [08:00 to 11:00)  = true
+     * 
+     * [09:00 to 10:00) overlaps [09:00 to 09:00)  = false (abuts before)
+     * [09:00 to 10:00) overlaps [09:00 to 09:30)  = true
+     * [09:00 to 10:00) overlaps [09:00 to 10:00)  = true
+     * [09:00 to 10:00) overlaps [09:00 to 11:00)  = true
+     * 
+     * [09:00 to 10:00) overlaps [09:30 to 09:30)  = true
+     * [09:00 to 10:00) overlaps [09:30 to 10:00)  = true
+     * [09:00 to 10:00) overlaps [09:30 to 11:00)  = true
+     * 
+     * [09:00 to 10:00) overlaps [10:00 to 10:00)  = false (abuts after)
+     * [09:00 to 10:00) overlaps [10:00 to 11:00)  = false (abuts after)
+     * 
+     * [09:00 to 10:00) overlaps [10:30 to 11:00)  = false (completely after)
+     * 
+     * [14:00 to 14:00) overlaps [14:00 to 14:00)  = false (abuts before and after)
+     * [14:00 to 14:00) overlaps [13:00 to 15:00)  = true
+     * &lt;/pre&gt;
+     *
+     * @param interval  the time interval to compare to, null means a zero length interval now
+     * @return true if the time intervals overlap
+     */
+    public boolean overlaps(ReadableInterval interval) {
+<span class="fc" id="L231">        long thisStart = getStartMillis();</span>
+<span class="fc" id="L232">        long thisEnd = getEndMillis();</span>
+<span class="fc bfc" id="L233" title="All 2 branches covered.">        if (interval == null) {</span>
+<span class="fc" id="L234">            long now = DateTimeUtils.currentTimeMillis();</span>
+<span class="fc bfc" id="L235" title="All 4 branches covered.">            return (thisStart &lt; now &amp;&amp; now &lt; thisEnd);</span>
+        }  else {
+<span class="fc" id="L237">            long otherStart = interval.getStartMillis();</span>
+<span class="fc" id="L238">            long otherEnd = interval.getEndMillis();</span>
+<span class="fc bfc" id="L239" title="All 4 branches covered.">            return (thisStart &lt; otherEnd &amp;&amp; otherStart &lt; thisEnd);</span>
+        }
+    }
+
+    //-----------------------------------------------------------------------
+    /**
+     * Is this time interval before the specified millisecond instant.
+     * &lt;p&gt;
+     * Intervals are inclusive of the start instant and exclusive of the end.
+     * 
+     * @param millisInstant  the instant to compare to,
+     *  millisecond instant from 1970-01-01T00:00:00Z
+     * @return true if this time interval is before the instant
+     */
+    public boolean isBefore(long millisInstant) {
+<span class="fc bfc" id="L254" title="All 2 branches covered.">        return (getEndMillis() &lt;= millisInstant);</span>
+    }
+
+    /**
+     * Is this time interval before the current instant.
+     * &lt;p&gt;
+     * Intervals are inclusive of the start instant and exclusive of the end.
+     * 
+     * @return true if this time interval is before the current instant
+     */
+    public boolean isBeforeNow() {
+<span class="fc" id="L265">        return isBefore(DateTimeUtils.currentTimeMillis());</span>
+    }
+
+    /**
+     * Is this time interval before the specified instant.
+     * &lt;p&gt;
+     * Intervals are inclusive of the start instant and exclusive of the end.
+     * 
+     * @param instant  the instant to compare to, null means now
+     * @return true if this time interval is before the instant
+     */
+    public boolean isBefore(ReadableInstant instant) {
+<span class="fc bfc" id="L277" title="All 2 branches covered.">        if (instant == null) {</span>
+<span class="fc" id="L278">            return isBeforeNow();</span>
+        }
+<span class="fc" id="L280">        return isBefore(instant.getMillis());</span>
+    }
+
+    /**
+     * Is this time interval entirely before the specified instant.
+     * &lt;p&gt;
+     * Intervals are inclusive of the start instant and exclusive of the end.
+     * 
+     * @param interval  the interval to compare to, null means now
+     * @return true if this time interval is before the interval specified
+     */
+    public boolean isBefore(ReadableInterval interval) {
+<span class="fc bfc" id="L292" title="All 2 branches covered.">        if (interval == null) {</span>
+<span class="fc" id="L293">            return isBeforeNow();</span>
+        }
+<span class="fc" id="L295">        return isBefore(interval.getStartMillis());</span>
+    }
+
+    //-----------------------------------------------------------------------
+    /**
+     * Is this time interval after the specified millisecond instant.
+     * &lt;p&gt;
+     * Intervals are inclusive of the start instant and exclusive of the end.
+     * 
+     * @param millisInstant  the instant to compare to,
+     *  millisecond instant from 1970-01-01T00:00:00Z
+     * @return true if this time interval is after the instant
+     */
+    public boolean isAfter(long millisInstant) {
+<span class="fc bfc" id="L309" title="All 2 branches covered.">        return (getStartMillis() &gt; millisInstant);</span>
+    }
+
+    /**
+     * Is this time interval after the current instant.
+     * &lt;p&gt;
+     * Intervals are inclusive of the start instant and exclusive of the end.
+     * 
+     * @return true if this time interval is after the current instant
+     */
+    public boolean isAfterNow() {
+<span class="fc" id="L320">        return isAfter(DateTimeUtils.currentTimeMillis());</span>
+    }
+
+    /**
+     * Is this time interval after the specified instant.
+     * &lt;p&gt;
+     * Intervals are inclusive of the start instant and exclusive of the end.
+     * 
+     * @param instant  the instant to compare to, null means now
+     * @return true if this time interval is after the instant
+     */
+    public boolean isAfter(ReadableInstant instant) {
+<span class="fc bfc" id="L332" title="All 2 branches covered.">        if (instant == null) {</span>
+<span class="fc" id="L333">            return isAfterNow();</span>
+        }
+<span class="fc" id="L335">        return isAfter(instant.getMillis());</span>
+    }
+
+    /**
+     * Is this time interval entirely after the specified interval.
+     * &lt;p&gt;
+     * Intervals are inclusive of the start instant and exclusive of the end.
+     * Only the end time of the specified interval is used in the comparison.
+     * 
+     * @param interval  the interval to compare to, null means now
+     * @return true if this time interval is after the interval specified
+     */
+    public boolean isAfter(ReadableInterval interval) {
+        long endMillis;
+<span class="fc bfc" id="L349" title="All 2 branches covered.">        if (interval == null) {</span>
+<span class="fc" id="L350">            endMillis = DateTimeUtils.currentTimeMillis();</span>
+        } else {
+<span class="fc" id="L352">            endMillis = interval.getEndMillis();</span>
+        }
+<span class="fc bfc" id="L354" title="All 2 branches covered.">        return (getStartMillis() &gt;= endMillis);</span>
+    }
+
+    //-----------------------------------------------------------------------
+    /**
+     * Get this interval as an immutable &lt;code&gt;Interval&lt;/code&gt; object.
+     *
+     * @return the interval as an Interval object
+     */
+    public Interval toInterval() {
+<span class="fc" id="L364">        return new Interval(getStartMillis(), getEndMillis(), getChronology());</span>
+    }
+
+    /**
+     * Get this time interval as a &lt;code&gt;MutableInterval&lt;/code&gt;.
+     * &lt;p&gt;
+     * This will always return a new &lt;code&gt;MutableInterval&lt;/code&gt; with the same interval.
+     *
+     * @return the time interval as a MutableInterval object
+     */
+    public MutableInterval toMutableInterval() {
+<span class="fc" id="L375">        return new MutableInterval(getStartMillis(), getEndMillis(), getChronology());</span>
+    }
+
+    //-----------------------------------------------------------------------
+    /**
+     * Gets the duration of this time interval in milliseconds.
+     * &lt;p&gt;
+     * The duration is equal to the end millis minus the start millis.
+     *
+     * @return the duration of the time interval in milliseconds
+     * @throws ArithmeticException if the duration exceeds the capacity of a long
+     */
+    public long toDurationMillis() {
+<span class="fc" id="L388">        return FieldUtils.safeAdd(getEndMillis(), -getStartMillis());</span>
+    }
+
+    /**
+     * Gets the duration of this time interval.
+     * &lt;p&gt;
+     * The duration is equal to the end millis minus the start millis.
+     *
+     * @return the duration of the time interval
+     * @throws ArithmeticException if the duration exceeds the capacity of a long
+     */
+    public Duration toDuration() {
+<span class="fc" id="L400">        long durMillis = toDurationMillis();</span>
+<span class="fc bfc" id="L401" title="All 2 branches covered.">        if (durMillis == 0) {</span>
+<span class="fc" id="L402">            return Duration.ZERO;</span>
+        } else {
+<span class="fc" id="L404">            return new Duration(durMillis);</span>
+        }
+    }
+
+    //-----------------------------------------------------------------------
+    /**
+     * Converts the duration of the interval to a &lt;code&gt;Period&lt;/code&gt; using the
+     * All period type.
+     * &lt;p&gt;
+     * This method should be used to exract the field values describing the
+     * difference between the start and end instants.
+     *
+     * @return a time period derived from the interval
+     */
+    public Period toPeriod() {
+<span class="fc" id="L419">        return new Period(getStartMillis(), getEndMillis(), getChronology());</span>
+    }
+
+    /**
+     * Converts the duration of the interval to a &lt;code&gt;Period&lt;/code&gt; using the
+     * specified period type.
+     * &lt;p&gt;
+     * This method should be used to exract the field values describing the
+     * difference between the start and end instants.
+     *
+     * @param type  the requested type of the duration, null means AllType
+     * @return a time period derived from the interval
+     */
+    public Period toPeriod(PeriodType type) {
+<span class="fc" id="L433">        return new Period(getStartMillis(), getEndMillis(), type, getChronology());</span>
+    }
+
+    //-----------------------------------------------------------------------
+    /**
+     * Compares this object with the specified object for equality based
+     * on start and end millis plus the chronology.
+     * All ReadableInterval instances are accepted.
+     * &lt;p&gt;
+     * To compare the duration of two time intervals, use {@link #toDuration()}
+     * to get the durations and compare those.
+     *
+     * @param readableInterval  a readable interval to check against
+     * @return true if the start and end millis are equal
+     */
+    public boolean equals(Object readableInterval) {
+<span class="fc bfc" id="L449" title="All 2 branches covered.">        if (this == readableInterval) {</span>
+<span class="fc" id="L450">            return true;</span>
+        }
+<span class="fc bfc" id="L452" title="All 2 branches covered.">        if (readableInterval instanceof ReadableInterval == false) {</span>
+<span class="fc" id="L453">            return false;</span>
+        }
+<span class="fc" id="L455">        ReadableInterval other = (ReadableInterval) readableInterval;</span>
+<span class="fc" id="L456">        return </span>
+<span class="fc bfc" id="L457" title="All 2 branches covered.">            getStartMillis() == other.getStartMillis() &amp;&amp;</span>
+<span class="pc bpc" id="L458" title="1 of 2 branches missed.">            getEndMillis() == other.getEndMillis() &amp;&amp;</span>
+<span class="fc bfc" id="L459" title="All 2 branches covered.">            FieldUtils.equals(getChronology(), other.getChronology());</span>
+    }
+
+    /**
+     * Hashcode compatible with equals method.
+     *
+     * @return suitable hashcode
+     */
+    public int hashCode() {
+<span class="fc" id="L468">        long start = getStartMillis();</span>
+<span class="fc" id="L469">        long end = getEndMillis();</span>
+<span class="fc" id="L470">        int result = 97;</span>
+<span class="fc" id="L471">        result = 31 * result + ((int) (start ^ (start &gt;&gt;&gt; 32)));</span>
+<span class="fc" id="L472">        result = 31 * result + ((int) (end ^ (end &gt;&gt;&gt; 32)));</span>
+<span class="fc" id="L473">        result = 31 * result + getChronology().hashCode();</span>
+<span class="fc" id="L474">        return result;</span>
+    }
+
+    /**
+     * Output a string in ISO8601 interval format.
+     * &lt;p&gt;
+     * From version 2.1, the string includes the time zone offset.
+     *
+     * @return re-parsable string (in the default zone)
+     */
+    public String toString() {
+<span class="fc" id="L485">        DateTimeFormatter printer = ISODateTimeFormat.dateTime();</span>
+<span class="fc" id="L486">        printer = printer.withChronology(getChronology());</span>
+<span class="fc" id="L487">        StringBuffer buf = new StringBuffer(48);</span>
+<span class="fc" id="L488">        printer.printTo(buf, getStartMillis());</span>
+<span class="fc" id="L489">        buf.append('/');</span>
+<span class="fc" id="L490">        printer.printTo(buf, getEndMillis());</span>
+<span class="fc" id="L491">        return buf.toString();</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

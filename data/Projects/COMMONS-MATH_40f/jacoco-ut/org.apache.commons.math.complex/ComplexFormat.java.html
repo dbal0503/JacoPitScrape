@@ -1,0 +1,398 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ComplexFormat.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Commons Math</a> &gt; <a href="index.source.html" class="el_package">org.apache.commons.math.complex</a> &gt; <span class="el_source">ComplexFormat.java</span></div><h1>ComplexFormat.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.commons.math.complex;
+
+import java.text.FieldPosition;
+import java.text.NumberFormat;
+import java.text.ParsePosition;
+import java.util.Locale;
+
+import org.apache.commons.math.util.CompositeFormat;
+import org.apache.commons.math.exception.util.LocalizedFormats;
+import org.apache.commons.math.exception.MathParseException;
+import org.apache.commons.math.exception.MathIllegalArgumentException;
+import org.apache.commons.math.exception.MathInternalError;
+import org.apache.commons.math.exception.NullArgumentException;
+import org.apache.commons.math.exception.NoDataException;
+
+/**
+ * Formats a Complex number in cartesian format &quot;Re(c) + Im(c)i&quot;.  'i' can
+ * be replaced with 'j' (or anything else), and the number format for both real
+ * and imaginary parts can be configured.
+ *
+ * @version $Id$
+ */
+public class ComplexFormat {
+
+     /** The default imaginary character. */
+    private static final String DEFAULT_IMAGINARY_CHARACTER = &quot;i&quot;;
+    /** The notation used to signify the imaginary part of the complex number. */
+    private final String imaginaryCharacter;
+    /** The format used for the imaginary part. */
+    private final NumberFormat imaginaryFormat;
+    /** The format used for the real part. */
+    private final NumberFormat realFormat;
+
+    /**
+     * Create an instance with the default imaginary character, 'i', and the
+     * default number format for both real and imaginary parts.
+     */
+    public ComplexFormat() {
+<span class="fc" id="L56">        this(DEFAULT_IMAGINARY_CHARACTER, CompositeFormat.getDefaultNumberFormat());</span>
+<span class="fc" id="L57">    }</span>
+
+    /**
+     * Create an instance with a custom number format for both real and
+     * imaginary parts.
+     * @param format the custom format for both real and imaginary parts.
+     */
+    public ComplexFormat(NumberFormat format) {
+<span class="fc" id="L65">        this(DEFAULT_IMAGINARY_CHARACTER, format);</span>
+<span class="fc" id="L66">    }</span>
+
+    /**
+     * Create an instance with a custom number format for the real part and a
+     * custom number format for the imaginary part.
+     * @param realFormat the custom format for the real part.
+     * @param imaginaryFormat the custom format for the imaginary part.
+     */
+    public ComplexFormat(NumberFormat realFormat, NumberFormat imaginaryFormat) {
+<span class="nc" id="L75">        this(DEFAULT_IMAGINARY_CHARACTER, realFormat, imaginaryFormat);</span>
+<span class="nc" id="L76">    }</span>
+
+    /**
+     * Create an instance with a custom imaginary character, and the default
+     * number format for both real and imaginary parts.
+     * @param imaginaryCharacter The custom imaginary character.
+     */
+    public ComplexFormat(String imaginaryCharacter) {
+<span class="nc" id="L84">        this(imaginaryCharacter, CompositeFormat.getDefaultNumberFormat());</span>
+<span class="nc" id="L85">    }</span>
+
+    /**
+     * Create an instance with a custom imaginary character, and a custom number
+     * format for both real and imaginary parts.
+     * @param imaginaryCharacter The custom imaginary character.
+     * @param format the custom format for both real and imaginary parts.
+     */
+    public ComplexFormat(String imaginaryCharacter, NumberFormat format) {
+<span class="fc" id="L94">        this(imaginaryCharacter, format, format);</span>
+<span class="fc" id="L95">    }</span>
+
+    /**
+     * Create an instance with a custom imaginary character, a custom number
+     * format for the real part, and a custom number format for the imaginary
+     * part.
+     *
+     * @param imaginaryCharacter The custom imaginary character.
+     * @param realFormat the custom format for the real part.
+     * @param imaginaryFormat the custom format for the imaginary part.
+     * @throws NullArgumentException if {@code imaginaryCharacter} is
+     * {@code null}.
+     * @throws NoDataException if {@code imaginaryCharacter} is an
+     * empty string.
+     * @throws NullArgumentException if {@code imaginaryFormat} is {@code null}.
+     * @throws NullArgumentException if {@code realFormat} is {@code null}.
+     */
+    public ComplexFormat(String imaginaryCharacter,
+                         NumberFormat realFormat,
+<span class="fc" id="L114">                         NumberFormat imaginaryFormat) {</span>
+<span class="pc bpc" id="L115" title="1 of 2 branches missed.">        if (imaginaryCharacter == null) {</span>
+<span class="nc" id="L116">            throw new NullArgumentException();</span>
+        }
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">        if (imaginaryCharacter.length() == 0) {</span>
+<span class="nc" id="L119">            throw new NoDataException();</span>
+        }
+<span class="pc bpc" id="L121" title="1 of 2 branches missed.">        if (imaginaryFormat == null) {</span>
+<span class="nc" id="L122">            throw new NullArgumentException(LocalizedFormats.IMAGINARY_FORMAT);</span>
+        }
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">        if (realFormat == null) {</span>
+<span class="nc" id="L125">            throw new NullArgumentException(LocalizedFormats.REAL_FORMAT);</span>
+        }
+
+<span class="fc" id="L128">        this.imaginaryCharacter = imaginaryCharacter;</span>
+<span class="fc" id="L129">        this.imaginaryFormat = imaginaryFormat;</span>
+<span class="fc" id="L130">        this.realFormat = realFormat;</span>
+<span class="fc" id="L131">    }</span>
+
+    /**
+     * Get the set of locales for which complex formats are available.
+     * &lt;p&gt;This is the same set as the {@link NumberFormat} set.&lt;/p&gt;
+     * @return available complex format locales.
+     */
+    public static Locale[] getAvailableLocales() {
+<span class="nc" id="L139">        return NumberFormat.getAvailableLocales();</span>
+    }
+
+    /**
+     * This method calls {@link #format(Object,StringBuffer,FieldPosition)}.
+     *
+     * @param c Complex object to format.
+     * @return A formatted number in the form &quot;Re(c) + Im(c)i&quot;.
+     */
+    public String format(Complex c) {
+<span class="fc" id="L149">        return format(c, new StringBuffer(), new FieldPosition(0)).toString();</span>
+    }
+
+    /**
+     * This method calls {@link #format(Object,StringBuffer,FieldPosition)}.
+     *
+     * @param c Double object to format.
+     * @return A formatted number.
+     */
+    public String format(Double c) {
+<span class="fc" id="L159">        return format(new Complex(c, 0), new StringBuffer(), new FieldPosition(0)).toString();</span>
+    }
+
+    /**
+     * Formats a {@link Complex} object to produce a string.
+     *
+     * @param complex the object to format.
+     * @param toAppendTo where the text is to be appended
+     * @param pos On input: an alignment field, if desired. On output: the
+     *            offsets of the alignment field
+     * @return the value passed in as toAppendTo.
+     */
+    public StringBuffer format(Complex complex, StringBuffer toAppendTo,
+                               FieldPosition pos) {
+<span class="fc" id="L173">        pos.setBeginIndex(0);</span>
+<span class="fc" id="L174">        pos.setEndIndex(0);</span>
+
+        // format real
+<span class="fc" id="L177">        double re = complex.getReal();</span>
+<span class="fc" id="L178">        CompositeFormat.formatDouble(re, getRealFormat(), toAppendTo, pos);</span>
+
+        // format sign and imaginary
+<span class="fc" id="L181">        double im = complex.getImaginary();</span>
+<span class="fc" id="L182">        StringBuffer imAppendTo = new StringBuffer();</span>
+<span class="fc bfc" id="L183" title="All 2 branches covered.">        if (im &lt; 0.0) {</span>
+<span class="fc" id="L184">            toAppendTo.append(&quot; - &quot;);</span>
+<span class="fc" id="L185">            imAppendTo = formatImaginary(-im, new StringBuffer(), pos);</span>
+<span class="fc" id="L186">            toAppendTo.append(imAppendTo);</span>
+<span class="fc" id="L187">            toAppendTo.append(getImaginaryCharacter());</span>
+<span class="fc bfc" id="L188" title="All 4 branches covered.">        } else if (im &gt; 0.0 || Double.isNaN(im)) {</span>
+<span class="fc" id="L189">            toAppendTo.append(&quot; + &quot;);</span>
+<span class="fc" id="L190">            imAppendTo = formatImaginary(im, new StringBuffer(), pos);</span>
+<span class="fc" id="L191">            toAppendTo.append(imAppendTo);</span>
+<span class="fc" id="L192">            toAppendTo.append(getImaginaryCharacter());</span>
+        }
+
+<span class="fc" id="L195">        return toAppendTo;</span>
+    }
+
+    /**
+     * Format the absolute value of the imaginary part.
+     *
+     * @param absIm Absolute value of the imaginary part of a complex number.
+     * @param toAppendTo where the text is to be appended.
+     * @param pos On input: an alignment field, if desired. On output: the
+     * offsets of the alignment field.
+     * @return the value passed in as toAppendTo.
+     * @throws MathInternalError if {@code absIm} is not positive.
+     */
+    private StringBuffer formatImaginary(double absIm,
+                                         StringBuffer toAppendTo,
+                                         FieldPosition pos) {
+<span class="pc bpc" id="L211" title="1 of 2 branches missed.">        if (absIm &lt; 0) {</span>
+<span class="nc" id="L212">            throw new MathInternalError();</span>
+        }
+
+<span class="fc" id="L215">        pos.setBeginIndex(0);</span>
+<span class="fc" id="L216">        pos.setEndIndex(0);</span>
+
+<span class="fc" id="L218">        CompositeFormat.formatDouble(absIm, getImaginaryFormat(), toAppendTo, pos);</span>
+<span class="fc bfc" id="L219" title="All 2 branches covered.">        if (toAppendTo.toString().equals(&quot;1&quot;)) {</span>
+            // Remove the character &quot;1&quot; if it is the only one.
+<span class="fc" id="L221">            toAppendTo.setLength(0);</span>
+        }
+
+<span class="fc" id="L224">        return toAppendTo;</span>
+    }
+
+    /**
+     * Formats a object to produce a string.  {@code obj} must be either a
+     * {@link Complex} object or a {@link Number} object.  Any other type of
+     * object will result in an {@link IllegalArgumentException} being thrown.
+     *
+     * @param obj the object to format.
+     * @param toAppendTo where the text is to be appended
+     * @param pos On input: an alignment field, if desired. On output: the
+     *            offsets of the alignment field
+     * @return the value passed in as toAppendTo.
+     * @see java.text.Format#format(java.lang.Object, java.lang.StringBuffer, java.text.FieldPosition)
+     * @throws IllegalArgumentException is {@code obj} is not a valid type.
+     */
+    public StringBuffer format(Object obj, StringBuffer toAppendTo,
+                               FieldPosition pos) {
+
+<span class="nc" id="L243">        StringBuffer ret = null;</span>
+
+<span class="nc bnc" id="L245" title="All 2 branches missed.">        if (obj instanceof Complex) {</span>
+<span class="nc" id="L246">            ret = format( (Complex)obj, toAppendTo, pos);</span>
+<span class="nc bnc" id="L247" title="All 2 branches missed.">        } else if (obj instanceof Number) {</span>
+<span class="nc" id="L248">            ret = format(new Complex(((Number)obj).doubleValue(), 0.0),</span>
+                         toAppendTo, pos);
+        } else {
+<span class="nc" id="L251">            throw new MathIllegalArgumentException(LocalizedFormats.CANNOT_FORMAT_INSTANCE_AS_COMPLEX,</span>
+<span class="nc" id="L252">                                                   obj.getClass().getName());</span>
+        }
+
+<span class="nc" id="L255">        return ret;</span>
+    }
+
+    /**
+     * Access the imaginaryCharacter.
+     * @return the imaginaryCharacter.
+     */
+    public String getImaginaryCharacter() {
+<span class="fc" id="L263">        return imaginaryCharacter;</span>
+    }
+
+    /**
+     * Access the imaginaryFormat.
+     * @return the imaginaryFormat.
+     */
+    public NumberFormat getImaginaryFormat() {
+<span class="fc" id="L271">        return imaginaryFormat;</span>
+    }
+
+    /**
+     * Returns the default complex format for the current locale.
+     * @return the default complex format.
+     */
+    public static ComplexFormat getInstance() {
+<span class="nc" id="L279">        return getInstance(Locale.getDefault());</span>
+    }
+
+    /**
+     * Returns the default complex format for the given locale.
+     * @param locale the specific locale used by the format.
+     * @return the complex format specific to the given locale.
+     */
+    public static ComplexFormat getInstance(Locale locale) {
+<span class="fc" id="L288">        NumberFormat f = CompositeFormat.getDefaultNumberFormat(locale);</span>
+<span class="fc" id="L289">        return new ComplexFormat(f);</span>
+    }
+
+    /**
+     * Returns the default complex format for the given locale.
+     * @param locale the specific locale used by the format.
+     * @param imaginaryCharacter Imaginary character.
+     * @return the complex format specific to the given locale.
+     */
+    public static ComplexFormat getInstance(String imaginaryCharacter,
+                                            Locale locale) {
+<span class="fc" id="L300">        NumberFormat f = CompositeFormat.getDefaultNumberFormat(locale);</span>
+<span class="fc" id="L301">        return new ComplexFormat(imaginaryCharacter, f);</span>
+    }
+
+    /**
+     * Access the realFormat.
+     * @return the realFormat.
+     */
+    public NumberFormat getRealFormat() {
+<span class="fc" id="L309">        return realFormat;</span>
+    }
+
+    /**
+     * Parses a string to produce a {@link Complex} object.
+     *
+     * @param source the string to parse.
+     * @return the parsed {@link Complex} object.
+     * @throws MathParseException if the beginning of the specified string
+     * cannot be parsed.
+     */
+    public Complex parse(String source) {
+<span class="fc" id="L321">        ParsePosition parsePosition = new ParsePosition(0);</span>
+<span class="fc" id="L322">        Complex result = parse(source, parsePosition);</span>
+<span class="pc bpc" id="L323" title="1 of 2 branches missed.">        if (parsePosition.getIndex() == 0) {</span>
+<span class="nc" id="L324">            throw new MathParseException(source,</span>
+<span class="nc" id="L325">                                         parsePosition.getErrorIndex(),</span>
+                                         Complex.class);
+        }
+<span class="fc" id="L328">        return result;</span>
+    }
+
+    /**
+     * Parses a string to produce a {@link Complex} object.
+     *
+     * @param source the string to parse
+     * @param pos input/ouput parsing parameter.
+     * @return the parsed {@link Complex} object.
+     */
+    public Complex parse(String source, ParsePosition pos) {
+<span class="fc" id="L339">        int initialIndex = pos.getIndex();</span>
+
+        // parse whitespace
+<span class="fc" id="L342">        CompositeFormat.parseAndIgnoreWhitespace(source, pos);</span>
+
+        // parse real
+<span class="fc" id="L345">        Number re = CompositeFormat.parseNumber(source, getRealFormat(), pos);</span>
+<span class="pc bpc" id="L346" title="1 of 2 branches missed.">        if (re == null) {</span>
+            // invalid real number
+            // set index back to initial, error index should already be set
+<span class="nc" id="L349">            pos.setIndex(initialIndex);</span>
+<span class="nc" id="L350">            return null;</span>
+        }
+
+        // parse sign
+<span class="fc" id="L354">        int startIndex = pos.getIndex();</span>
+<span class="fc" id="L355">        char c = CompositeFormat.parseNextCharacter(source, pos);</span>
+<span class="fc" id="L356">        int sign = 0;</span>
+<span class="pc bpc" id="L357" title="1 of 4 branches missed.">        switch (c) {</span>
+        case 0 :
+            // no sign
+            // return real only complex number
+<span class="fc" id="L361">            return new Complex(re.doubleValue(), 0.0);</span>
+        case '-' :
+<span class="fc" id="L363">            sign = -1;</span>
+<span class="fc" id="L364">            break;</span>
+        case '+' :
+<span class="fc" id="L366">            sign = 1;</span>
+<span class="fc" id="L367">            break;</span>
+        default :
+            // invalid sign
+            // set index back to initial, error index should be the last
+            // character examined.
+<span class="nc" id="L372">            pos.setIndex(initialIndex);</span>
+<span class="nc" id="L373">            pos.setErrorIndex(startIndex);</span>
+<span class="nc" id="L374">            return null;</span>
+        }
+
+        // parse whitespace
+<span class="fc" id="L378">        CompositeFormat.parseAndIgnoreWhitespace(source, pos);</span>
+
+        // parse imaginary
+<span class="fc" id="L381">        Number im = CompositeFormat.parseNumber(source, getRealFormat(), pos);</span>
+<span class="pc bpc" id="L382" title="1 of 2 branches missed.">        if (im == null) {</span>
+            // invalid imaginary number
+            // set index back to initial, error index should already be set
+<span class="nc" id="L385">            pos.setIndex(initialIndex);</span>
+<span class="nc" id="L386">            return null;</span>
+        }
+
+        // parse imaginary character
+<span class="fc bfc" id="L390" title="All 2 branches covered.">        if (!CompositeFormat.parseFixedstring(source, getImaginaryCharacter(), pos)) {</span>
+<span class="fc" id="L391">            return null;</span>
+        }
+
+<span class="fc" id="L394">        return new Complex(re.doubleValue(), im.doubleValue() * sign);</span>
+
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

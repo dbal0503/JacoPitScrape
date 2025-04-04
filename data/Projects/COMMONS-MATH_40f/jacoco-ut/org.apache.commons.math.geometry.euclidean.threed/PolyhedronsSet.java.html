@@ -1,0 +1,429 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PolyhedronsSet.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Commons Math</a> &gt; <a href="index.source.html" class="el_package">org.apache.commons.math.geometry.euclidean.threed</a> &gt; <span class="el_source">PolyhedronsSet.java</span></div><h1>PolyhedronsSet.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.commons.math.geometry.euclidean.threed;
+
+import java.awt.geom.AffineTransform;
+import java.util.Collection;
+
+import org.apache.commons.math.geometry.Vector;
+import org.apache.commons.math.geometry.euclidean.oned.Euclidean1D;
+import org.apache.commons.math.geometry.euclidean.twod.Euclidean2D;
+import org.apache.commons.math.geometry.euclidean.twod.SubLine;
+import org.apache.commons.math.geometry.euclidean.twod.Vector2D;
+import org.apache.commons.math.geometry.partitioning.BSPTree;
+import org.apache.commons.math.geometry.partitioning.BSPTreeVisitor;
+import org.apache.commons.math.geometry.partitioning.BoundaryAttribute;
+import org.apache.commons.math.geometry.partitioning.Hyperplane;
+import org.apache.commons.math.geometry.partitioning.Region;
+import org.apache.commons.math.geometry.partitioning.RegionFactory;
+import org.apache.commons.math.geometry.partitioning.SubHyperplane;
+import org.apache.commons.math.geometry.partitioning.Transform;
+import org.apache.commons.math.geometry.partitioning.AbstractRegion;
+import org.apache.commons.math.util.FastMath;
+
+/** This class represents a 3D region: a set of polyhedrons.
+ * @version $Id$
+ * @since 3.0
+ */
+public class PolyhedronsSet extends AbstractRegion&lt;Euclidean3D, Euclidean2D&gt; {
+
+    /** Build a polyhedrons set representing the whole real line.
+     */
+    public PolyhedronsSet() {
+<span class="fc" id="L47">        super();</span>
+<span class="fc" id="L48">    }</span>
+
+    /** Build a polyhedrons set from a BSP tree.
+     * &lt;p&gt;The leaf nodes of the BSP tree &lt;em&gt;must&lt;/em&gt; have a
+     * {@code Boolean} attribute representing the inside status of
+     * the corresponding cell (true for inside cells, false for outside
+     * cells). In order to avoid building too many small objects, it is
+     * recommended to use the predefined constants
+     * {@code Boolean.TRUE} and {@code Boolean.FALSE}&lt;/p&gt;
+     * @param tree inside/outside BSP tree representing the region
+     */
+    public PolyhedronsSet(final BSPTree&lt;Euclidean3D&gt; tree) {
+<span class="fc" id="L60">        super(tree);</span>
+<span class="fc" id="L61">    }</span>
+
+    /** Build a polyhedrons set from a Boundary REPresentation (B-rep).
+     * &lt;p&gt;The boundary is provided as a collection of {@link
+     * SubHyperplane sub-hyperplanes}. Each sub-hyperplane has the
+     * interior part of the region on its minus side and the exterior on
+     * its plus side.&lt;/p&gt;
+     * &lt;p&gt;The boundary elements can be in any order, and can form
+     * several non-connected sets (like for example polyhedrons with holes
+     * or a set of disjoint polyhedrons considered as a whole). In
+     * fact, the elements do not even need to be connected together
+     * (their topological connections are not used here). However, if the
+     * boundary does not really separate an inside open from an outside
+     * open (open having here its topological meaning), then subsequent
+     * calls to the {@link Region#checkPoint(Vector) checkPoint} method will
+     * not be meaningful anymore.&lt;/p&gt;
+     * &lt;p&gt;If the boundary is empty, the region will represent the whole
+     * space.&lt;/p&gt;
+     * @param boundary collection of boundary elements, as a
+     * collection of {@link SubHyperplane SubHyperplane} objects
+     */
+    public PolyhedronsSet(final Collection&lt;SubHyperplane&lt;Euclidean3D&gt;&gt; boundary) {
+<span class="nc" id="L83">        super(boundary);</span>
+<span class="nc" id="L84">    }</span>
+
+    /** Build a parallellepipedic box.
+     * @param xMin low bound along the x direction
+     * @param xMax high bound along the x direction
+     * @param yMin low bound along the y direction
+     * @param yMax high bound along the y direction
+     * @param zMin low bound along the z direction
+     * @param zMax high bound along the z direction
+     */
+    @SuppressWarnings(&quot;unchecked&quot;)
+    public PolyhedronsSet(final double xMin, final double xMax,
+                          final double yMin, final double yMax,
+                          final double zMin, final double zMax) {
+<span class="fc" id="L98">        this(new RegionFactory&lt;Euclidean3D&gt;().buildConvex(</span>
+            new Plane(new Vector3D(xMin, 0,    0),   Vector3D.MINUS_I),
+            new Plane(new Vector3D(xMax, 0,    0),   Vector3D.PLUS_I),
+            new Plane(new Vector3D(0,    yMin, 0),   Vector3D.MINUS_J),
+            new Plane(new Vector3D(0,    yMax, 0),   Vector3D.PLUS_J),
+            new Plane(new Vector3D(0,    0,   zMin), Vector3D.MINUS_K),
+<span class="fc" id="L104">            new Plane(new Vector3D(0,    0,   zMax), Vector3D.PLUS_K)).getTree(false));</span>
+<span class="fc" id="L105">    }</span>
+
+    /** {@inheritDoc} */
+    @Override
+    public PolyhedronsSet buildNew(final BSPTree&lt;Euclidean3D&gt; tree) {
+<span class="fc" id="L110">        return new PolyhedronsSet(tree);</span>
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    protected void computeGeometricalProperties() {
+
+        // compute the contribution of all boundary facets
+<span class="fc" id="L118">        getTree(true).visit(new FacetsContributionVisitor());</span>
+
+<span class="pc bpc" id="L120" title="1 of 2 branches missed.">        if (getSize() &lt; 0) {</span>
+            // the polyhedrons set as a finite outside
+            // surrounded by an infinite inside
+<span class="nc" id="L123">            setSize(Double.POSITIVE_INFINITY);</span>
+<span class="nc" id="L124">            setBarycenter(Vector3D.NaN);</span>
+        } else {
+            // the polyhedrons set is finite, apply the remaining scaling factors
+<span class="fc" id="L127">            setSize(getSize() / 3.0);</span>
+<span class="fc" id="L128">            setBarycenter(new Vector3D(1.0 / (4 * getSize()), (Vector3D) getBarycenter()));</span>
+        }
+
+<span class="fc" id="L131">    }</span>
+
+    /** Visitor computing geometrical properties. */
+    private class FacetsContributionVisitor implements BSPTreeVisitor&lt;Euclidean3D&gt; {
+
+        /** Simple constructor. */
+<span class="fc" id="L137">        public FacetsContributionVisitor() {</span>
+<span class="fc" id="L138">            setSize(0);</span>
+<span class="fc" id="L139">            setBarycenter(new Vector3D(0, 0, 0));</span>
+<span class="fc" id="L140">        }</span>
+
+        /** {@inheritDoc} */
+        public Order visitOrder(final BSPTree&lt;Euclidean3D&gt; node) {
+<span class="fc" id="L144">            return Order.MINUS_SUB_PLUS;</span>
+        }
+
+        /** {@inheritDoc} */
+        public void visitInternalNode(final BSPTree&lt;Euclidean3D&gt; node) {
+            @SuppressWarnings(&quot;unchecked&quot;)
+<span class="fc" id="L150">            final BoundaryAttribute&lt;Euclidean3D&gt; attribute =</span>
+<span class="fc" id="L151">                (BoundaryAttribute&lt;Euclidean3D&gt;) node.getAttribute();</span>
+<span class="pc bpc" id="L152" title="1 of 2 branches missed.">            if (attribute.getPlusOutside() != null) {</span>
+<span class="fc" id="L153">                addContribution(attribute.getPlusOutside(), false);</span>
+            }
+<span class="pc bpc" id="L155" title="1 of 2 branches missed.">            if (attribute.getPlusInside() != null) {</span>
+<span class="nc" id="L156">                addContribution(attribute.getPlusInside(), true);</span>
+            }
+<span class="fc" id="L158">        }</span>
+
+        /** {@inheritDoc} */
+        public void visitLeafNode(final BSPTree&lt;Euclidean3D&gt; node) {
+<span class="fc" id="L162">        }</span>
+
+        /** Add he contribution of a boundary facet.
+         * @param facet boundary facet
+         * @param reversed if true, the facet has the inside on its plus side
+         */
+        private void addContribution(final SubHyperplane&lt;Euclidean3D&gt; facet, final boolean reversed) {
+
+<span class="fc" id="L170">            final Region&lt;Euclidean2D&gt; polygon = ((SubPlane) facet).getRemainingRegion();</span>
+<span class="fc" id="L171">            final double area    = polygon.getSize();</span>
+
+<span class="pc bpc" id="L173" title="1 of 2 branches missed.">            if (Double.isInfinite(area)) {</span>
+<span class="nc" id="L174">                setSize(Double.POSITIVE_INFINITY);</span>
+<span class="nc" id="L175">                setBarycenter(Vector3D.NaN);</span>
+            } else {
+
+<span class="fc" id="L178">                final Plane    plane  = (Plane) facet.getHyperplane();</span>
+<span class="fc" id="L179">                final Vector3D facetB = plane.toSpace(polygon.getBarycenter());</span>
+<span class="fc" id="L180">                double   scaled = area * facetB.dotProduct(plane.getNormal());</span>
+<span class="pc bpc" id="L181" title="1 of 2 branches missed.">                if (reversed) {</span>
+<span class="nc" id="L182">                    scaled = -scaled;</span>
+                }
+
+<span class="fc" id="L185">                setSize(getSize() + scaled);</span>
+<span class="fc" id="L186">                setBarycenter(new Vector3D(1.0, (Vector3D) getBarycenter(), scaled, facetB));</span>
+
+            }
+
+<span class="fc" id="L190">        }</span>
+
+    }
+
+    /** Get the first sub-hyperplane crossed by a semi-infinite line.
+     * @param point start point of the part of the line considered
+     * @param line line to consider (contains point)
+     * @return the first sub-hyperplaned crossed by the line after the
+     * given point, or null if the line does not intersect any
+     * sub-hyperplaned
+     */
+    public SubHyperplane&lt;Euclidean3D&gt; firstIntersection(final Vector3D point, final Line line) {
+<span class="nc" id="L202">        return recurseFirstIntersection(getTree(true), point, line);</span>
+    }
+
+    /** Get the first sub-hyperplane crossed by a semi-infinite line.
+     * @param node current node
+     * @param point start point of the part of the line considered
+     * @param line line to consider (contains point)
+     * @return the first sub-hyperplaned crossed by the line after the
+     * given point, or null if the line does not intersect any
+     * sub-hyperplaned
+     */
+    private SubHyperplane&lt;Euclidean3D&gt; recurseFirstIntersection(final BSPTree&lt;Euclidean3D&gt; node,
+                                                                final Vector3D point,
+                                                                final Line line) {
+
+<span class="nc" id="L217">        final SubHyperplane&lt;Euclidean3D&gt; cut = node.getCut();</span>
+<span class="nc bnc" id="L218" title="All 2 branches missed.">        if (cut == null) {</span>
+<span class="nc" id="L219">            return null;</span>
+        }
+<span class="nc" id="L221">        final BSPTree&lt;Euclidean3D&gt; minus = node.getMinus();</span>
+<span class="nc" id="L222">        final BSPTree&lt;Euclidean3D&gt; plus  = node.getPlus();</span>
+<span class="nc" id="L223">        final Plane               plane = (Plane) cut.getHyperplane();</span>
+
+        // establish search order
+<span class="nc" id="L226">        final double offset = plane.getOffset(point);</span>
+<span class="nc bnc" id="L227" title="All 2 branches missed.">        final boolean in    = FastMath.abs(offset) &lt; 1.0e-10;</span>
+        final BSPTree&lt;Euclidean3D&gt; near;
+        final BSPTree&lt;Euclidean3D&gt; far;
+<span class="nc bnc" id="L230" title="All 2 branches missed.">        if (offset &lt; 0) {</span>
+<span class="nc" id="L231">            near = minus;</span>
+<span class="nc" id="L232">            far  = plus;</span>
+        } else {
+<span class="nc" id="L234">            near = plus;</span>
+<span class="nc" id="L235">            far  = minus;</span>
+        }
+
+<span class="nc bnc" id="L238" title="All 2 branches missed.">        if (in) {</span>
+            // search in the cut hyperplane
+<span class="nc" id="L240">            final SubHyperplane&lt;Euclidean3D&gt; facet = boundaryFacet(point, node);</span>
+<span class="nc bnc" id="L241" title="All 2 branches missed.">            if (facet != null) {</span>
+<span class="nc" id="L242">                return facet;</span>
+            }
+        }
+
+        // search in the near branch
+<span class="nc" id="L247">        final SubHyperplane&lt;Euclidean3D&gt; crossed = recurseFirstIntersection(near, point, line);</span>
+<span class="nc bnc" id="L248" title="All 2 branches missed.">        if (crossed != null) {</span>
+<span class="nc" id="L249">            return crossed;</span>
+        }
+
+<span class="nc bnc" id="L252" title="All 2 branches missed.">        if (!in) {</span>
+            // search in the cut hyperplane
+<span class="nc" id="L254">            final Vector3D hit3D = plane.intersection(line);</span>
+<span class="nc bnc" id="L255" title="All 2 branches missed.">            if (hit3D != null) {</span>
+<span class="nc" id="L256">                final SubHyperplane&lt;Euclidean3D&gt; facet = boundaryFacet(hit3D, node);</span>
+<span class="nc bnc" id="L257" title="All 2 branches missed.">                if (facet != null) {</span>
+<span class="nc" id="L258">                    return facet;</span>
+                }
+            }
+        }
+
+        // search in the far branch
+<span class="nc" id="L264">        return recurseFirstIntersection(far, point, line);</span>
+
+    }
+
+    /** Check if a point belongs to the boundary part of a node.
+     * @param point point to check
+     * @param node node containing the boundary facet to check
+     * @return the boundary facet this points belongs to (or null if it
+     * does not belong to any boundary facet)
+     */
+    private SubHyperplane&lt;Euclidean3D&gt; boundaryFacet(final Vector3D point,
+                                                     final BSPTree&lt;Euclidean3D&gt; node) {
+<span class="nc" id="L276">        final Vector2D point2D = ((Plane) node.getCut().getHyperplane()).toSubSpace(point);</span>
+        @SuppressWarnings(&quot;unchecked&quot;)
+<span class="nc" id="L278">        final BoundaryAttribute&lt;Euclidean3D&gt; attribute =</span>
+<span class="nc" id="L279">            (BoundaryAttribute&lt;Euclidean3D&gt;) node.getAttribute();</span>
+<span class="nc bnc" id="L280" title="All 2 branches missed.">        if ((attribute.getPlusOutside() != null) &amp;&amp;</span>
+<span class="nc bnc" id="L281" title="All 2 branches missed.">            (((SubPlane) attribute.getPlusOutside()).getRemainingRegion().checkPoint(point2D) == Location.INSIDE)) {</span>
+<span class="nc" id="L282">            return attribute.getPlusOutside();</span>
+        }
+<span class="nc bnc" id="L284" title="All 2 branches missed.">        if ((attribute.getPlusInside() != null) &amp;&amp;</span>
+<span class="nc bnc" id="L285" title="All 2 branches missed.">            (((SubPlane) attribute.getPlusInside()).getRemainingRegion().checkPoint(point2D) == Location.INSIDE)) {</span>
+<span class="nc" id="L286">            return attribute.getPlusInside();</span>
+        }
+<span class="nc" id="L288">        return null;</span>
+    }
+
+    /** Rotate the region around the specified point.
+     * &lt;p&gt;The instance is not modified, a new instance is created.&lt;/p&gt;
+     * @param center rotation center
+     * @param rotation vectorial rotation operator
+     * @return a new instance representing the rotated region
+     */
+    public PolyhedronsSet rotate(final Vector3D center, final Rotation rotation) {
+<span class="fc" id="L298">        return (PolyhedronsSet) applyTransform(new RotationTransform(center, rotation));</span>
+    }
+
+    /** 3D rotation as a Transform. */
+    private static class RotationTransform implements Transform&lt;Euclidean3D, Euclidean2D&gt; {
+
+        /** Center point of the rotation. */
+        private Vector3D   center;
+
+        /** Vectorial rotation. */
+        private Rotation   rotation;
+
+        /** Cached original hyperplane. */
+        private Plane cachedOriginal;
+
+        /** Cached 2D transform valid inside the cached original hyperplane. */
+        private Transform&lt;Euclidean2D, Euclidean1D&gt;  cachedTransform;
+
+        /** Build a rotation transform.
+         * @param center center point of the rotation
+         * @param rotation vectorial rotation
+         */
+<span class="fc" id="L320">        public RotationTransform(final Vector3D center, final Rotation rotation) {</span>
+<span class="fc" id="L321">            this.center   = center;</span>
+<span class="fc" id="L322">            this.rotation = rotation;</span>
+<span class="fc" id="L323">        }</span>
+
+        /** {@inheritDoc} */
+        public Vector3D apply(final Vector&lt;Euclidean3D&gt; point) {
+<span class="fc" id="L327">            final Vector3D delta = ((Vector3D) point).subtract(center);</span>
+<span class="fc" id="L328">            return new Vector3D(1.0, center, 1.0, rotation.applyTo(delta));</span>
+        }
+
+        /** {@inheritDoc} */
+        public Plane apply(final Hyperplane&lt;Euclidean3D&gt; hyperplane) {
+<span class="fc" id="L333">            return ((Plane) hyperplane).rotate(center, rotation);</span>
+        }
+
+        /** {@inheritDoc} */
+        public SubHyperplane&lt;Euclidean2D&gt; apply(final SubHyperplane&lt;Euclidean2D&gt; sub,
+                                                final Hyperplane&lt;Euclidean3D&gt; original,
+                                                final Hyperplane&lt;Euclidean3D&gt; transformed) {
+<span class="fc bfc" id="L340" title="All 2 branches covered.">            if (original != cachedOriginal) {</span>
+                // we have changed hyperplane, reset the in-hyperplane transform
+
+<span class="fc" id="L343">                final Plane    oPlane = (Plane) original;</span>
+<span class="fc" id="L344">                final Plane    tPlane = (Plane) transformed;</span>
+<span class="fc" id="L345">                final Vector3D p00    = oPlane.getOrigin();</span>
+<span class="fc" id="L346">                final Vector3D p10    = oPlane.toSpace(new Vector2D(1.0, 0.0));</span>
+<span class="fc" id="L347">                final Vector3D p01    = oPlane.toSpace(new Vector2D(0.0, 1.0));</span>
+<span class="fc" id="L348">                final Vector2D  tP00   = tPlane.toSubSpace(apply(p00));</span>
+<span class="fc" id="L349">                final Vector2D  tP10   = tPlane.toSubSpace(apply(p10));</span>
+<span class="fc" id="L350">                final Vector2D  tP01   = tPlane.toSubSpace(apply(p01));</span>
+<span class="fc" id="L351">                final AffineTransform at =</span>
+<span class="fc" id="L352">                    new AffineTransform(tP10.getX() - tP00.getX(), tP10.getY() - tP00.getY(),</span>
+<span class="fc" id="L353">                                        tP01.getX() - tP00.getX(), tP01.getY() - tP00.getY(),</span>
+<span class="fc" id="L354">                                        tP00.getX(), tP00.getY());</span>
+
+<span class="fc" id="L356">                cachedOriginal  = (Plane) original;</span>
+<span class="fc" id="L357">                cachedTransform = org.apache.commons.math.geometry.euclidean.twod.Line.getTransform(at);</span>
+
+            }
+<span class="fc" id="L360">            return ((SubLine) sub).applyTransform(cachedTransform);</span>
+        }
+
+    }
+
+    /** Translate the region by the specified amount.
+     * &lt;p&gt;The instance is not modified, a new instance is created.&lt;/p&gt;
+     * @param translation translation to apply
+     * @return a new instance representing the translated region
+     */
+    public PolyhedronsSet translate(final Vector3D translation) {
+<span class="fc" id="L371">        return (PolyhedronsSet) applyTransform(new TranslationTransform(translation));</span>
+    }
+
+    /** 3D translation as a transform. */
+    private static class TranslationTransform implements Transform&lt;Euclidean3D, Euclidean2D&gt; {
+
+        /** Translation vector. */
+        private Vector3D   translation;
+
+        /** Cached original hyperplane. */
+        private Plane cachedOriginal;
+
+        /** Cached 2D transform valid inside the cached original hyperplane. */
+        private Transform&lt;Euclidean2D, Euclidean1D&gt;  cachedTransform;
+
+        /** Build a translation transform.
+         * @param translation translation vector
+         */
+<span class="fc" id="L389">        public TranslationTransform(final Vector3D translation) {</span>
+<span class="fc" id="L390">            this.translation = translation;</span>
+<span class="fc" id="L391">        }</span>
+
+        /** {@inheritDoc} */
+        public Vector3D apply(final Vector&lt;Euclidean3D&gt; point) {
+<span class="fc" id="L395">            return new Vector3D(1.0, (Vector3D) point, 1.0, translation);</span>
+        }
+
+        /** {@inheritDoc} */
+        public Plane apply(final Hyperplane&lt;Euclidean3D&gt; hyperplane) {
+<span class="fc" id="L400">            return ((Plane) hyperplane).translate(translation);</span>
+        }
+
+        /** {@inheritDoc} */
+        public SubHyperplane&lt;Euclidean2D&gt; apply(final SubHyperplane&lt;Euclidean2D&gt; sub,
+                                                final Hyperplane&lt;Euclidean3D&gt; original,
+                                                final Hyperplane&lt;Euclidean3D&gt; transformed) {
+<span class="fc bfc" id="L407" title="All 2 branches covered.">            if (original != cachedOriginal) {</span>
+                // we have changed hyperplane, reset the in-hyperplane transform
+
+<span class="fc" id="L410">                final Plane   oPlane = (Plane) original;</span>
+<span class="fc" id="L411">                final Plane   tPlane = (Plane) transformed;</span>
+<span class="fc" id="L412">                final Vector2D shift  = tPlane.toSubSpace(apply(oPlane.getOrigin()));</span>
+<span class="fc" id="L413">                final AffineTransform at =</span>
+<span class="fc" id="L414">                    AffineTransform.getTranslateInstance(shift.getX(), shift.getY());</span>
+
+<span class="fc" id="L416">                cachedOriginal  = (Plane) original;</span>
+<span class="fc" id="L417">                cachedTransform =</span>
+<span class="fc" id="L418">                    org.apache.commons.math.geometry.euclidean.twod.Line.getTransform(at);</span>
+
+            }
+
+<span class="fc" id="L422">            return ((SubLine) sub).applyTransform(cachedTransform);</span>
+
+        }
+
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

@@ -1,0 +1,196 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SerializationUtils.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Commons Lang</a> &gt; <a href="index.source.html" class="el_package">org.apache.commons.lang</a> &gt; <span class="el_source">SerializationUtils.java</span></div><h1>SerializationUtils.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ * 
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.commons.lang;
+
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.OutputStream;
+import java.io.Serializable;
+
+/**
+ * &lt;p&gt;Assists with the serialization process and performs additional functionality based 
+ * on serialization.&lt;/p&gt;
+ * &lt;p&gt;
+ * &lt;ul&gt;
+ * &lt;li&gt;Deep clone using serialization
+ * &lt;li&gt;Serialize managing finally and IOException
+ * &lt;li&gt;Deserialize managing finally and IOException
+ * &lt;/ul&gt;
+ *
+ * &lt;p&gt;This class throws exceptions for invalid &lt;code&gt;null&lt;/code&gt; inputs.
+ * Each method documents its behaviour in more detail.&lt;/p&gt;
+ *
+ * @author &lt;a href=&quot;mailto:nissim@nksystems.com&quot;&gt;Nissim Karpenstein&lt;/a&gt;
+ * @author &lt;a href=&quot;mailto:janekdb@yahoo.co.uk&quot;&gt;Janek Bogucki&lt;/a&gt;
+ * @author Daniel L. Rall
+ * @author Stephen Colebourne
+ * @author Jeff Varszegi
+ * @author Gary Gregory
+ * @since 1.0
+ * @version $Id$
+ */
+public class SerializationUtils {
+    
+    /**
+     * &lt;p&gt;SerializationUtils instances should NOT be constructed in standard programming.
+     * Instead, the class should be used as &lt;code&gt;SerializationUtils.clone(object)&lt;/code&gt;.&lt;/p&gt;
+     *
+     * &lt;p&gt;This constructor is public to permit tools that require a JavaBean instance
+     * to operate.&lt;/p&gt;
+     * @since 2.0
+     */
+    public SerializationUtils() {
+<span class="fc" id="L61">        super();</span>
+<span class="fc" id="L62">    }</span>
+
+    // Clone
+    //-----------------------------------------------------------------------
+    /**
+     * &lt;p&gt;Deep clone an &lt;code&gt;Object&lt;/code&gt; using serialization.&lt;/p&gt;
+     *
+     * &lt;p&gt;This is many times slower than writing clone methods by hand
+     * on all objects in your object graph. However, for complex object
+     * graphs, or for those that don't support deep cloning this can
+     * be a simple alternative implementation. Of course all the objects
+     * must be &lt;code&gt;Serializable&lt;/code&gt;.&lt;/p&gt;
+     * 
+     * @param object  the &lt;code&gt;Serializable&lt;/code&gt; object to clone
+     * @return the cloned object
+     * @throws SerializationException (runtime) if the serialization fails
+     */
+    public static Object clone(Serializable object) {
+<span class="fc" id="L80">        return deserialize(serialize(object));</span>
+    }
+    
+    // Serialize
+    //-----------------------------------------------------------------------
+    /**
+     * &lt;p&gt;Serializes an &lt;code&gt;Object&lt;/code&gt; to the specified stream.&lt;/p&gt;
+     *
+     * &lt;p&gt;The stream will be closed once the object is written.
+     * This avoids the need for a finally clause, and maybe also exception
+     * handling, in the application code.&lt;/p&gt;
+     * 
+     * &lt;p&gt;The stream passed in is not buffered internally within this method.
+     * This is the responsibility of your application if desired.&lt;/p&gt;
+     *
+     * @param obj  the object to serialize to bytes, may be null
+     * @param outputStream  the stream to write to, must not be null
+     * @throws IllegalArgumentException if &lt;code&gt;outputStream&lt;/code&gt; is &lt;code&gt;null&lt;/code&gt;
+     * @throws SerializationException (runtime) if the serialization fails
+     */
+    public static void serialize(Serializable obj, OutputStream outputStream) {
+<span class="fc bfc" id="L101" title="All 2 branches covered.">        if (outputStream == null) {</span>
+<span class="fc" id="L102">            throw new IllegalArgumentException(&quot;The OutputStream must not be null&quot;);</span>
+        }
+<span class="fc" id="L104">        ObjectOutputStream out = null;</span>
+        try {
+            // stream closed in the finally
+<span class="fc" id="L107">            out = new ObjectOutputStream(outputStream);</span>
+<span class="fc" id="L108">            out.writeObject(obj);</span>
+            
+<span class="fc" id="L110">        } catch (IOException ex) {</span>
+<span class="fc" id="L111">            throw new SerializationException(ex);</span>
+        } finally {
+            try {
+<span class="fc bfc" id="L114" title="All 2 branches covered.">                if (out != null) {</span>
+<span class="fc" id="L115">                    out.close();</span>
+                }
+<span class="nc" id="L117">            } catch (IOException ex) {</span>
+                // ignore close exception
+<span class="fc" id="L119">            }</span>
+        }
+<span class="fc" id="L121">    }</span>
+
+    /**
+     * &lt;p&gt;Serializes an &lt;code&gt;Object&lt;/code&gt; to a byte array for
+     * storage/serialization.&lt;/p&gt;
+     *
+     * @param obj  the object to serialize to bytes
+     * @return a byte[] with the converted Serializable
+     * @throws SerializationException (runtime) if the serialization fails
+     */
+    public static byte[] serialize(Serializable obj) {
+<span class="fc" id="L132">        ByteArrayOutputStream baos = new ByteArrayOutputStream(512);</span>
+<span class="fc" id="L133">        serialize(obj, baos);</span>
+<span class="fc" id="L134">        return baos.toByteArray();</span>
+    }
+
+    // Deserialize
+    //-----------------------------------------------------------------------
+    /**
+     * &lt;p&gt;Deserializes an &lt;code&gt;Object&lt;/code&gt; from the specified stream.&lt;/p&gt;
+     *
+     * &lt;p&gt;The stream will be closed once the object is written. This
+     * avoids the need for a finally clause, and maybe also exception
+     * handling, in the application code.&lt;/p&gt;
+     * 
+     * &lt;p&gt;The stream passed in is not buffered internally within this method.
+     * This is the responsibility of your application if desired.&lt;/p&gt;
+     *
+     * @param inputStream  the serialized object input stream, must not be null
+     * @return the deserialized object
+     * @throws IllegalArgumentException if &lt;code&gt;inputStream&lt;/code&gt; is &lt;code&gt;null&lt;/code&gt;
+     * @throws SerializationException (runtime) if the serialization fails
+     */
+    public static Object deserialize(InputStream inputStream) {
+<span class="fc bfc" id="L155" title="All 2 branches covered.">        if (inputStream == null) {</span>
+<span class="fc" id="L156">            throw new IllegalArgumentException(&quot;The InputStream must not be null&quot;);</span>
+        }
+<span class="fc" id="L158">        ObjectInputStream in = null;</span>
+        try {
+            // stream closed in the finally
+<span class="fc" id="L161">            in = new ObjectInputStream(inputStream);</span>
+<span class="fc" id="L162">            return in.readObject();</span>
+            
+<span class="fc" id="L164">        } catch (ClassNotFoundException ex) {</span>
+<span class="fc" id="L165">            throw new SerializationException(ex);</span>
+<span class="fc" id="L166">        } catch (IOException ex) {</span>
+<span class="fc" id="L167">            throw new SerializationException(ex);</span>
+        } finally {
+            try {
+<span class="fc bfc" id="L170" title="All 2 branches covered.">                if (in != null) {</span>
+<span class="fc" id="L171">                    in.close();</span>
+                }
+<span class="nc" id="L173">            } catch (IOException ex) {</span>
+                // ignore close exception
+<span class="fc" id="L175">            }</span>
+        }
+    }
+
+    /**
+     * &lt;p&gt;Deserializes a single &lt;code&gt;Object&lt;/code&gt; from an array of bytes.&lt;/p&gt;
+     *
+     * @param objectData  the serialized object, must not be null
+     * @return the deserialized object
+     * @throws IllegalArgumentException if &lt;code&gt;objectData&lt;/code&gt; is &lt;code&gt;null&lt;/code&gt;
+     * @throws SerializationException (runtime) if the serialization fails
+     */
+    public static Object deserialize(byte[] objectData) {
+<span class="fc bfc" id="L188" title="All 2 branches covered.">        if (objectData == null) {</span>
+<span class="fc" id="L189">            throw new IllegalArgumentException(&quot;The byte[] must not be null&quot;);</span>
+        }
+<span class="fc" id="L191">        ByteArrayInputStream bais = new ByteArrayInputStream(objectData);</span>
+<span class="fc" id="L192">        return deserialize(bais);</span>
+    }
+    
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

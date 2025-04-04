@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>XmlTextDeserializer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Jackson-dataformat-XML</a> &gt; <a href="index.source.html" class="el_package">com.fasterxml.jackson.dataformat.xml.deser</a> &gt; <span class="el_source">XmlTextDeserializer.java</span></div><h1>XmlTextDeserializer.java</h1><pre class="source lang-java linenums">package com.fasterxml.jackson.dataformat.xml.deser;
+
+import java.io.IOException;
+
+import com.fasterxml.jackson.core.*;
+import com.fasterxml.jackson.databind.*;
+import com.fasterxml.jackson.databind.deser.*;
+import com.fasterxml.jackson.databind.deser.std.DelegatingDeserializer;
+import com.fasterxml.jackson.databind.jsontype.TypeDeserializer;
+
+/**
+ * Delegating deserializer that is used in the special cases where
+ * we may sometimes see a &quot;plain&quot; String value but need to map it
+ * as if it was a property of POJO. The impedance is introduced by
+ * heuristic conversion from XML events into rough JSON equivalents;
+ * and this is one work-around that can only be done after the fact.
+ */
+public class XmlTextDeserializer
+    extends DelegatingDeserializer
+{
+    private static final long serialVersionUID = 1L;
+
+    /**
+     * Property index of the &quot;XML text property&quot;; needed for finding actual
+     * property instance after resolution and contextualization: instance
+     * may change, but index will remain constant.
+     */
+    protected final int _xmlTextPropertyIndex;
+
+    /**
+     * Actual property that is indicated to be of type &quot;XML Text&quot; (and
+     * is the only element-valued property)
+     */
+    protected final SettableBeanProperty _xmlTextProperty;
+
+    protected final ValueInstantiator _valueInstantiator;
+
+    /*
+    /**********************************************************************
+    /* Construction
+    /**********************************************************************
+     */
+
+    public XmlTextDeserializer(BeanDeserializerBase delegate, SettableBeanProperty prop)
+    {
+<span class="fc" id="L46">        super(delegate);</span>
+<span class="fc" id="L47">        _xmlTextProperty = prop;</span>
+<span class="fc" id="L48">        _xmlTextPropertyIndex = prop.getPropertyIndex();</span>
+<span class="fc" id="L49">        _valueInstantiator = delegate.getValueInstantiator();</span>
+<span class="fc" id="L50">    }</span>
+
+    public XmlTextDeserializer(BeanDeserializerBase delegate, int textPropIndex)
+    {
+<span class="fc" id="L54">        super(delegate);</span>
+<span class="fc" id="L55">        _xmlTextPropertyIndex = textPropIndex;</span>
+<span class="fc" id="L56">        _valueInstantiator = delegate.getValueInstantiator();</span>
+<span class="fc" id="L57">        _xmlTextProperty = delegate.findProperty(textPropIndex);</span>
+<span class="fc" id="L58">    }</span>
+    
+    /*
+    /**********************************************************************
+    /* Abstract method implementations
+    /**********************************************************************
+     */
+
+    @Override
+    protected JsonDeserializer&lt;?&gt; newDelegatingInstance(JsonDeserializer&lt;?&gt; newDelegatee0) {
+        // default not enough, as we need to create a new wrapping deserializer
+        // even if delegatee does not change
+<span class="nc" id="L70">        throw new IllegalStateException(&quot;Internal error: should never get called&quot;);</span>
+    }
+
+    @Override
+    public JsonDeserializer&lt;?&gt; createContextual(DeserializationContext ctxt,
+            BeanProperty property)
+        throws JsonMappingException
+    {
+<span class="fc" id="L78">        return new XmlTextDeserializer(_verifyDeserType(_delegatee), _xmlTextPropertyIndex);</span>
+    }
+
+    /*
+    /**********************************************************************
+    /* Overridden deserialization methods
+    /**********************************************************************
+     */
+
+    @Override
+    public Object deserialize(JsonParser p, DeserializationContext ctxt)
+        throws IOException
+    {
+<span class="fc bfc" id="L91" title="All 2 branches covered.">        if (p.getCurrentToken() == JsonToken.VALUE_STRING) {</span>
+<span class="fc" id="L92">            Object bean = _valueInstantiator.createUsingDefault(ctxt);</span>
+<span class="fc" id="L93">            _xmlTextProperty.deserializeAndSet(p, ctxt, bean);</span>
+<span class="fc" id="L94">            return bean;</span>
+        }
+<span class="fc" id="L96">        return _delegatee.deserialize(p,  ctxt);</span>
+    }
+
+    @SuppressWarnings(&quot;unchecked&quot;)
+    @Override
+    public Object deserialize(JsonParser p, DeserializationContext ctxt,
+            Object bean) throws IOException
+    {
+<span class="nc bnc" id="L104" title="All 2 branches missed.">        if (p.getCurrentToken() == JsonToken.VALUE_STRING) {</span>
+<span class="nc" id="L105">            _xmlTextProperty.deserializeAndSet(p, ctxt, bean);</span>
+<span class="nc" id="L106">            return bean;</span>
+        }
+<span class="nc" id="L108">        return ((JsonDeserializer&lt;Object&gt;)_delegatee).deserialize(p, ctxt, bean);</span>
+    }
+
+    @Override
+    public Object deserializeWithType(JsonParser p, DeserializationContext ctxt,
+            TypeDeserializer typeDeserializer)
+        throws IOException
+    {
+<span class="nc" id="L116">        return _delegatee.deserializeWithType(p, ctxt, typeDeserializer);</span>
+    }
+    
+    /*
+    /**********************************************************************
+    /* Internal methods
+    /**********************************************************************
+     */
+
+    protected BeanDeserializerBase _verifyDeserType(JsonDeserializer&lt;?&gt; deser)
+    {
+<span class="pc bpc" id="L127" title="1 of 2 branches missed.">        if (!(deser instanceof BeanDeserializerBase)) {</span>
+<span class="nc" id="L128">            throw new IllegalArgumentException(&quot;Can not change delegate to be of type &quot;</span>
+<span class="nc" id="L129">                    +deser.getClass().getName());</span>
+        }
+<span class="fc" id="L131">        return (BeanDeserializerBase) deser;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

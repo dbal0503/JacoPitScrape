@@ -1,0 +1,199 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Gaussian.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Commons Math</a> &gt; <a href="index.source.html" class="el_package">org.apache.commons.math.analysis.function</a> &gt; <span class="el_source">Gaussian.java</span></div><h1>Gaussian.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.commons.math.analysis.function;
+
+import org.apache.commons.math.analysis.UnivariateFunction;
+import org.apache.commons.math.analysis.DifferentiableUnivariateFunction;
+import org.apache.commons.math.analysis.ParametricUnivariateFunction;
+import org.apache.commons.math.exception.NotStrictlyPositiveException;
+import org.apache.commons.math.exception.NullArgumentException;
+import org.apache.commons.math.exception.DimensionMismatchException;
+import org.apache.commons.math.util.FastMath;
+
+/**
+ * &lt;a href=&quot;http://en.wikipedia.org/wiki/Gaussian_function&quot;&gt;
+ *  Gaussian&lt;/a&gt; function.
+ *
+ * @version $Id$
+ * @since 3.0
+ */
+public class Gaussian implements DifferentiableUnivariateFunction {
+    /** Mean. */
+    private final double mean;
+    /** Inverse of twice the square of the standard deviation. */
+    private final double i2s2;
+    /** Normalization factor. */
+    private final double norm;
+
+    /**
+     * Gaussian with given normalization factor, mean and standard deviation.
+     *
+     * @param norm Normalization factor.
+     * @param mean Mean.
+     * @param sigma Standard deviation.
+     * @throws NotStrictlyPositiveException if {@code sigma &lt;= 0}.
+     */
+    public Gaussian(double norm,
+                    double mean,
+<span class="fc" id="L53">                    double sigma) {</span>
+<span class="fc bfc" id="L54" title="All 2 branches covered.">        if (sigma &lt;= 0) {</span>
+<span class="fc" id="L55">            throw new NotStrictlyPositiveException(sigma);</span>
+        }
+
+<span class="fc" id="L58">        this.norm = norm;</span>
+<span class="fc" id="L59">        this.mean = mean;</span>
+<span class="fc" id="L60">        this.i2s2 = 1 / (2 * sigma * sigma);</span>
+<span class="fc" id="L61">    }</span>
+
+    /**
+     * Normalized gaussian with given mean and standard deviation.
+     *
+     * @param mean Mean.
+     * @param sigma Standard deviation.
+     * @throws NotStrictlyPositiveException if {@code sigma &lt;= 0}.
+     */
+    public Gaussian(double mean,
+                    double sigma) {
+<span class="fc" id="L72">        this(1 / (sigma * FastMath.sqrt(2 * Math.PI)), mean, sigma);</span>
+<span class="fc" id="L73">    }</span>
+
+    /**
+     * Normalized gaussian with zero mean and unit standard deviation.
+     */
+    public Gaussian() {
+<span class="fc" id="L79">        this(0, 1);</span>
+<span class="fc" id="L80">    }</span>
+
+    /** {@inheritDoc} */
+    public double value(double x) {
+<span class="fc" id="L84">        return value(x - mean, norm, i2s2);</span>
+    }
+
+    /** {@inheritDoc} */
+    public UnivariateFunction derivative() {
+<span class="fc" id="L89">        return new UnivariateFunction() {</span>
+            /** {@inheritDoc} */
+            public double value(double x) {
+<span class="fc" id="L92">                final double diff = x - mean;</span>
+<span class="fc" id="L93">                final double g = Gaussian.value(diff, norm, i2s2);</span>
+
+<span class="fc bfc" id="L95" title="All 2 branches covered.">                if (g == 0) {</span>
+                    // Avoid returning NaN in case of overflow.
+<span class="fc" id="L97">                    return 0;</span>
+                } else {
+<span class="fc" id="L99">                    return -2 * diff * i2s2 * g;</span>
+                }
+            }
+        };
+    }
+
+    /**
+     * Parametric function where the input array contains the parameters of
+     * the Gaussian, ordered as follows:
+     * &lt;ul&gt;
+     *  &lt;li&gt;Norm&lt;/li&gt;
+     *  &lt;li&gt;Mean&lt;/li&gt;
+     *  &lt;li&gt;Standard deviation&lt;/li&gt;
+     * &lt;/ul&gt;
+     */
+<span class="fc" id="L114">    public static class Parametric implements ParametricUnivariateFunction {</span>
+        /**
+         * Computes the value of the Gaussian at {@code x}.
+         *
+         * @param x Value for which the function must be computed.
+         * @param param Values of norm, mean and standard deviation.
+         * @return the value of the function.
+         * @throws NullArgumentException if {@code param} is {@code null}.
+         * @throws DimensionMismatchException if the size of {@code param} is
+         * not 3.
+         * @throws NotStrictlyPositiveException if {@code param[2]} is negative.
+         */
+        public double value(double x, double ... param) {
+<span class="fc" id="L127">            validateParameters(param);</span>
+
+<span class="fc" id="L129">            final double diff = x - param[1];</span>
+<span class="fc" id="L130">            final double i2s2 = 1 / (2 * param[2] * param[2]);</span>
+<span class="fc" id="L131">            return Gaussian.value(diff, param[0], i2s2);</span>
+        }
+
+        /**
+         * Computes the value of the gradient at {@code x}.
+         * The components of the gradient vector are the partial
+         * derivatives of the function with respect to each of the
+         * &lt;em&gt;parameters&lt;/em&gt; (norm, mean and standard deviation).
+         *
+         * @param x Value at which the gradient must be computed.
+         * @param param Values of norm, mean and standard deviation.
+         * @return the gradient vector at {@code x}.
+         * @throws NullArgumentException if {@code param} is {@code null}.
+         * @throws DimensionMismatchException if the size of {@code param} is
+         * not 3.
+         * @throws NotStrictlyPositiveException if {@code param[2]} is negative.
+         */
+        public double[] gradient(double x, double ... param) {
+<span class="fc" id="L149">            validateParameters(param);</span>
+
+<span class="fc" id="L151">            final double norm = param[0];</span>
+<span class="fc" id="L152">            final double diff = x - param[1];</span>
+<span class="fc" id="L153">            final double sigma = param[2];</span>
+<span class="fc" id="L154">            final double i2s2 = 1 / (2 * sigma * sigma);</span>
+
+<span class="fc" id="L156">            final double n = Gaussian.value(diff, 1, i2s2);</span>
+<span class="fc" id="L157">            final double m = norm * n * 2 * i2s2 * diff;</span>
+<span class="fc" id="L158">            final double s = m * diff / sigma;</span>
+
+<span class="fc" id="L160">            return new double[] { n, m, s };</span>
+        }
+
+        /**
+         * Validates parameters to ensure they are appropriate for the evaluation of
+         * the {@link #value(double,double[])} and {@link #gradient(double,double[])}
+         * methods.
+         *
+         * @param param Values of norm, mean and standard deviation.
+         * @throws NullArgumentException if {@code param} is {@code null}.
+         * @throws DimensionMismatchException if the size of {@code param} is
+         * not 3.
+         * @throws NotStrictlyPositiveException if {@code param[2]} is negative.
+         */
+        private void validateParameters(double[] param) {
+<span class="fc bfc" id="L175" title="All 2 branches covered.">            if (param == null) {</span>
+<span class="fc" id="L176">                throw new NullArgumentException();</span>
+            }
+<span class="fc bfc" id="L178" title="All 2 branches covered.">            if (param.length != 3) {</span>
+<span class="fc" id="L179">                throw new DimensionMismatchException(param.length, 3);</span>
+            }
+<span class="fc bfc" id="L181" title="All 2 branches covered.">            if (param[2] &lt;= 0) {</span>
+<span class="fc" id="L182">                throw new NotStrictlyPositiveException(param[2]);</span>
+            }
+<span class="fc" id="L184">        }</span>
+    }
+
+    /**
+     * @param xMinusMean {@code x - mean}.
+     * @param norm Normalization factor.
+     * @param i2s2 Inverse of twice the square of the standard deviation.
+     * @return the value of the Gaussian at {@code x}.
+     */
+    private static double value(double xMinusMean,
+                                double norm,
+                                double i2s2) {
+<span class="fc" id="L196">        return norm * FastMath.exp(-xMinusMean * xMinusMean * i2s2);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

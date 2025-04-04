@@ -1,0 +1,396 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>XmlBeanSerializerBase.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Jackson-dataformat-XML</a> &gt; <a href="index.source.html" class="el_package">com.fasterxml.jackson.dataformat.xml.ser</a> &gt; <span class="el_source">XmlBeanSerializerBase.java</span></div><h1>XmlBeanSerializerBase.java</h1><pre class="source lang-java linenums">package com.fasterxml.jackson.dataformat.xml.ser;
+
+import java.io.IOException;
+import java.util.BitSet;
+import java.util.Set;
+
+import javax.xml.namespace.QName;
+
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import com.fasterxml.jackson.core.*;
+import com.fasterxml.jackson.databind.JsonMappingException;
+import com.fasterxml.jackson.databind.SerializerProvider;
+import com.fasterxml.jackson.databind.jsontype.TypeSerializer;
+import com.fasterxml.jackson.databind.ser.BeanPropertyWriter;
+import com.fasterxml.jackson.databind.ser.PropertyFilter;
+import com.fasterxml.jackson.databind.ser.impl.ObjectIdWriter;
+import com.fasterxml.jackson.databind.ser.impl.WritableObjectId;
+import com.fasterxml.jackson.databind.ser.std.BeanSerializerBase;
+import com.fasterxml.jackson.databind.util.NameTransformer;
+import com.fasterxml.jackson.dataformat.xml.util.XmlInfo;
+
+/**
+ * Specific sub-class of {@link BeanSerializerBase} needed to take care
+ * of some xml-specific aspects, such as distinction between attributes
+ * and elements.
+ */
+@SuppressWarnings(&quot;serial&quot;)
+public abstract class XmlBeanSerializerBase extends BeanSerializerBase
+{
+    /**
+     * Marker used for storing associated internal data with {@link BeanPropertyWriter}
+     * instances; to mark instances that are to be written out as attributes.
+     * Created as separate non-interned String to ensure there are no collisions.
+     */
+<span class="fc" id="L35">    public final static String KEY_XML_INFO = new String(&quot;xmlInfo&quot;);</span>
+
+    /**
+     * Number of attributes to write; these will have been ordered to be the first
+     * properties to write.
+     */
+    protected final int _attributeCount;
+
+    /**
+     * Index of &quot;text value&quot; property we have, if any; can have at most
+     * one such property.
+     */
+    protected final int _textPropertyIndex;
+
+    /**
+     * Array that contains namespace URIs associated with properties, if any;
+     * null if no namespace definitions have been assigned
+     */
+    protected final QName[] _xmlNames;
+
+    /**
+     * Optional set of indexes of properties that should be serialized as CDATA,
+     * instead of regular XML text segment. Left as null in cases where none of
+     * element values are to be written in such a way.
+     */
+    protected final BitSet _cdata;
+    
+    public XmlBeanSerializerBase(BeanSerializerBase src)
+    {
+<span class="fc" id="L64">        super(src);</span>
+
+        /* Then make sure attributes are sorted before elements, keep track
+         * of how many there are altogether
+         */
+<span class="fc" id="L69">        int attrCount = 0;</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">        for (BeanPropertyWriter bpw : _props) {</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">            if (_isAttribute(bpw)) { // Yup: let's build re-ordered list then</span>
+<span class="fc" id="L72">                attrCount = _orderAttributesFirst(_props, _filteredProps);</span>
+<span class="fc" id="L73">                break;</span>
+            }
+        }
+<span class="fc" id="L76">        _attributeCount = attrCount;</span>
+
+        // also: pre-compute need, if any, for CDATA handling:
+<span class="fc" id="L79">        BitSet cdata = null;</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">        for (int i = 0, len = _props.length; i &lt; len; ++i) {</span>
+<span class="fc" id="L81">            BeanPropertyWriter bpw = _props[i];</span>
+<span class="fc bfc" id="L82" title="All 2 branches covered.">            if (_isCData(bpw)) {</span>
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">                if (cdata == null) {</span>
+<span class="fc" id="L84">                    cdata = new BitSet(len);</span>
+                }
+<span class="fc" id="L86">                cdata.set(i);</span>
+            }
+        }
+<span class="fc" id="L89">        _cdata = cdata;</span>
+        
+        // And then collect namespace information
+<span class="fc" id="L92">        _xmlNames = new QName[_props.length];</span>
+<span class="fc" id="L93">        int textIndex = -1;</span>
+<span class="fc bfc" id="L94" title="All 2 branches covered.">        for (int i = 0, len = _props.length; i &lt; len; ++i) {</span>
+<span class="fc" id="L95">            BeanPropertyWriter bpw = _props[i];</span>
+<span class="fc" id="L96">            XmlInfo info = (XmlInfo) bpw.getInternalSetting(KEY_XML_INFO);</span>
+<span class="fc" id="L97">            String ns = null;</span>
+<span class="pc bpc" id="L98" title="1 of 2 branches missed.">            if (info != null) {</span>
+<span class="fc" id="L99">                ns = info.getNamespace();</span>
+<span class="fc bfc" id="L100" title="All 4 branches covered.">                if (textIndex &lt; 0 &amp;&amp; info.isText()) {</span>
+<span class="fc" id="L101">                    textIndex = i;</span>
+                }
+            }
+<span class="pc bpc" id="L104" title="1 of 2 branches missed.">            _xmlNames[i] = new QName((ns == null) ? &quot;&quot; : ns, bpw.getName());</span>
+        }
+<span class="fc" id="L106">        _textPropertyIndex = textIndex;</span>
+<span class="fc" id="L107">    }</span>
+
+    protected XmlBeanSerializerBase(XmlBeanSerializerBase src, ObjectIdWriter objectIdWriter)
+    {
+<span class="nc" id="L111">        super(src, objectIdWriter);</span>
+<span class="nc" id="L112">        _attributeCount = src._attributeCount;</span>
+<span class="nc" id="L113">        _textPropertyIndex = src._textPropertyIndex;</span>
+<span class="nc" id="L114">        _xmlNames = src._xmlNames;</span>
+<span class="nc" id="L115">        _cdata = src._cdata;</span>
+<span class="nc" id="L116">    }</span>
+
+    protected XmlBeanSerializerBase(XmlBeanSerializerBase src, ObjectIdWriter objectIdWriter, Object filterId)
+    {
+<span class="fc" id="L120">        super(src, objectIdWriter, filterId);</span>
+<span class="fc" id="L121">        _attributeCount = src._attributeCount;</span>
+<span class="fc" id="L122">        _textPropertyIndex = src._textPropertyIndex;</span>
+<span class="fc" id="L123">        _xmlNames = src._xmlNames;</span>
+<span class="fc" id="L124">        _cdata = src._cdata;</span>
+<span class="fc" id="L125">    }</span>
+
+    protected XmlBeanSerializerBase(XmlBeanSerializerBase src, Set&lt;String&gt; toIgnore)
+    {
+<span class="nc" id="L129">        super(src, toIgnore);</span>
+<span class="nc" id="L130">        _attributeCount = src._attributeCount;</span>
+<span class="nc" id="L131">        _textPropertyIndex = src._textPropertyIndex;</span>
+<span class="nc" id="L132">        _xmlNames = src._xmlNames;</span>
+<span class="nc" id="L133">        _cdata = src._cdata;</span>
+<span class="nc" id="L134">    }</span>
+    
+    public XmlBeanSerializerBase(XmlBeanSerializerBase src, NameTransformer transformer)
+    {
+<span class="fc" id="L138">        super(src, transformer);</span>
+<span class="fc" id="L139">        _attributeCount = src._attributeCount;</span>
+<span class="fc" id="L140">        _textPropertyIndex = src._textPropertyIndex;</span>
+<span class="fc" id="L141">        _xmlNames = src._xmlNames;</span>
+<span class="fc" id="L142">        _cdata = src._cdata;</span>
+<span class="fc" id="L143">    }</span>
+
+    /*
+    /**********************************************************
+    /* Overridden serialization methods
+    /**********************************************************
+     */
+
+    /**
+     * Main serialization method needs to be overridden to allow XML-specific
+     * extra handling, such as indication of whether to write attributes or
+     * elements.
+     */
+    @Override
+    protected void serializeFields(Object bean, JsonGenerator gen0, SerializerProvider provider)
+        throws IOException
+    {
+        // 19-Aug-2013, tatu: During 'convertValue()', need to skip
+<span class="fc bfc" id="L161" title="All 2 branches covered.">        if (!(gen0 instanceof ToXmlGenerator)) {</span>
+<span class="fc" id="L162">            super.serializeFields(bean, gen0, provider);</span>
+<span class="fc" id="L163">            return;</span>
+        }
+<span class="fc" id="L165">        final ToXmlGenerator xgen = (ToXmlGenerator) gen0;</span>
+        final BeanPropertyWriter[] props;
+<span class="pc bpc" id="L167" title="1 of 4 branches missed.">        if (_filteredProps != null &amp;&amp; provider.getActiveView() != null) {</span>
+<span class="fc" id="L168">            props = _filteredProps;</span>
+        } else {
+<span class="fc" id="L170">            props = _props;</span>
+        }
+
+<span class="fc" id="L173">        final int attrCount = _attributeCount;</span>
+<span class="fc" id="L174">        final boolean isAttribute = xgen._nextIsAttribute;</span>
+<span class="fc bfc" id="L175" title="All 2 branches covered.">        if (attrCount &gt; 0) {</span>
+<span class="fc" id="L176">            xgen.setNextIsAttribute(true);</span>
+        }
+<span class="fc" id="L178">        final int textIndex = _textPropertyIndex;</span>
+<span class="fc" id="L179">        final QName[] xmlNames = _xmlNames;</span>
+<span class="fc" id="L180">        int i = 0;</span>
+<span class="fc" id="L181">        final BitSet cdata = _cdata;</span>
+
+        try {
+<span class="fc bfc" id="L184" title="All 2 branches covered.">            for (final int len = props.length; i &lt; len; ++i) {</span>
+                // 28-jan-2014, pascal: we don't want to reset the attribute flag if we are an unwrapping serializer 
+                // that started with nextIsAttribute to true because all properties should be unwrapped as attributes too.
+<span class="fc bfc" id="L187" title="All 6 branches covered.">                if (i == attrCount &amp;&amp; !(isAttribute &amp;&amp; isUnwrappingSerializer())) {</span>
+<span class="fc" id="L188">                    xgen.setNextIsAttribute(false);</span>
+                }
+                // also: if this is property to write as text (&quot;unwrap&quot;), need to:
+<span class="fc bfc" id="L191" title="All 2 branches covered.">                if (i == textIndex) {</span>
+<span class="fc" id="L192">                    xgen.setNextIsUnwrapped(true);</span>
+                }
+<span class="fc" id="L194">                xgen.setNextName(xmlNames[i]);</span>
+<span class="fc" id="L195">                BeanPropertyWriter prop = props[i];</span>
+<span class="pc bpc" id="L196" title="1 of 2 branches missed.">                if (prop != null) { // can have nulls in filtered list</span>
+<span class="pc bpc" id="L197" title="1 of 4 branches missed.">                    if ((cdata != null) &amp;&amp; cdata.get(i)) {</span>
+<span class="fc" id="L198">                        xgen.setNextIsCData(true);</span>
+<span class="fc" id="L199">                        prop.serializeAsField(bean, xgen, provider);</span>
+<span class="fc" id="L200">                        xgen.setNextIsCData(false);</span>
+                    } else {
+<span class="fc" id="L202">                        prop.serializeAsField(bean, xgen, provider);</span>
+                    }
+                }
+                // Reset to avoid next value being written as unwrapped, 
+                // for example when property is suppressed
+<span class="fc bfc" id="L207" title="All 2 branches covered.">                if (i == textIndex) {</span>
+<span class="fc" id="L208">                    xgen.setNextIsUnwrapped(false);</span>
+                }
+            }
+<span class="fc bfc" id="L211" title="All 2 branches covered.">            if (_anyGetterWriter != null) {</span>
+                // For [#117]: not a clean fix, but with @JsonTypeInfo, we'll end up
+                // with accidental attributes otherwise
+<span class="fc" id="L214">                xgen.setNextIsAttribute(false);</span>
+<span class="fc" id="L215">                _anyGetterWriter.getAndSerialize(bean, xgen, provider);</span>
+            }
+<span class="nc" id="L217">        } catch (Exception e) {</span>
+<span class="nc bnc" id="L218" title="All 2 branches missed.">            String name = (i == props.length) ? &quot;[anySetter]&quot; : props[i].getName();</span>
+<span class="nc" id="L219">            wrapAndThrow(provider, e, bean, name);</span>
+<span class="nc" id="L220">        } catch (StackOverflowError e) { // Bit tricky, can't do more calls as stack is full; so:</span>
+<span class="nc" id="L221">            JsonMappingException mapE = JsonMappingException.from(gen0,</span>
+                    &quot;Infinite recursion (StackOverflowError)&quot;);
+<span class="nc bnc" id="L223" title="All 2 branches missed.">            String name = (i == props.length) ? &quot;[anySetter]&quot; : props[i].getName();</span>
+<span class="nc" id="L224">            mapE.prependPath(new JsonMappingException.Reference(bean, name));</span>
+<span class="nc" id="L225">            throw mapE;</span>
+<span class="pc" id="L226">        }</span>
+<span class="fc" id="L227">    }</span>
+
+    @Override
+    protected void serializeFieldsFiltered(Object bean, JsonGenerator gen0,
+            SerializerProvider provider)
+        throws IOException
+    {
+        // 19-Aug-2013, tatu: During 'convertValue()', need to skip
+<span class="pc bpc" id="L235" title="1 of 2 branches missed.">        if (!(gen0 instanceof ToXmlGenerator)) {</span>
+<span class="nc" id="L236">            super.serializeFieldsFiltered(bean, gen0, provider);</span>
+<span class="nc" id="L237">            return;</span>
+        }
+        
+<span class="fc" id="L240">        final ToXmlGenerator xgen = (ToXmlGenerator) gen0;</span>
+        
+        final BeanPropertyWriter[] props;
+<span class="pc bpc" id="L243" title="3 of 4 branches missed.">        if (_filteredProps != null &amp;&amp; provider.getActiveView() != null) {</span>
+<span class="nc" id="L244">            props = _filteredProps;</span>
+        } else {
+<span class="fc" id="L246">            props = _props;</span>
+        }
+<span class="fc" id="L248">        final PropertyFilter filter = findPropertyFilter(provider, _propertyFilterId, bean);</span>
+        // better also allow missing filter actually..
+<span class="pc bpc" id="L250" title="1 of 2 branches missed.">        if (filter == null) {</span>
+<span class="nc" id="L251">            serializeFields(bean, gen0, provider);</span>
+<span class="nc" id="L252">            return;</span>
+        }
+
+<span class="fc" id="L255">        final boolean isAttribute = xgen._nextIsAttribute;</span>
+<span class="fc" id="L256">        final int attrCount = _attributeCount;</span>
+<span class="pc bpc" id="L257" title="1 of 2 branches missed.">        if (attrCount &gt; 0) {</span>
+<span class="fc" id="L258">            xgen.setNextIsAttribute(true);</span>
+        }
+<span class="fc" id="L260">        final int textIndex = _textPropertyIndex;</span>
+<span class="fc" id="L261">        final QName[] xmlNames = _xmlNames;</span>
+<span class="fc" id="L262">        final BitSet cdata = _cdata;</span>
+
+<span class="fc" id="L264">        int i = 0;</span>
+        try {
+<span class="fc bfc" id="L266" title="All 2 branches covered.">            for (final int len = props.length; i &lt; len; ++i) {</span>
+                // 28-jan-2014, pascal: we don't want to reset the attribute flag if we are an unwrapping serializer 
+                // that started with nextIsAttribute to true because all properties should be unwrapped as attributes too.
+<span class="pc bpc" id="L269" title="3 of 6 branches missed.">                if (i == attrCount &amp;&amp; !(isAttribute &amp;&amp; isUnwrappingSerializer())) {</span>
+<span class="fc" id="L270">                    xgen.setNextIsAttribute(false);</span>
+                }
+                // also: if this is property to write as text (&quot;unwrap&quot;), need to:
+<span class="pc bpc" id="L273" title="1 of 2 branches missed.">                if (i == textIndex) {</span>
+<span class="nc" id="L274">                    xgen.setNextIsUnwrapped(true);</span>
+                }
+<span class="fc" id="L276">                xgen.setNextName(xmlNames[i]);</span>
+<span class="fc" id="L277">                BeanPropertyWriter prop = props[i];</span>
+<span class="pc bpc" id="L278" title="1 of 2 branches missed.">                if (prop != null) { // can have nulls in filtered list</span>
+<span class="pc bpc" id="L279" title="3 of 4 branches missed.">                    if ((cdata != null) &amp;&amp; cdata.get(i)) {</span>
+<span class="nc" id="L280">                        xgen.setNextIsCData(true);</span>
+<span class="nc" id="L281">                        filter.serializeAsField(bean, xgen, provider, prop);</span>
+<span class="nc" id="L282">                        xgen.setNextIsCData(false);</span>
+                    } else {
+<span class="fc" id="L284">                        filter.serializeAsField(bean, xgen, provider, prop);</span>
+                    }
+                }
+            }
+<span class="pc bpc" id="L288" title="1 of 2 branches missed.">            if (_anyGetterWriter != null) {</span>
+                // For [#117]: not a clean fix, but with @JsonTypeInfo, we'll end up
+                // with accidental attributes otherwise
+<span class="nc" id="L291">                xgen.setNextIsAttribute(false);</span>
+<span class="nc" id="L292">                _anyGetterWriter.getAndSerialize(bean, xgen, provider);</span>
+            }
+<span class="nc" id="L294">        } catch (Exception e) {</span>
+<span class="nc bnc" id="L295" title="All 2 branches missed.">            String name = (i == props.length) ? &quot;[anySetter]&quot; : props[i].getName();</span>
+<span class="nc" id="L296">            wrapAndThrow(provider, e, bean, name);</span>
+<span class="nc" id="L297">        } catch (StackOverflowError e) {</span>
+<span class="nc" id="L298">            JsonMappingException mapE = JsonMappingException.from(gen0, &quot;Infinite recursion (StackOverflowError)&quot;, e);</span>
+<span class="nc bnc" id="L299" title="All 2 branches missed.">            String name = (i == props.length) ? &quot;[anySetter]&quot; : props[i].getName();</span>
+<span class="nc" id="L300">            mapE.prependPath(new JsonMappingException.Reference(bean, name));</span>
+<span class="nc" id="L301">            throw mapE;</span>
+<span class="pc" id="L302">        }</span>
+<span class="fc" id="L303">    }</span>
+    
+    @Override
+    public void serializeWithType(Object bean, JsonGenerator gen, SerializerProvider provider,
+            TypeSerializer typeSer)
+        throws IOException
+    {
+<span class="fc bfc" id="L310" title="All 2 branches covered.">        if (_objectIdWriter != null) {</span>
+<span class="fc" id="L311">            _serializeWithObjectId(bean, gen, provider, typeSer);</span>
+<span class="fc" id="L312">            return;</span>
+        }
+        /* Ok: let's serialize type id as attribute, but if (and only if!)
+         * we are using AS_PROPERTY
+         */
+<span class="fc bfc" id="L317" title="All 2 branches covered.">        if (typeSer.getTypeInclusion() == JsonTypeInfo.As.PROPERTY) {</span>
+<span class="fc" id="L318">            ToXmlGenerator xgen = (ToXmlGenerator)gen;</span>
+<span class="fc" id="L319">            xgen.setNextIsAttribute(true);</span>
+<span class="fc" id="L320">            super.serializeWithType(bean, gen, provider, typeSer);</span>
+<span class="pc bpc" id="L321" title="1 of 2 branches missed.">            if (_attributeCount == 0) { // if no attributes, need to reset</span>
+<span class="fc" id="L322">                xgen.setNextIsAttribute(false);</span>
+            }
+<span class="fc" id="L324">        } else {</span>
+<span class="fc" id="L325">            super.serializeWithType(bean, gen, provider, typeSer);</span>
+        }
+<span class="fc" id="L327">    }</span>
+    
+    @Override
+    protected void _serializeObjectId(Object bean, JsonGenerator gen, SerializerProvider provider,
+            TypeSerializer typeSer, WritableObjectId objectId) throws IOException
+    {
+        // Ok: let's serialize type id as attribute, but if (and only if!) we are using AS_PROPERTY
+<span class="pc bpc" id="L334" title="1 of 2 branches missed.">        if (typeSer.getTypeInclusion() == JsonTypeInfo.As.PROPERTY) {</span>
+<span class="fc" id="L335">            ToXmlGenerator xgen = (ToXmlGenerator)gen;</span>
+<span class="fc" id="L336">            xgen.setNextIsAttribute(true);</span>
+<span class="fc" id="L337">            super._serializeObjectId(bean, gen, provider, typeSer, objectId);</span>
+<span class="pc bpc" id="L338" title="1 of 2 branches missed.">            if (_attributeCount == 0) { // if no attributes, need to reset</span>
+<span class="fc" id="L339">                xgen.setNextIsAttribute(false);</span>
+            }
+<span class="fc" id="L341">        } else {</span>
+<span class="nc" id="L342">            super._serializeObjectId(bean, gen, provider, typeSer, objectId);</span>
+        }
+<span class="fc" id="L344">    }</span>
+
+    /*
+    /**********************************************************
+    /* Helper methods
+    /**********************************************************
+     */
+
+    protected static boolean _isAttribute(BeanPropertyWriter bpw)
+    {
+<span class="fc" id="L354">        XmlInfo info = (XmlInfo) bpw.getInternalSetting(KEY_XML_INFO);</span>
+<span class="pc bpc" id="L355" title="1 of 4 branches missed.">        return (info != null) &amp;&amp; info.isAttribute();</span>
+    }
+
+    protected static boolean _isCData(BeanPropertyWriter bpw)
+    {
+<span class="fc" id="L360">        XmlInfo info = (XmlInfo) bpw.getInternalSetting(KEY_XML_INFO);</span>
+<span class="pc bpc" id="L361" title="1 of 4 branches missed.">        return (info != null) &amp;&amp; info.isCData();</span>
+    }
+
+    /**
+     * Method for re-sorting lists of bean properties such that attributes are strictly
+     * written before elements.
+     */
+    protected static int _orderAttributesFirst(BeanPropertyWriter[] properties,
+            BeanPropertyWriter[] filteredProperties)
+    {
+<span class="fc" id="L371">        int attrCount = 0;</span>
+
+<span class="fc bfc" id="L373" title="All 2 branches covered.">        for (int i = 0, len = properties.length; i &lt; len; ++i) {</span>
+<span class="fc" id="L374">            BeanPropertyWriter bpw = properties[i];</span>
+            
+<span class="fc bfc" id="L376" title="All 2 branches covered.">            if (!_isAttribute(bpw)) {</span>
+<span class="fc" id="L377">                continue;</span>
+            }
+            
+            // Move attribute a few places down as necessary
+<span class="fc" id="L381">            int moveBy = i - attrCount;</span>
+<span class="fc bfc" id="L382" title="All 2 branches covered.">            if (moveBy &gt; 0) {</span>
+<span class="fc" id="L383">                System.arraycopy(properties, attrCount, properties, attrCount + 1, moveBy);</span>
+<span class="fc" id="L384">                properties[attrCount] = bpw;</span>
+<span class="pc bpc" id="L385" title="1 of 2 branches missed.">                if (filteredProperties != null) {</span>
+<span class="nc" id="L386">                    BeanPropertyWriter fbpw = filteredProperties[i];</span>
+<span class="nc" id="L387">                    System.arraycopy(filteredProperties, attrCount, filteredProperties, attrCount+1, moveBy);</span>
+<span class="nc" id="L388">                    filteredProperties[attrCount] = fbpw;</span>
+                }
+            }
+<span class="fc" id="L391">            ++attrCount;</span>
+        }
+<span class="fc" id="L393">        return attrCount;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

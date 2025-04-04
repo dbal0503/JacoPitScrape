@@ -1,0 +1,348 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SynchronizedSummaryStatistics.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Commons Math</a> &gt; <a href="index.source.html" class="el_package">org.apache.commons.math.stat.descriptive</a> &gt; <span class="el_source">SynchronizedSummaryStatistics.java</span></div><h1>SynchronizedSummaryStatistics.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.commons.math.stat.descriptive;
+
+import org.apache.commons.math.exception.NullArgumentException;
+import org.apache.commons.math.util.MathUtils;
+
+/**
+ * Implementation of
+ * {@link org.apache.commons.math.stat.descriptive.SummaryStatistics} that
+ * is safe to use in a multithreaded environment.  Multiple threads can safely
+ * operate on a single instance without causing runtime exceptions due to race
+ * conditions.  In effect, this implementation makes modification and access
+ * methods atomic operations for a single instance.  That is to say, as one
+ * thread is computing a statistic from the instance, no other thread can modify
+ * the instance nor compute another statistic.
+ *
+ * @since 1.2
+ * @version $Id$
+ */
+public class SynchronizedSummaryStatistics extends SummaryStatistics {
+
+    /** Serialization UID */
+    private static final long serialVersionUID = 1909861009042253704L;
+
+    /**
+     * Construct a SynchronizedSummaryStatistics instance
+     */
+    public SynchronizedSummaryStatistics() {
+<span class="fc" id="L44">        super();</span>
+<span class="fc" id="L45">    }</span>
+
+    /**
+     * A copy constructor. Creates a deep-copy of the {@code original}.
+     *
+     * @param original the {@code SynchronizedSummaryStatistics} instance to copy
+     */
+<span class="nc" id="L52">    public SynchronizedSummaryStatistics(SynchronizedSummaryStatistics original) {</span>
+<span class="nc" id="L53">        copy(original, this);</span>
+<span class="nc" id="L54">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public synchronized StatisticalSummary getSummary() {
+<span class="fc" id="L61">        return super.getSummary();</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public synchronized void addValue(double value) {
+<span class="fc" id="L69">        super.addValue(value);</span>
+<span class="fc" id="L70">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public synchronized long getN() {
+<span class="fc" id="L77">        return super.getN();</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public synchronized double getSum() {
+<span class="fc" id="L85">        return super.getSum();</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public synchronized double getSumsq() {
+<span class="fc" id="L93">        return super.getSumsq();</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public synchronized double getMean() {
+<span class="fc" id="L101">        return super.getMean();</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public synchronized double getStandardDeviation() {
+<span class="fc" id="L109">        return super.getStandardDeviation();</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public synchronized double getVariance() {
+<span class="fc" id="L117">        return super.getVariance();</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public synchronized double getPopulationVariance() {
+<span class="fc" id="L125">        return super.getPopulationVariance();</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public synchronized double getMax() {
+<span class="fc" id="L133">        return super.getMax();</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public synchronized double getMin() {
+<span class="fc" id="L141">        return super.getMin();</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public synchronized double getGeometricMean() {
+<span class="fc" id="L149">        return super.getGeometricMean();</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public synchronized String toString() {
+<span class="nc" id="L157">        return super.toString();</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public synchronized void clear() {
+<span class="fc" id="L165">        super.clear();</span>
+<span class="fc" id="L166">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public synchronized boolean equals(Object object) {
+<span class="fc" id="L173">        return super.equals(object);</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public synchronized int hashCode() {
+<span class="fc" id="L181">        return super.hashCode();</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public synchronized StorelessUnivariateStatistic getSumImpl() {
+<span class="fc" id="L189">        return super.getSumImpl();</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public synchronized void setSumImpl(StorelessUnivariateStatistic sumImpl) {
+<span class="fc" id="L197">        super.setSumImpl(sumImpl);</span>
+<span class="fc" id="L198">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public synchronized StorelessUnivariateStatistic getSumsqImpl() {
+<span class="nc" id="L205">        return super.getSumsqImpl();</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public synchronized void setSumsqImpl(StorelessUnivariateStatistic sumsqImpl) {
+<span class="nc" id="L213">        super.setSumsqImpl(sumsqImpl);</span>
+<span class="nc" id="L214">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public synchronized StorelessUnivariateStatistic getMinImpl() {
+<span class="nc" id="L221">        return super.getMinImpl();</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public synchronized void setMinImpl(StorelessUnivariateStatistic minImpl) {
+<span class="nc" id="L229">        super.setMinImpl(minImpl);</span>
+<span class="nc" id="L230">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public synchronized StorelessUnivariateStatistic getMaxImpl() {
+<span class="nc" id="L237">        return super.getMaxImpl();</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public synchronized void setMaxImpl(StorelessUnivariateStatistic maxImpl) {
+<span class="nc" id="L245">        super.setMaxImpl(maxImpl);</span>
+<span class="nc" id="L246">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public synchronized StorelessUnivariateStatistic getSumLogImpl() {
+<span class="nc" id="L253">        return super.getSumLogImpl();</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public synchronized void setSumLogImpl(StorelessUnivariateStatistic sumLogImpl) {
+<span class="fc" id="L261">        super.setSumLogImpl(sumLogImpl);</span>
+<span class="fc" id="L262">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public synchronized StorelessUnivariateStatistic getGeoMeanImpl() {
+<span class="fc" id="L269">        return super.getGeoMeanImpl();</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public synchronized void setGeoMeanImpl(StorelessUnivariateStatistic geoMeanImpl) {
+<span class="nc" id="L277">        super.setGeoMeanImpl(geoMeanImpl);</span>
+<span class="nc" id="L278">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public synchronized StorelessUnivariateStatistic getMeanImpl() {
+<span class="nc" id="L285">        return super.getMeanImpl();</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public synchronized void setMeanImpl(StorelessUnivariateStatistic meanImpl) {
+<span class="fc" id="L293">        super.setMeanImpl(meanImpl);</span>
+<span class="fc" id="L294">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public synchronized StorelessUnivariateStatistic getVarianceImpl() {
+<span class="fc" id="L301">        return super.getVarianceImpl();</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public synchronized void setVarianceImpl(StorelessUnivariateStatistic varianceImpl) {
+<span class="nc" id="L309">        super.setVarianceImpl(varianceImpl);</span>
+<span class="nc" id="L310">    }</span>
+
+    /**
+     * Returns a copy of this SynchronizedSummaryStatistics instance with the
+     * same internal state.
+     *
+     * @return a copy of this
+     */
+    @Override
+    public synchronized SynchronizedSummaryStatistics copy() {
+<span class="nc" id="L320">        SynchronizedSummaryStatistics result =</span>
+            new SynchronizedSummaryStatistics();
+<span class="nc" id="L322">        copy(this, result);</span>
+<span class="nc" id="L323">        return result;</span>
+    }
+
+    /**
+     * Copies source to dest.
+     * &lt;p&gt;Neither source nor dest can be null.&lt;/p&gt;
+     * &lt;p&gt;Acquires synchronization lock on source, then dest before copying.&lt;/p&gt;
+     *
+     * @param source SynchronizedSummaryStatistics to copy
+     * @param dest SynchronizedSummaryStatistics to copy to
+     * @throws NullArgumentException if either source or dest is null
+     */
+    public static void copy(SynchronizedSummaryStatistics source,
+                            SynchronizedSummaryStatistics dest)
+        throws NullArgumentException {
+<span class="nc" id="L338">        MathUtils.checkNotNull(source);</span>
+<span class="nc" id="L339">        MathUtils.checkNotNull(dest);</span>
+<span class="nc" id="L340">        synchronized (source) {</span>
+<span class="nc" id="L341">            synchronized (dest) {</span>
+<span class="nc" id="L342">                SummaryStatistics.copy(source, dest);</span>
+<span class="nc" id="L343">            }</span>
+<span class="nc" id="L344">        }</span>
+<span class="nc" id="L345">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

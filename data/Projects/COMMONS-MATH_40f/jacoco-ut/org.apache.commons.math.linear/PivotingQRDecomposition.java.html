@@ -1,0 +1,421 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PivotingQRDecomposition.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Commons Math</a> &gt; <a href="index.source.html" class="el_package">org.apache.commons.math.linear</a> &gt; <span class="el_source">PivotingQRDecomposition.java</span></div><h1>PivotingQRDecomposition.java</h1><pre class="source lang-java linenums">/*
+ * Copyright 2011 The Apache Software Foundation.
+ *
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.commons.math.linear;
+
+import java.util.Arrays;
+import org.apache.commons.math.util.MathArrays;
+import org.apache.commons.math.exception.ConvergenceException;
+import org.apache.commons.math.exception.DimensionMismatchException;
+import org.apache.commons.math.exception.util.LocalizedFormats;
+import org.apache.commons.math.util.FastMath;
+
+/**
+ *
+ * @author gregsterijevski
+ */
+public class PivotingQRDecomposition {
+
+    private double[][] qr;
+    /** The diagonal elements of R. */
+    private double[] rDiag;
+    /** Cached value of Q. */
+    private RealMatrix cachedQ;
+    /** Cached value of QT. */
+    private RealMatrix cachedQT;
+    /** Cached value of R. */
+    private RealMatrix cachedR;
+    /** Cached value of H. */
+    private RealMatrix cachedH;
+    /** permutation info */
+    private int[] permutation;
+    /** the rank **/
+    private int rank;
+    /** vector of column multipliers */
+    private double[] beta;
+
+    public boolean isSingular() {
+<span class="nc bnc" id="L50" title="All 2 branches missed.">        return rank != qr[0].length;</span>
+    }
+
+    public int getRank() {
+<span class="nc" id="L54">        return rank;</span>
+    }
+
+    public int[] getOrder() {
+<span class="nc" id="L58">        return MathArrays.copyOf(permutation);</span>
+    }
+
+    public PivotingQRDecomposition(RealMatrix matrix) throws ConvergenceException {
+<span class="fc" id="L62">        this(matrix, 1.0e-16, true);</span>
+<span class="fc" id="L63">    }</span>
+
+    public PivotingQRDecomposition(RealMatrix matrix, boolean allowPivot) throws ConvergenceException {
+<span class="fc" id="L66">        this(matrix, 1.0e-16, allowPivot);</span>
+<span class="fc" id="L67">    }</span>
+
+    public PivotingQRDecomposition(RealMatrix matrix, double qrRankingThreshold,
+<span class="fc" id="L70">            boolean allowPivot) throws ConvergenceException {</span>
+<span class="fc" id="L71">        final int rows = matrix.getRowDimension();</span>
+<span class="fc" id="L72">        final int cols = matrix.getColumnDimension();</span>
+<span class="fc" id="L73">        qr = matrix.getData();</span>
+<span class="fc" id="L74">        rDiag = new double[cols];</span>
+        //final double[] norms = new double[cols];
+<span class="fc" id="L76">        this.beta = new double[cols];</span>
+<span class="fc" id="L77">        this.permutation = new int[cols];</span>
+<span class="fc" id="L78">        cachedQ = null;</span>
+<span class="fc" id="L79">        cachedQT = null;</span>
+<span class="fc" id="L80">        cachedR = null;</span>
+<span class="fc" id="L81">        cachedH = null;</span>
+
+        /*- initialize the permutation vector and calculate the norms */
+<span class="fc bfc" id="L84" title="All 2 branches covered.">        for (int k = 0; k &lt; cols; ++k) {</span>
+<span class="fc" id="L85">            permutation[k] = k;</span>
+        }
+        // transform the matrix column after column
+<span class="fc bfc" id="L88" title="All 2 branches covered.">        for (int k = 0; k &lt; cols; ++k) {</span>
+            // select the column with the greatest norm on active components
+<span class="fc" id="L90">            int nextColumn = -1;</span>
+<span class="fc" id="L91">            double ak2 = Double.NEGATIVE_INFINITY;</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">            if (allowPivot) {</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">                for (int i = k; i &lt; cols; ++i) {</span>
+<span class="fc" id="L94">                    double norm2 = 0;</span>
+<span class="fc bfc" id="L95" title="All 2 branches covered.">                    for (int j = k; j &lt; rows; ++j) {</span>
+<span class="fc" id="L96">                        final double aki = qr[j][permutation[i]];</span>
+<span class="fc" id="L97">                        norm2 += aki * aki;</span>
+                    }
+<span class="pc bpc" id="L99" title="2 of 4 branches missed.">                    if (Double.isInfinite(norm2) || Double.isNaN(norm2)) {</span>
+<span class="nc" id="L100">                        throw new ConvergenceException(LocalizedFormats.UNABLE_TO_PERFORM_QR_DECOMPOSITION_ON_JACOBIAN,</span>
+<span class="nc" id="L101">                                rows, cols);</span>
+                    }
+<span class="fc bfc" id="L103" title="All 2 branches covered.">                    if (norm2 &gt; ak2) {</span>
+<span class="fc" id="L104">                        nextColumn = i;</span>
+<span class="fc" id="L105">                        ak2 = norm2;</span>
+                    }
+                }
+            } else {
+<span class="fc" id="L109">                nextColumn = k;</span>
+<span class="fc" id="L110">                ak2 = 0.0;</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">                for (int j = k; j &lt; rows; ++j) {</span>
+<span class="fc" id="L112">                    final double aki = qr[j][k];</span>
+<span class="fc" id="L113">                    ak2 += aki * aki;</span>
+                }
+            }
+<span class="fc bfc" id="L116" title="All 2 branches covered.">            if (ak2 &lt;= qrRankingThreshold) {</span>
+<span class="fc" id="L117">                rank = k;</span>
+<span class="fc bfc" id="L118" title="All 2 branches covered.">                for (int i = rank; i &lt; rows; i++) {</span>
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">                    for (int j = i + 1; j &lt; cols; j++) {</span>
+<span class="nc" id="L120">                        qr[i][permutation[j]] = 0.0;</span>
+                    }
+                }
+<span class="fc" id="L123">                return;</span>
+            }
+<span class="fc" id="L125">            final int pk = permutation[nextColumn];</span>
+<span class="fc" id="L126">            permutation[nextColumn] = permutation[k];</span>
+<span class="fc" id="L127">            permutation[k] = pk;</span>
+
+            // choose alpha such that Hk.u = alpha ek
+<span class="fc" id="L130">            final double akk = qr[k][pk];</span>
+<span class="fc bfc" id="L131" title="All 2 branches covered.">            final double alpha = (akk &gt; 0) ? -FastMath.sqrt(ak2) : FastMath.sqrt(ak2);</span>
+<span class="fc" id="L132">            final double betak = 1.0 / (ak2 - akk * alpha);</span>
+<span class="fc" id="L133">            beta[pk] = betak;</span>
+
+            // transform the current column
+<span class="fc" id="L136">            rDiag[pk] = alpha;</span>
+<span class="fc" id="L137">            qr[k][pk] -= alpha;</span>
+
+            // transform the remaining columns
+<span class="fc bfc" id="L140" title="All 2 branches covered.">            for (int dk = cols - 1 - k; dk &gt; 0; --dk) {</span>
+<span class="fc" id="L141">                double gamma = 0;</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">                for (int j = k; j &lt; rows; ++j) {</span>
+<span class="fc" id="L143">                    gamma += qr[j][pk] * qr[j][permutation[k + dk]];</span>
+                }
+<span class="fc" id="L145">                gamma *= betak;</span>
+<span class="fc bfc" id="L146" title="All 2 branches covered.">                for (int j = k; j &lt; rows; ++j) {</span>
+<span class="fc" id="L147">                    qr[j][permutation[k + dk]] -= gamma * qr[j][pk];</span>
+                }
+            }
+        }
+<span class="fc" id="L151">        rank = cols;</span>
+<span class="fc" id="L152">        return;</span>
+    }
+
+    /**
+     * Returns the matrix Q of the decomposition.
+     * &lt;p&gt;Q is an orthogonal matrix&lt;/p&gt;
+     * @return the Q matrix
+     */
+    public RealMatrix getQ() {
+<span class="fc bfc" id="L161" title="All 2 branches covered.">        if (cachedQ == null) {</span>
+<span class="fc" id="L162">            cachedQ = getQT().transpose();</span>
+        }
+<span class="fc" id="L164">        return cachedQ;</span>
+    }
+
+    /**
+     * Returns the transpose of the matrix Q of the decomposition.
+     * &lt;p&gt;Q is an orthogonal matrix&lt;/p&gt;
+     * @return the Q matrix
+     */
+    public RealMatrix getQT() {
+<span class="fc bfc" id="L173" title="All 2 branches covered.">        if (cachedQT == null) {</span>
+
+            // QT is supposed to be m x m
+<span class="fc" id="L176">            final int m = qr.length;</span>
+<span class="fc" id="L177">            cachedQT = MatrixUtils.createRealMatrix(m, m);</span>
+
+            /*
+             * Q = Q1 Q2 ... Q_m, so Q is formed by first constructing Q_m and then
+             * applying the Householder transformations Q_(m-1),Q_(m-2),...,Q1 in
+             * succession to the result
+             */
+<span class="fc bfc" id="L184" title="All 2 branches covered.">            for (int minor = m - 1; minor &gt;= rank; minor--) {</span>
+<span class="fc" id="L185">                cachedQT.setEntry(minor, minor, 1.0);</span>
+            }
+
+<span class="fc bfc" id="L188" title="All 2 branches covered.">            for (int minor = rank - 1; minor &gt;= 0; minor--) {</span>
+                //final double[] qrtMinor = qrt[minor];
+<span class="fc" id="L190">                final int p_minor = permutation[minor];</span>
+<span class="fc" id="L191">                cachedQT.setEntry(minor, minor, 1.0);</span>
+                //if (qrtMinor[minor] != 0.0) {
+<span class="fc bfc" id="L193" title="All 2 branches covered.">                for (int col = minor; col &lt; m; col++) {</span>
+<span class="fc" id="L194">                    double alpha = 0.0;</span>
+<span class="fc bfc" id="L195" title="All 2 branches covered.">                    for (int row = minor; row &lt; m; row++) {</span>
+<span class="fc" id="L196">                        alpha -= cachedQT.getEntry(col, row) * qr[row][p_minor];</span>
+                    }
+<span class="fc" id="L198">                    alpha /= rDiag[p_minor] * qr[minor][p_minor];</span>
+<span class="fc bfc" id="L199" title="All 2 branches covered.">                    for (int row = minor; row &lt; m; row++) {</span>
+<span class="fc" id="L200">                        cachedQT.addToEntry(col, row, -alpha * qr[row][p_minor]);</span>
+                    }
+                }
+                //}
+            }
+        }
+        // return the cached matrix
+<span class="fc" id="L207">        return cachedQT;</span>
+    }
+
+    /**
+     * Returns the matrix R of the decomposition.
+     * &lt;p&gt;R is an upper-triangular matrix&lt;/p&gt;
+     * @return the R matrix
+     */
+    public RealMatrix getR() {
+<span class="fc bfc" id="L216" title="All 2 branches covered.">        if (cachedR == null) {</span>
+            // R is supposed to be m x n
+<span class="fc" id="L218">            final int n = qr[0].length;</span>
+<span class="fc" id="L219">            final int m = qr.length;</span>
+<span class="fc" id="L220">            cachedR = MatrixUtils.createRealMatrix(m, n);</span>
+            // copy the diagonal from rDiag and the upper triangle of qr
+<span class="fc bfc" id="L222" title="All 2 branches covered.">            for (int row = rank - 1; row &gt;= 0; row--) {</span>
+<span class="fc" id="L223">                cachedR.setEntry(row, row, rDiag[permutation[row]]);</span>
+<span class="fc bfc" id="L224" title="All 2 branches covered.">                for (int col = row + 1; col &lt; n; col++) {</span>
+<span class="fc" id="L225">                    cachedR.setEntry(row, col, qr[row][permutation[col]]);</span>
+                }
+            }
+        }
+        // return the cached matrix
+<span class="fc" id="L230">        return cachedR;</span>
+    }
+
+    public RealMatrix getH() {
+<span class="fc bfc" id="L234" title="All 2 branches covered.">        if (cachedH == null) {</span>
+<span class="fc" id="L235">            final int n = qr[0].length;</span>
+<span class="fc" id="L236">            final int m = qr.length;</span>
+<span class="fc" id="L237">            cachedH = MatrixUtils.createRealMatrix(m, n);</span>
+<span class="fc bfc" id="L238" title="All 2 branches covered.">            for (int i = 0; i &lt; m; ++i) {</span>
+<span class="fc bfc" id="L239" title="All 2 branches covered.">                for (int j = 0; j &lt; FastMath.min(i + 1, n); ++j) {</span>
+<span class="fc" id="L240">                    final int p_j = permutation[j];</span>
+<span class="fc" id="L241">                    cachedH.setEntry(i, j, qr[i][p_j] / -rDiag[p_j]);</span>
+                }
+            }
+        }
+        // return the cached matrix
+<span class="fc" id="L246">        return cachedH;</span>
+    }
+
+    public RealMatrix getPermutationMatrix() {
+<span class="fc" id="L250">        RealMatrix rm = MatrixUtils.createRealMatrix(qr[0].length, qr[0].length);</span>
+<span class="fc bfc" id="L251" title="All 2 branches covered.">        for (int i = 0; i &lt; this.qr[0].length; i++) {</span>
+<span class="fc" id="L252">            rm.setEntry(permutation[i], i, 1.0);</span>
+        }
+<span class="fc" id="L254">        return rm;</span>
+    }
+
+    public DecompositionSolver getSolver() {
+<span class="fc" id="L258">        return new Solver(qr, rDiag, permutation, rank);</span>
+    }
+
+    /** Specialized solver. */
+    private static class Solver implements DecompositionSolver {
+
+        /**
+         * A packed TRANSPOSED representation of the QR decomposition.
+         * &lt;p&gt;The elements BELOW the diagonal are the elements of the UPPER triangular
+         * matrix R, and the rows ABOVE the diagonal are the Householder reflector vectors
+         * from which an explicit form of Q can be recomputed if desired.&lt;/p&gt;
+         */
+        private final double[][] qr;
+        /** The diagonal elements of R. */
+        private final double[] rDiag;
+        /** The rank of the matrix      */
+        private final int rank;
+        /** The permutation matrix      */
+        private final int[] perm;
+
+        /**
+         * Build a solver from decomposed matrix.
+         * @param qrt packed TRANSPOSED representation of the QR decomposition
+         * @param rDiag diagonal elements of R
+         */
+<span class="fc" id="L283">        private Solver(final double[][] qr, final double[] rDiag, int[] perm, int rank) {</span>
+<span class="fc" id="L284">            this.qr = qr;</span>
+<span class="fc" id="L285">            this.rDiag = rDiag;</span>
+<span class="fc" id="L286">            this.perm = perm;</span>
+<span class="fc" id="L287">            this.rank = rank;</span>
+<span class="fc" id="L288">        }</span>
+
+        /** {@inheritDoc} */
+        public boolean isNonSingular() {
+<span class="fc bfc" id="L292" title="All 2 branches covered.">            if (qr.length &gt;= qr[0].length) {</span>
+<span class="fc bfc" id="L293" title="All 2 branches covered.">                return rank == qr[0].length;</span>
+            } else { //qr.length &lt; qr[0].length
+<span class="pc bpc" id="L295" title="1 of 2 branches missed.">                return rank == qr.length;</span>
+            }
+        }
+
+        /** {@inheritDoc} */
+        public RealVector solve(RealVector b) {
+<span class="fc" id="L301">            final int n = qr[0].length;</span>
+<span class="fc" id="L302">            final int m = qr.length;</span>
+<span class="fc bfc" id="L303" title="All 2 branches covered.">            if (b.getDimension() != m) {</span>
+<span class="fc" id="L304">                throw new DimensionMismatchException(b.getDimension(), m);</span>
+            }
+<span class="fc bfc" id="L306" title="All 2 branches covered.">            if (!isNonSingular()) {</span>
+<span class="fc" id="L307">                throw new SingularMatrixException();</span>
+            }
+
+<span class="fc" id="L310">            final double[] x = new double[n];</span>
+<span class="fc" id="L311">            final double[] y = b.toArray();</span>
+
+            // apply Householder transforms to solve Q.y = b
+<span class="fc bfc" id="L314" title="All 2 branches covered.">            for (int minor = 0; minor &lt; rank; minor++) {</span>
+<span class="fc" id="L315">                final int m_idx = perm[minor];</span>
+<span class="fc" id="L316">                double dotProduct = 0;</span>
+<span class="fc bfc" id="L317" title="All 2 branches covered.">                for (int row = minor; row &lt; m; row++) {</span>
+<span class="fc" id="L318">                    dotProduct += y[row] * qr[row][m_idx];</span>
+                }
+<span class="fc" id="L320">                dotProduct /= rDiag[m_idx] * qr[minor][m_idx];</span>
+<span class="fc bfc" id="L321" title="All 2 branches covered.">                for (int row = minor; row &lt; m; row++) {</span>
+<span class="fc" id="L322">                    y[row] += dotProduct * qr[row][m_idx];</span>
+                }
+            }
+            // solve triangular system R.x = y
+<span class="fc bfc" id="L326" title="All 2 branches covered.">            for (int row = rank - 1; row &gt;= 0; --row) {</span>
+<span class="fc" id="L327">                final int m_row = perm[row];</span>
+<span class="fc" id="L328">                y[row] /= rDiag[m_row];</span>
+<span class="fc" id="L329">                final double yRow = y[row];</span>
+                //final double[] qrtRow = qrt[row];
+<span class="fc" id="L331">                x[perm[row]] = yRow;</span>
+<span class="fc bfc" id="L332" title="All 2 branches covered.">                for (int i = 0; i &lt; row; i++) {</span>
+<span class="fc" id="L333">                    y[i] -= yRow * qr[i][m_row];</span>
+                }
+            }
+<span class="fc" id="L336">            return new ArrayRealVector(x, false);</span>
+        }
+
+        /** {@inheritDoc} */
+        public RealMatrix solve(RealMatrix b) {
+<span class="fc" id="L341">            final int cols = qr[0].length;</span>
+<span class="fc" id="L342">            final int rows = qr.length;</span>
+<span class="fc bfc" id="L343" title="All 2 branches covered.">            if (b.getRowDimension() != rows) {</span>
+<span class="fc" id="L344">                throw new DimensionMismatchException(b.getRowDimension(), rows);</span>
+            }
+<span class="fc bfc" id="L346" title="All 2 branches covered.">            if (!isNonSingular()) {</span>
+<span class="fc" id="L347">                throw new SingularMatrixException();</span>
+            }
+
+<span class="fc" id="L350">            final int columns = b.getColumnDimension();</span>
+<span class="fc" id="L351">            final int blockSize = BlockRealMatrix.BLOCK_SIZE;</span>
+<span class="fc" id="L352">            final int cBlocks = (columns + blockSize - 1) / blockSize;</span>
+<span class="fc" id="L353">            final double[][] xBlocks = BlockRealMatrix.createBlocksLayout(cols, columns);</span>
+<span class="fc" id="L354">            final double[][] y = new double[b.getRowDimension()][blockSize];</span>
+<span class="fc" id="L355">            final double[] alpha = new double[blockSize];</span>
+            //final BlockRealMatrix result = new BlockRealMatrix(cols, columns, xBlocks, false);
+<span class="fc bfc" id="L357" title="All 2 branches covered.">            for (int kBlock = 0; kBlock &lt; cBlocks; ++kBlock) {</span>
+<span class="fc" id="L358">                final int kStart = kBlock * blockSize;</span>
+<span class="fc" id="L359">                final int kEnd = FastMath.min(kStart + blockSize, columns);</span>
+<span class="fc" id="L360">                final int kWidth = kEnd - kStart;</span>
+                // get the right hand side vector
+<span class="fc" id="L362">                b.copySubMatrix(0, rows - 1, kStart, kEnd - 1, y);</span>
+
+                // apply Householder transforms to solve Q.y = b
+<span class="fc bfc" id="L365" title="All 2 branches covered.">                for (int minor = 0; minor &lt; rank; minor++) {</span>
+<span class="fc" id="L366">                    final int m_idx = perm[minor];</span>
+<span class="fc" id="L367">                    final double factor = 1.0 / (rDiag[m_idx] * qr[minor][m_idx]);</span>
+
+<span class="fc" id="L369">                    Arrays.fill(alpha, 0, kWidth, 0.0);</span>
+<span class="fc bfc" id="L370" title="All 2 branches covered.">                    for (int row = minor; row &lt; rows; ++row) {</span>
+<span class="fc" id="L371">                        final double d = qr[row][m_idx];</span>
+<span class="fc" id="L372">                        final double[] yRow = y[row];</span>
+<span class="fc bfc" id="L373" title="All 2 branches covered.">                        for (int k = 0; k &lt; kWidth; ++k) {</span>
+<span class="fc" id="L374">                            alpha[k] += d * yRow[k];</span>
+                        }
+                    }
+<span class="fc bfc" id="L377" title="All 2 branches covered.">                    for (int k = 0; k &lt; kWidth; ++k) {</span>
+<span class="fc" id="L378">                        alpha[k] *= factor;</span>
+                    }
+
+<span class="fc bfc" id="L381" title="All 2 branches covered.">                    for (int row = minor; row &lt; rows; ++row) {</span>
+<span class="fc" id="L382">                        final double d = qr[row][m_idx];</span>
+<span class="fc" id="L383">                        final double[] yRow = y[row];</span>
+<span class="fc bfc" id="L384" title="All 2 branches covered.">                        for (int k = 0; k &lt; kWidth; ++k) {</span>
+<span class="fc" id="L385">                            yRow[k] += alpha[k] * d;</span>
+                        }
+                    }
+                }
+
+                // solve triangular system R.x = y
+<span class="fc bfc" id="L391" title="All 2 branches covered.">                for (int j = rank - 1; j &gt;= 0; --j) {</span>
+<span class="fc" id="L392">                    final int jBlock = perm[j] / blockSize; //which block</span>
+<span class="fc" id="L393">                    final int jStart = jBlock * blockSize;  // idx of top corner of block in my coord</span>
+<span class="fc" id="L394">                    final double factor = 1.0 / rDiag[perm[j]];</span>
+<span class="fc" id="L395">                    final double[] yJ = y[j];</span>
+<span class="fc" id="L396">                    final double[] xBlock = xBlocks[jBlock * cBlocks + kBlock];</span>
+<span class="fc" id="L397">                    int index = (perm[j] - jStart) * kWidth; //to local (block) coordinates</span>
+<span class="fc bfc" id="L398" title="All 2 branches covered.">                    for (int k = 0; k &lt; kWidth; ++k) {</span>
+<span class="fc" id="L399">                        yJ[k] *= factor;</span>
+<span class="fc" id="L400">                        xBlock[index++] = yJ[k];</span>
+                    }
+<span class="fc bfc" id="L402" title="All 2 branches covered.">                    for (int i = 0; i &lt; j; ++i) {</span>
+<span class="fc" id="L403">                        final double rIJ = qr[i][perm[j]];</span>
+<span class="fc" id="L404">                        final double[] yI = y[i];</span>
+<span class="fc bfc" id="L405" title="All 2 branches covered.">                        for (int k = 0; k &lt; kWidth; ++k) {</span>
+<span class="fc" id="L406">                            yI[k] -= yJ[k] * rIJ;</span>
+                        }
+                    }
+                }
+            }
+            //return result;
+<span class="fc" id="L412">            return new BlockRealMatrix(cols, columns, xBlocks, false);</span>
+        }
+
+        /** {@inheritDoc} */
+        public RealMatrix getInverse() {
+<span class="nc" id="L417">            return solve(MatrixUtils.createRealIdentityMatrix(rDiag.length));</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

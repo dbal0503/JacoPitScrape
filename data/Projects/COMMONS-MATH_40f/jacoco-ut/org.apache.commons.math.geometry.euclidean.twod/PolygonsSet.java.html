@@ -1,0 +1,473 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PolygonsSet.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Commons Math</a> &gt; <a href="index.source.html" class="el_package">org.apache.commons.math.geometry.euclidean.twod</a> &gt; <span class="el_source">PolygonsSet.java</span></div><h1>PolygonsSet.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.commons.math.geometry.euclidean.twod;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+
+import org.apache.commons.math.exception.MathInternalError;
+import org.apache.commons.math.geometry.euclidean.oned.Euclidean1D;
+import org.apache.commons.math.geometry.euclidean.oned.Interval;
+import org.apache.commons.math.geometry.euclidean.oned.IntervalsSet;
+import org.apache.commons.math.geometry.euclidean.oned.Vector1D;
+import org.apache.commons.math.geometry.partitioning.AbstractSubHyperplane;
+import org.apache.commons.math.geometry.partitioning.BSPTree;
+import org.apache.commons.math.geometry.partitioning.BSPTreeVisitor;
+import org.apache.commons.math.geometry.partitioning.BoundaryAttribute;
+import org.apache.commons.math.geometry.partitioning.SubHyperplane;
+import org.apache.commons.math.geometry.partitioning.AbstractRegion;
+import org.apache.commons.math.geometry.partitioning.utilities.AVLTree;
+import org.apache.commons.math.geometry.partitioning.utilities.OrderedTuple;
+import org.apache.commons.math.util.FastMath;
+
+/** This class represents a 2D region: a set of polygons.
+ * @version $Id$
+ * @since 3.0
+ */
+public class PolygonsSet extends AbstractRegion&lt;Euclidean2D, Euclidean1D&gt; {
+
+    /** Vertices organized as boundary loops. */
+    private Vector2D[][] vertices;
+
+    /** Build a polygons set representing the whole real line.
+     */
+    public PolygonsSet() {
+<span class="fc" id="L50">        super();</span>
+<span class="fc" id="L51">    }</span>
+
+    /** Build a polygons set from a BSP tree.
+     * &lt;p&gt;The leaf nodes of the BSP tree &lt;em&gt;must&lt;/em&gt; have a
+     * {@code Boolean} attribute representing the inside status of
+     * the corresponding cell (true for inside cells, false for outside
+     * cells). In order to avoid building too many small objects, it is
+     * recommended to use the predefined constants
+     * {@code Boolean.TRUE} and {@code Boolean.FALSE}&lt;/p&gt;
+     * @param tree inside/outside BSP tree representing the region
+     */
+    public PolygonsSet(final BSPTree&lt;Euclidean2D&gt; tree) {
+<span class="fc" id="L63">        super(tree);</span>
+<span class="fc" id="L64">    }</span>
+
+    /** Build a polygons set from a Boundary REPresentation (B-rep).
+     * &lt;p&gt;The boundary is provided as a collection of {@link
+     * SubHyperplane sub-hyperplanes}. Each sub-hyperplane has the
+     * interior part of the region on its minus side and the exterior on
+     * its plus side.&lt;/p&gt;
+     * &lt;p&gt;The boundary elements can be in any order, and can form
+     * several non-connected sets (like for example polygons with holes
+     * or a set of disjoint polyhedrons considered as a whole). In
+     * fact, the elements do not even need to be connected together
+     * (their topological connections are not used here). However, if the
+     * boundary does not really separate an inside open from an outside
+     * open (open having here its topological meaning), then subsequent
+     * calls to the {@link
+     * org.apache.commons.math.geometry.partitioning.Region#checkPoint(org.apache.commons.math.geometry.Vector)
+     * checkPoint} method will not be meaningful anymore.&lt;/p&gt;
+     * &lt;p&gt;If the boundary is empty, the region will represent the whole
+     * space.&lt;/p&gt;
+     * @param boundary collection of boundary elements, as a
+     * collection of {@link SubHyperplane SubHyperplane} objects
+     */
+    public PolygonsSet(final Collection&lt;SubHyperplane&lt;Euclidean2D&gt;&gt; boundary) {
+<span class="fc" id="L87">        super(boundary);</span>
+<span class="fc" id="L88">    }</span>
+
+    /** Build a parallellepipedic box.
+     * @param xMin low bound along the x direction
+     * @param xMax high bound along the x direction
+     * @param yMin low bound along the y direction
+     * @param yMax high bound along the y direction
+     */
+    public PolygonsSet(final double xMin, final double xMax,
+                       final double yMin, final double yMax) {
+<span class="nc" id="L98">        super(boxBoundary(xMin, xMax, yMin, yMax));</span>
+<span class="nc" id="L99">    }</span>
+
+    /** Create a list of hyperplanes representing the boundary of a box.
+     * @param xMin low bound along the x direction
+     * @param xMax high bound along the x direction
+     * @param yMin low bound along the y direction
+     * @param yMax high bound along the y direction
+     * @return boundary of the box
+     */
+    private static Line[] boxBoundary(final double xMin, final double xMax,
+                                      final double yMin, final double yMax) {
+<span class="nc" id="L110">        final Vector2D minMin = new Vector2D(xMin, yMin);</span>
+<span class="nc" id="L111">        final Vector2D minMax = new Vector2D(xMin, yMax);</span>
+<span class="nc" id="L112">        final Vector2D maxMin = new Vector2D(xMax, yMin);</span>
+<span class="nc" id="L113">        final Vector2D maxMax = new Vector2D(xMax, yMax);</span>
+<span class="nc" id="L114">        return new Line[] {</span>
+            new Line(minMin, maxMin),
+            new Line(maxMin, maxMax),
+            new Line(maxMax, minMax),
+            new Line(minMax, minMin)
+        };
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public PolygonsSet buildNew(final BSPTree&lt;Euclidean2D&gt; tree) {
+<span class="fc" id="L125">        return new PolygonsSet(tree);</span>
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    protected void computeGeometricalProperties() {
+
+<span class="fc" id="L132">        final Vector2D[][] v = getVertices();</span>
+
+<span class="pc bpc" id="L134" title="1 of 2 branches missed.">        if (v.length == 0) {</span>
+<span class="nc bnc" id="L135" title="All 2 branches missed.">            if ((Boolean) getTree(false).getAttribute()) {</span>
+<span class="nc" id="L136">                setSize(Double.POSITIVE_INFINITY);</span>
+<span class="nc" id="L137">                setBarycenter(Vector2D.NaN);</span>
+            } else {
+<span class="nc" id="L139">                setSize(0);</span>
+<span class="nc" id="L140">                setBarycenter(new Vector2D(0, 0));</span>
+            }
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">        } else if (v[0][0] == null) {</span>
+            // there is at least one open-loop: the polygon is infinite
+<span class="nc" id="L144">            setSize(Double.POSITIVE_INFINITY);</span>
+<span class="nc" id="L145">            setBarycenter(Vector2D.NaN);</span>
+        } else {
+            // all loops are closed, we compute some integrals around the shape
+
+<span class="fc" id="L149">            double sum  = 0;</span>
+<span class="fc" id="L150">            double sumX = 0;</span>
+<span class="fc" id="L151">            double sumY = 0;</span>
+
+<span class="fc bfc" id="L153" title="All 2 branches covered.">            for (Vector2D[] loop : v) {</span>
+<span class="fc" id="L154">                double x1 = loop[loop.length - 1].getX();</span>
+<span class="fc" id="L155">                double y1 = loop[loop.length - 1].getY();</span>
+<span class="fc bfc" id="L156" title="All 2 branches covered.">                for (final Vector2D point : loop) {</span>
+<span class="fc" id="L157">                    final double x0 = x1;</span>
+<span class="fc" id="L158">                    final double y0 = y1;</span>
+<span class="fc" id="L159">                    x1 = point.getX();</span>
+<span class="fc" id="L160">                    y1 = point.getY();</span>
+<span class="fc" id="L161">                    final double factor = x0 * y1 - y0 * x1;</span>
+<span class="fc" id="L162">                    sum  += factor;</span>
+<span class="fc" id="L163">                    sumX += factor * (x0 + x1);</span>
+<span class="fc" id="L164">                    sumY += factor * (y0 + y1);</span>
+                }
+            }
+
+<span class="pc bpc" id="L168" title="1 of 2 branches missed.">            if (sum &lt; 0) {</span>
+                // the polygon as a finite outside surrounded by an infinite inside
+<span class="nc" id="L170">                setSize(Double.POSITIVE_INFINITY);</span>
+<span class="nc" id="L171">                setBarycenter(Vector2D.NaN);</span>
+            } else {
+<span class="fc" id="L173">                setSize(sum / 2);</span>
+<span class="fc" id="L174">                setBarycenter(new Vector2D(sumX / (3 * sum), sumY / (3 * sum)));</span>
+            }
+
+        }
+
+<span class="fc" id="L179">    }</span>
+
+    /** Get the vertices of the polygon.
+     * &lt;p&gt;The polygon boundary can be represented as an array of loops,
+     * each loop being itself an array of vertices.&lt;/p&gt;
+     * &lt;p&gt;In order to identify open loops which start and end by
+     * infinite edges, the open loops arrays start with a null point. In
+     * this case, the first non null point and the last point of the
+     * array do not represent real vertices, they are dummy points
+     * intended only to get the direction of the first and last edge. An
+     * open loop consisting of a single infinite line will therefore be
+     * represented by a three elements array with one null point
+     * followed by two dummy points. The open loops are always the first
+     * ones in the loops array.&lt;/p&gt;
+     * &lt;p&gt;If the polygon has no boundary at all, a zero length loop
+     * array will be returned.&lt;/p&gt;
+     * &lt;p&gt;All line segments in the various loops have the inside of the
+     * region on their left side and the outside on their right side
+     * when moving in the underlying line direction. This means that
+     * closed loops surrounding finite areas obey the direct
+     * trigonometric orientation.&lt;/p&gt;
+     * @return vertices of the polygon, organized as oriented boundary
+     * loops with the open loops first (the returned value is guaranteed
+     * to be non-null)
+     */
+    public Vector2D[][] getVertices() {
+<span class="fc bfc" id="L205" title="All 2 branches covered.">        if (vertices == null) {</span>
+<span class="pc bpc" id="L206" title="1 of 2 branches missed.">            if (getTree(false).getCut() == null) {</span>
+<span class="nc" id="L207">                vertices = new Vector2D[0][];</span>
+            } else {
+
+                // sort the segments according to their start point
+<span class="fc" id="L211">                final SegmentsBuilder visitor = new SegmentsBuilder();</span>
+<span class="fc" id="L212">                getTree(true).visit(visitor);</span>
+<span class="fc" id="L213">                final AVLTree&lt;ComparableSegment&gt; sorted = visitor.getSorted();</span>
+
+                // identify the loops, starting from the open ones
+                // (their start segments are naturally at the sorted set beginning)
+<span class="fc" id="L217">                final ArrayList&lt;List&lt;ComparableSegment&gt;&gt; loops = new ArrayList&lt;List&lt;ComparableSegment&gt;&gt;();</span>
+<span class="fc bfc" id="L218" title="All 2 branches covered.">                while (!sorted.isEmpty()) {</span>
+<span class="fc" id="L219">                    final AVLTree&lt;ComparableSegment&gt;.Node node = sorted.getSmallest();</span>
+<span class="fc" id="L220">                    final List&lt;ComparableSegment&gt; loop = followLoop(node, sorted);</span>
+<span class="fc bfc" id="L221" title="All 2 branches covered.">                    if (loop != null) {</span>
+<span class="fc" id="L222">                        loops.add(loop);</span>
+                    }
+<span class="fc" id="L224">                }</span>
+
+                // tranform the loops in an array of arrays of points
+<span class="fc" id="L227">                vertices = new Vector2D[loops.size()][];</span>
+<span class="fc" id="L228">                int i = 0;</span>
+
+<span class="fc bfc" id="L230" title="All 2 branches covered.">                for (final List&lt;ComparableSegment&gt; loop : loops) {</span>
+<span class="pc bpc" id="L231" title="1 of 2 branches missed.">                    if (loop.size() &lt; 2) {</span>
+                        // single infinite line
+<span class="nc" id="L233">                        final Line line = loop.get(0).getLine();</span>
+<span class="nc" id="L234">                        vertices[i++] = new Vector2D[] {</span>
+                            null,
+<span class="nc" id="L236">                            line.toSpace(new Vector1D(-Float.MAX_VALUE)),</span>
+<span class="nc" id="L237">                            line.toSpace(new Vector1D(+Float.MAX_VALUE))</span>
+                        };
+<span class="pc bpc" id="L239" title="1 of 2 branches missed.">                    } else if (loop.get(0).getStart() == null) {</span>
+                        // open loop with at least one real point
+<span class="nc" id="L241">                        final Vector2D[] array = new Vector2D[loop.size() + 2];</span>
+<span class="nc" id="L242">                        int j = 0;</span>
+<span class="nc bnc" id="L243" title="All 2 branches missed.">                        for (Segment segment : loop) {</span>
+
+<span class="nc bnc" id="L245" title="All 2 branches missed.">                            if (j == 0) {</span>
+                                // null point and first dummy point
+<span class="nc" id="L247">                                double x = segment.getLine().toSubSpace(segment.getEnd()).getX();</span>
+<span class="nc" id="L248">                                x -= FastMath.max(1.0, FastMath.abs(x / 2));</span>
+<span class="nc" id="L249">                                array[j++] = null;</span>
+<span class="nc" id="L250">                                array[j++] = segment.getLine().toSpace(new Vector1D(x));</span>
+                            }
+
+<span class="nc bnc" id="L253" title="All 2 branches missed.">                            if (j &lt; (array.length - 1)) {</span>
+                                // current point
+<span class="nc" id="L255">                                array[j++] = segment.getEnd();</span>
+                            }
+
+<span class="nc bnc" id="L258" title="All 2 branches missed.">                            if (j == (array.length - 1)) {</span>
+                                // last dummy point
+<span class="nc" id="L260">                                double x = segment.getLine().toSubSpace(segment.getStart()).getX();</span>
+<span class="nc" id="L261">                                x += FastMath.max(1.0, FastMath.abs(x / 2));</span>
+<span class="nc" id="L262">                                array[j++] = segment.getLine().toSpace(new Vector1D(x));</span>
+                            }
+
+<span class="nc" id="L265">                        }</span>
+<span class="nc" id="L266">                        vertices[i++] = array;</span>
+<span class="nc" id="L267">                    } else {</span>
+<span class="fc" id="L268">                        final Vector2D[] array = new Vector2D[loop.size()];</span>
+<span class="fc" id="L269">                        int j = 0;</span>
+<span class="fc bfc" id="L270" title="All 2 branches covered.">                        for (Segment segment : loop) {</span>
+<span class="fc" id="L271">                            array[j++] = segment.getStart();</span>
+<span class="fc" id="L272">                        }</span>
+<span class="fc" id="L273">                        vertices[i++] = array;</span>
+                    }
+<span class="fc" id="L275">                }</span>
+
+            }
+        }
+
+<span class="fc" id="L280">        return vertices.clone();</span>
+
+    }
+
+    /** Follow a boundary loop.
+     * @param node node containing the segment starting the loop
+     * @param sorted set of segments belonging to the boundary, sorted by
+     * start points (contains {@code node})
+     * @return a list of connected sub-hyperplanes starting at
+     * {@code node}
+     */
+    private List&lt;ComparableSegment&gt; followLoop(final AVLTree&lt;ComparableSegment&gt;.Node node,
+                                               final AVLTree&lt;ComparableSegment&gt; sorted) {
+
+<span class="fc" id="L294">        final ArrayList&lt;ComparableSegment&gt; loop = new ArrayList&lt;ComparableSegment&gt;();</span>
+<span class="fc" id="L295">        ComparableSegment segment = node.getElement();</span>
+<span class="fc" id="L296">        loop.add(segment);</span>
+<span class="fc" id="L297">        final Vector2D globalStart = segment.getStart();</span>
+<span class="fc" id="L298">        Vector2D end = segment.getEnd();</span>
+<span class="fc" id="L299">        node.delete();</span>
+
+        // is this an open or a closed loop ?
+<span class="pc bpc" id="L302" title="1 of 2 branches missed.">        final boolean open = segment.getStart() == null;</span>
+
+<span class="pc bpc" id="L304" title="2 of 6 branches missed.">        while ((end != null) &amp;&amp; (open || (globalStart.distance(end) &gt; 1.0e-10))) {</span>
+
+            // search the sub-hyperplane starting where the previous one ended
+<span class="fc" id="L307">            AVLTree&lt;ComparableSegment&gt;.Node selectedNode = null;</span>
+<span class="fc" id="L308">            ComparableSegment       selectedSegment  = null;</span>
+<span class="fc" id="L309">            double                  selectedDistance = Double.POSITIVE_INFINITY;</span>
+<span class="fc" id="L310">            final ComparableSegment lowerLeft        = new ComparableSegment(end, -1.0e-10, -1.0e-10);</span>
+<span class="fc" id="L311">            final ComparableSegment upperRight       = new ComparableSegment(end, +1.0e-10, +1.0e-10);</span>
+<span class="fc" id="L312">            for (AVLTree&lt;ComparableSegment&gt;.Node n = sorted.getNotSmaller(lowerLeft);</span>
+<span class="fc bfc" id="L313" title="All 4 branches covered.">                 (n != null) &amp;&amp; (n.getElement().compareTo(upperRight) &lt;= 0);</span>
+<span class="fc" id="L314">                 n = n.getNext()) {</span>
+<span class="fc" id="L315">                segment = n.getElement();</span>
+<span class="fc" id="L316">                final double distance = end.distance(segment.getStart());</span>
+<span class="fc bfc" id="L317" title="All 2 branches covered.">                if (distance &lt; selectedDistance) {</span>
+<span class="fc" id="L318">                    selectedNode     = n;</span>
+<span class="fc" id="L319">                    selectedSegment  = segment;</span>
+<span class="fc" id="L320">                    selectedDistance = distance;</span>
+                }
+            }
+
+<span class="pc bpc" id="L324" title="1 of 2 branches missed.">            if (selectedDistance &gt; 1.0e-10) {</span>
+                // this is a degenerated loop, it probably comes from a very
+                // tiny region with some segments smaller than the threshold, we
+                // simply ignore it
+<span class="nc" id="L328">                return null;</span>
+            }
+
+<span class="fc" id="L331">            end = selectedSegment.getEnd();</span>
+<span class="fc" id="L332">            loop.add(selectedSegment);</span>
+<span class="fc" id="L333">            selectedNode.delete();</span>
+
+<span class="fc" id="L335">        }</span>
+
+<span class="pc bpc" id="L337" title="1 of 4 branches missed.">        if ((loop.size() == 2) &amp;&amp; !open) {</span>
+            // this is a degenerated infinitely thin loop, we simply ignore it
+<span class="fc" id="L339">            return null;</span>
+        }
+
+<span class="pc bpc" id="L342" title="3 of 4 branches missed.">        if ((end == null) &amp;&amp; !open) {</span>
+<span class="nc" id="L343">            throw new MathInternalError();</span>
+        }
+
+<span class="fc" id="L346">        return loop;</span>
+
+    }
+
+    /** Private extension of Segment allowing comparison. */
+    private static class ComparableSegment extends Segment implements Comparable&lt;ComparableSegment&gt; {
+
+        /** Sorting key. */
+        private OrderedTuple sortingKey;
+
+        /** Build a segment.
+         * @param start start point of the segment
+         * @param end end point of the segment
+         * @param line line containing the segment
+         */
+        public ComparableSegment(final Vector2D start, final Vector2D end, final Line line) {
+<span class="fc" id="L362">            super(start, end, line);</span>
+<span class="pc bpc" id="L363" title="1 of 2 branches missed.">            sortingKey = (start == null) ?</span>
+<span class="nc" id="L364">                         new OrderedTuple(Double.NEGATIVE_INFINITY, Double.NEGATIVE_INFINITY) :</span>
+<span class="fc" id="L365">                         new OrderedTuple(start.getX(), start.getY());</span>
+<span class="fc" id="L366">        }</span>
+
+        /** Build a dummy segment.
+         * &lt;p&gt;
+         * The object built is not a real segment, only the sorting key is used to
+         * allow searching in the neighborhood of a point. This is an horrible hack ...
+         * &lt;/p&gt;
+         * @param start start point of the segment
+         * @param dx abscissa offset from the start point
+         * @param dy ordinate offset from the start point
+         */
+        public ComparableSegment(final Vector2D start, final double dx, final double dy) {
+<span class="fc" id="L378">            super(null, null, null);</span>
+<span class="fc" id="L379">            sortingKey = new OrderedTuple(start.getX() + dx, start.getY() + dy);</span>
+<span class="fc" id="L380">        }</span>
+
+        /** {@inheritDoc} */
+        public int compareTo(final ComparableSegment o) {
+<span class="fc" id="L384">            return sortingKey.compareTo(o.sortingKey);</span>
+        }
+
+        /** {@inheritDoc} */
+        @Override
+        public boolean equals(final Object other) {
+<span class="nc bnc" id="L390" title="All 2 branches missed.">            if (this == other) {</span>
+<span class="nc" id="L391">                return true;</span>
+<span class="nc bnc" id="L392" title="All 2 branches missed.">            } else if (other instanceof ComparableSegment) {</span>
+<span class="nc bnc" id="L393" title="All 2 branches missed.">                return compareTo((ComparableSegment) other) == 0;</span>
+            } else {
+<span class="nc" id="L395">                return false;</span>
+            }
+        }
+
+        /** {@inheritDoc} */
+        @Override
+        public int hashCode() {
+<span class="nc" id="L402">            return getStart().hashCode() ^ getEnd().hashCode() ^</span>
+<span class="nc" id="L403">                   getLine().hashCode() ^ sortingKey.hashCode();</span>
+        }
+
+    }
+
+    /** Visitor building segments. */
+    private static class SegmentsBuilder implements BSPTreeVisitor&lt;Euclidean2D&gt; {
+
+        /** Sorted segments. */
+        private AVLTree&lt;ComparableSegment&gt; sorted;
+
+        /** Simple constructor. */
+<span class="fc" id="L415">        public SegmentsBuilder() {</span>
+<span class="fc" id="L416">            sorted = new AVLTree&lt;ComparableSegment&gt;();</span>
+<span class="fc" id="L417">        }</span>
+
+        /** {@inheritDoc} */
+        public Order visitOrder(final BSPTree&lt;Euclidean2D&gt; node) {
+<span class="fc" id="L421">            return Order.MINUS_SUB_PLUS;</span>
+        }
+
+        /** {@inheritDoc} */
+        public void visitInternalNode(final BSPTree&lt;Euclidean2D&gt; node) {
+            @SuppressWarnings(&quot;unchecked&quot;)
+<span class="fc" id="L427">            final BoundaryAttribute&lt;Euclidean2D&gt; attribute = (BoundaryAttribute&lt;Euclidean2D&gt;) node.getAttribute();</span>
+<span class="fc bfc" id="L428" title="All 2 branches covered.">            if (attribute.getPlusOutside() != null) {</span>
+<span class="fc" id="L429">                addContribution(attribute.getPlusOutside(), false);</span>
+            }
+<span class="fc bfc" id="L431" title="All 2 branches covered.">            if (attribute.getPlusInside() != null) {</span>
+<span class="fc" id="L432">                addContribution(attribute.getPlusInside(), true);</span>
+            }
+<span class="fc" id="L434">        }</span>
+
+        /** {@inheritDoc} */
+        public void visitLeafNode(final BSPTree&lt;Euclidean2D&gt; node) {
+<span class="fc" id="L438">        }</span>
+
+        /** Add he contribution of a boundary facet.
+         * @param sub boundary facet
+         * @param reversed if true, the facet has the inside on its plus side
+         */
+        private void addContribution(final SubHyperplane&lt;Euclidean2D&gt; sub, final boolean reversed) {
+            @SuppressWarnings(&quot;unchecked&quot;)
+<span class="fc" id="L446">            final AbstractSubHyperplane&lt;Euclidean2D, Euclidean1D&gt; absSub =</span>
+                (AbstractSubHyperplane&lt;Euclidean2D, Euclidean1D&gt;) sub;
+<span class="fc" id="L448">            final Line line      = (Line) sub.getHyperplane();</span>
+<span class="fc" id="L449">            final List&lt;Interval&gt; intervals = ((IntervalsSet) absSub.getRemainingRegion()).asList();</span>
+<span class="fc bfc" id="L450" title="All 2 branches covered.">            for (final Interval i : intervals) {</span>
+<span class="pc bpc" id="L451" title="1 of 2 branches missed.">                final Vector2D start = Double.isInfinite(i.getLower()) ?</span>
+<span class="pc" id="L452">                                      null : (Vector2D) line.toSpace(new Vector1D(i.getLower()));</span>
+<span class="pc bpc" id="L453" title="1 of 2 branches missed.">                final Vector2D end   = Double.isInfinite(i.getUpper()) ?</span>
+<span class="pc" id="L454">                                      null : (Vector2D) line.toSpace(new Vector1D(i.getUpper()));</span>
+<span class="fc bfc" id="L455" title="All 2 branches covered.">                if (reversed) {</span>
+<span class="fc" id="L456">                    sorted.insert(new ComparableSegment(end, start, line.getReverse()));</span>
+                } else {
+<span class="fc" id="L458">                    sorted.insert(new ComparableSegment(start, end, line));</span>
+                }
+<span class="fc" id="L460">            }</span>
+<span class="fc" id="L461">        }</span>
+
+        /** Get the sorted segments.
+         * @return sorted segments
+         */
+        public AVLTree&lt;ComparableSegment&gt; getSorted() {
+<span class="fc" id="L467">            return sorted;</span>
+        }
+
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

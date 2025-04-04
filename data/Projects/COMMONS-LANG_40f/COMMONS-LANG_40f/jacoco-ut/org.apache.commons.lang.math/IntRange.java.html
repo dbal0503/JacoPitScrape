@@ -1,0 +1,418 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IntRange.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Commons Lang</a> &gt; <a href="index.source.html" class="el_package">org.apache.commons.lang.math</a> &gt; <span class="el_source">IntRange.java</span></div><h1>IntRange.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ * 
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.commons.lang.math;
+
+import java.io.Serializable;
+
+/**
+ * &lt;p&gt;&lt;code&gt;IntRange&lt;/code&gt; represents an inclusive range of &lt;code&gt;int&lt;/code&gt;s.&lt;/p&gt;
+ *
+ * @author Stephen Colebourne
+ * @since 2.0
+ * @version $Id$
+ */
+public final class IntRange extends Range implements Serializable {
+    
+    /**
+     * Required for serialization support.
+     * 
+     * @see java.io.Serializable
+     */
+    private static final long serialVersionUID = 71849363892730L;
+
+    /**
+     * The minimum number in this range (inclusive).
+     */
+    private final int min;
+    /**
+     * The maximum number in this range (inclusive).
+     */
+    private final int max;
+    
+    /**
+     * Cached output minObject (class is immutable).
+     */
+<span class="fc" id="L49">    private transient Integer minObject = null;</span>
+    /**
+     * Cached output maxObject (class is immutable).
+     */
+<span class="fc" id="L53">    private transient Integer maxObject = null;</span>
+    /**
+     * Cached output hashCode (class is immutable).
+     */
+<span class="fc" id="L57">    private transient int hashCode = 0;</span>
+    /**
+     * Cached output toString (class is immutable).
+     */
+<span class="fc" id="L61">    private transient String toString = null;</span>
+    
+    /**
+     * &lt;p&gt;Constructs a new &lt;code&gt;IntRange&lt;/code&gt; using the specified
+     * number as both the minimum and maximum in this range.&lt;/p&gt;
+     *
+     * @param number  the number to use for this range
+     */
+    public IntRange(int number) {
+<span class="fc" id="L70">        super();</span>
+<span class="fc" id="L71">        this.min = number;</span>
+<span class="fc" id="L72">        this.max = number;</span>
+<span class="fc" id="L73">    }</span>
+
+    /**
+     * &lt;p&gt;Constructs a new &lt;code&gt;IntRange&lt;/code&gt; using the specified
+     * number as both the minimum and maximum in this range.&lt;/p&gt;
+     *
+     * @param number  the number to use for this range, must not be &lt;code&gt;null&lt;/code&gt;
+     * @throws IllegalArgumentException if the number is &lt;code&gt;null&lt;/code&gt;
+     */
+    public IntRange(Number number) {
+<span class="fc" id="L83">        super();</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">        if (number == null) {</span>
+<span class="fc" id="L85">            throw new IllegalArgumentException(&quot;The number must not be null&quot;);</span>
+        }
+<span class="fc" id="L87">        this.min = number.intValue();</span>
+<span class="fc" id="L88">        this.max = number.intValue();</span>
+<span class="fc bfc" id="L89" title="All 2 branches covered.">        if (number instanceof Integer) {</span>
+<span class="fc" id="L90">            this.minObject = (Integer) number;</span>
+<span class="fc" id="L91">            this.maxObject = (Integer) number;</span>
+        }
+<span class="fc" id="L93">    }</span>
+
+    /**
+     * &lt;p&gt;Constructs a new &lt;code&gt;IntRange&lt;/code&gt; with the specified
+     * minimum and maximum numbers (both inclusive).&lt;/p&gt;
+     * 
+     * &lt;p&gt;The arguments may be passed in the order (min,max) or (max,min). The
+     * getMinimum and getMaximum methods will return the correct values.&lt;/p&gt;
+     * 
+     * @param number1  first number that defines the edge of the range, inclusive
+     * @param number2  second number that defines the edge of the range, inclusive
+     */
+    public IntRange(int number1, int number2) {
+<span class="fc" id="L106">        super();</span>
+<span class="fc bfc" id="L107" title="All 2 branches covered.">        if (number2 &lt; number1) {</span>
+<span class="fc" id="L108">            this.min = number2;</span>
+<span class="fc" id="L109">            this.max = number1;</span>
+        } else {
+<span class="fc" id="L111">            this.min = number1;</span>
+<span class="fc" id="L112">            this.max = number2;</span>
+        }
+<span class="fc" id="L114">    }</span>
+
+    /**
+     * &lt;p&gt;Constructs a new &lt;code&gt;IntRange&lt;/code&gt; with the specified
+     * minimum and maximum numbers (both inclusive).&lt;/p&gt;
+     * 
+     * &lt;p&gt;The arguments may be passed in the order (min,max) or (max,min). The
+     * getMinimum and getMaximum methods will return the correct values.&lt;/p&gt;
+     *
+     * @param number1  first number that defines the edge of the range, inclusive
+     * @param number2  second number that defines the edge of the range, inclusive
+     * @throws IllegalArgumentException if either number is &lt;code&gt;null&lt;/code&gt;
+     */
+    public IntRange(Number number1, Number number2) {
+<span class="fc" id="L128">        super();</span>
+<span class="fc bfc" id="L129" title="All 4 branches covered.">        if (number1 == null || number2 == null) {</span>
+<span class="fc" id="L130">            throw new IllegalArgumentException(&quot;The numbers must not be null&quot;);</span>
+        }
+<span class="fc" id="L132">        int number1val = number1.intValue();</span>
+<span class="fc" id="L133">        int number2val = number2.intValue();</span>
+<span class="fc bfc" id="L134" title="All 2 branches covered.">        if (number2val &lt; number1val) {</span>
+<span class="fc" id="L135">            this.min = number2val;</span>
+<span class="fc" id="L136">            this.max = number1val;</span>
+<span class="fc bfc" id="L137" title="All 2 branches covered.">            if (number2 instanceof Integer) {</span>
+<span class="fc" id="L138">                this.minObject = (Integer) number2;</span>
+            }
+<span class="fc bfc" id="L140" title="All 2 branches covered.">            if (number1 instanceof Integer) {</span>
+<span class="fc" id="L141">                this.maxObject = (Integer) number1;</span>
+            }
+        } else {
+<span class="fc" id="L144">            this.min = number1val;</span>
+<span class="fc" id="L145">            this.max = number2val;</span>
+<span class="fc bfc" id="L146" title="All 2 branches covered.">            if (number1 instanceof Integer) {</span>
+<span class="fc" id="L147">                this.minObject = (Integer) number1;</span>
+            }
+<span class="fc bfc" id="L149" title="All 2 branches covered.">            if (number2 instanceof Integer) {</span>
+<span class="fc" id="L150">                this.maxObject = (Integer) number2;</span>
+            }
+        }
+<span class="fc" id="L153">    }</span>
+
+    // Accessors
+    //--------------------------------------------------------------------
+
+    /**
+     * &lt;p&gt;Returns the minimum number in this range.&lt;/p&gt;
+     *
+     * @return the minimum number in this range
+     */
+    @Override
+    public Number getMinimumNumber() {
+<span class="fc bfc" id="L165" title="All 2 branches covered.">        if (minObject == null) {</span>
+<span class="fc" id="L166">            minObject = new Integer(min);            </span>
+        }
+<span class="fc" id="L168">        return minObject;</span>
+    }
+
+    /**
+     * &lt;p&gt;Gets the minimum number in this range as a &lt;code&gt;long&lt;/code&gt;.&lt;/p&gt;
+     *
+     * @return the minimum number in this range
+     */
+    @Override
+    public long getMinimumLong() {
+<span class="fc" id="L178">        return min;</span>
+    }
+
+    /**
+     * &lt;p&gt;Gets the minimum number in this range as a &lt;code&gt;int&lt;/code&gt;.&lt;/p&gt;
+     *
+     * @return the minimum number in this range
+     */
+    @Override
+    public int getMinimumInteger() {
+<span class="fc" id="L188">        return min;</span>
+    }
+
+    /**
+     * &lt;p&gt;Gets the minimum number in this range as a &lt;code&gt;double&lt;/code&gt;.&lt;/p&gt;
+     *
+     * @return the minimum number in this range
+     */
+    @Override
+    public double getMinimumDouble() {
+<span class="fc" id="L198">        return min;</span>
+    }
+
+    /**
+     * &lt;p&gt;Gets the minimum number in this range as a &lt;code&gt;float&lt;/code&gt;.&lt;/p&gt;
+     *
+     * @return the minimum number in this range
+     */
+    @Override
+    public float getMinimumFloat() {
+<span class="fc" id="L208">        return min;</span>
+    }
+
+    /**
+     * &lt;p&gt;Returns the maximum number in this range.&lt;/p&gt;
+     *
+     * @return the maximum number in this range
+     */
+    @Override
+    public Number getMaximumNumber() {
+<span class="fc bfc" id="L218" title="All 2 branches covered.">        if (maxObject == null) {</span>
+<span class="fc" id="L219">            maxObject = new Integer(max);            </span>
+        }
+<span class="fc" id="L221">        return maxObject;</span>
+    }
+
+    /**
+     * &lt;p&gt;Gets the maximum number in this range as a &lt;code&gt;long&lt;/code&gt;.&lt;/p&gt;
+     *
+     * @return the maximum number in this range
+     */
+    @Override
+    public long getMaximumLong() {
+<span class="fc" id="L231">        return max;</span>
+    }
+
+    /**
+     * &lt;p&gt;Gets the maximum number in this range as a &lt;code&gt;int&lt;/code&gt;.&lt;/p&gt;
+     *
+     * @return the maximum number in this range
+     */
+    @Override
+    public int getMaximumInteger() {
+<span class="fc" id="L241">        return max;</span>
+    }
+
+    /**
+     * &lt;p&gt;Gets the maximum number in this range as a &lt;code&gt;double&lt;/code&gt;.&lt;/p&gt;
+     *
+     * @return the maximum number in this range
+     */
+    @Override
+    public double getMaximumDouble() {
+<span class="fc" id="L251">        return max;</span>
+    }
+
+    /**
+     * &lt;p&gt;Gets the maximum number in this range as a &lt;code&gt;float&lt;/code&gt;.&lt;/p&gt;
+     *
+     * @return the maximum number in this range
+     */
+    @Override
+    public float getMaximumFloat() {
+<span class="fc" id="L261">        return max;</span>
+    }
+
+    // Tests
+    //--------------------------------------------------------------------
+    
+    /**
+     * &lt;p&gt;Tests whether the specified &lt;code&gt;number&lt;/code&gt; occurs within
+     * this range using &lt;code&gt;int&lt;/code&gt; comparison.&lt;/p&gt;
+     * 
+     * &lt;p&gt;&lt;code&gt;null&lt;/code&gt; is handled and returns &lt;code&gt;false&lt;/code&gt;.&lt;/p&gt;
+     *
+     * @param number  the number to test, may be &lt;code&gt;null&lt;/code&gt;
+     * @return &lt;code&gt;true&lt;/code&gt; if the specified number occurs within this range
+     */
+    @Override
+    public boolean containsNumber(Number number) {
+<span class="fc bfc" id="L278" title="All 2 branches covered.">        if (number == null) {</span>
+<span class="fc" id="L279">            return false;</span>
+        }
+<span class="fc" id="L281">        return containsInteger(number.intValue());</span>
+    }
+
+    /**
+     * &lt;p&gt;Tests whether the specified &lt;code&gt;int&lt;/code&gt; occurs within
+     * this range using &lt;code&gt;int&lt;/code&gt; comparison.&lt;/p&gt;
+     * 
+     * &lt;p&gt;This implementation overrides the superclass for performance as it is
+     * the most common case.&lt;/p&gt;
+     * 
+     * @param value  the int to test
+     * @return &lt;code&gt;true&lt;/code&gt; if the specified number occurs within this
+     *  range by &lt;code&gt;int&lt;/code&gt; comparison
+     */
+    @Override
+    public boolean containsInteger(int value) {
+<span class="fc bfc" id="L297" title="All 4 branches covered.">        return value &gt;= min &amp;&amp; value &lt;= max;</span>
+    }
+
+    // Range tests
+    //--------------------------------------------------------------------
+
+    /**
+     * &lt;p&gt;Tests whether the specified range occurs entirely within this range
+     * using &lt;code&gt;int&lt;/code&gt; comparison.&lt;/p&gt;
+     * 
+     * &lt;p&gt;&lt;code&gt;null&lt;/code&gt; is handled and returns &lt;code&gt;false&lt;/code&gt;.&lt;/p&gt;
+     *
+     * @param range  the range to test, may be &lt;code&gt;null&lt;/code&gt;
+     * @return &lt;code&gt;true&lt;/code&gt; if the specified range occurs entirely within this range
+     * @throws IllegalArgumentException if the range is not of this type
+     */
+    @Override
+    public boolean containsRange(Range range) {
+<span class="fc bfc" id="L315" title="All 2 branches covered.">        if (range == null) {</span>
+<span class="fc" id="L316">            return false;</span>
+        }
+<span class="fc bfc" id="L318" title="All 2 branches covered.">        return containsInteger(range.getMinimumInteger()) &amp;&amp;</span>
+<span class="fc bfc" id="L319" title="All 2 branches covered.">               containsInteger(range.getMaximumInteger());</span>
+    }
+
+    /**
+     * &lt;p&gt;Tests whether the specified range overlaps with this range
+     * using &lt;code&gt;int&lt;/code&gt; comparison.&lt;/p&gt;
+     * 
+     * &lt;p&gt;&lt;code&gt;null&lt;/code&gt; is handled and returns &lt;code&gt;false&lt;/code&gt;.&lt;/p&gt;
+     *
+     * @param range  the range to test, may be &lt;code&gt;null&lt;/code&gt;
+     * @return &lt;code&gt;true&lt;/code&gt; if the specified range overlaps with this range
+     */
+    @Override
+    public boolean overlapsRange(Range range) {
+<span class="fc bfc" id="L333" title="All 2 branches covered.">        if (range == null) {</span>
+<span class="fc" id="L334">            return false;</span>
+        }
+<span class="fc bfc" id="L336" title="All 2 branches covered.">        return range.containsInteger(min) ||</span>
+<span class="fc bfc" id="L337" title="All 2 branches covered.">               range.containsInteger(max) || </span>
+<span class="fc bfc" id="L338" title="All 2 branches covered.">               containsInteger(range.getMinimumInteger());</span>
+    }
+
+    // Basics
+    //--------------------------------------------------------------------
+
+    /**
+     * &lt;p&gt;Compares this range to another object to test if they are equal.&lt;/p&gt;.
+     * 
+     * &lt;p&gt;To be equal, the class, minimum and maximum must be equal.&lt;/p&gt;
+     *
+     * @param obj the reference object with which to compare
+     * @return &lt;code&gt;true&lt;/code&gt; if this object is equal
+     */
+    @Override
+    public boolean equals(Object obj) {
+<span class="fc bfc" id="L354" title="All 2 branches covered.">        if (obj == this) {</span>
+<span class="fc" id="L355">            return true;</span>
+        }
+<span class="fc bfc" id="L357" title="All 2 branches covered.">        if (obj instanceof IntRange == false) {</span>
+<span class="fc" id="L358">            return false;</span>
+        }
+<span class="fc" id="L360">        IntRange range = (IntRange) obj;</span>
+<span class="fc bfc" id="L361" title="All 4 branches covered.">        return min == range.min &amp;&amp; max == range.max;</span>
+    }
+
+    /**
+     * &lt;p&gt;Gets a hashCode for the range.&lt;/p&gt;
+     *
+     * @return a hash code value for this object
+     */
+    @Override
+    public int hashCode() {
+<span class="fc" id="L371">        int temp = hashCode;</span>
+<span class="fc bfc" id="L372" title="All 2 branches covered.">        if (temp == 0) {</span>
+<span class="fc" id="L373">            temp = 17;</span>
+<span class="fc" id="L374">            temp = 37 * temp + getClass().hashCode();</span>
+<span class="fc" id="L375">            temp = 37 * temp + min;</span>
+<span class="fc" id="L376">            temp = 37 * temp + max;</span>
+<span class="fc" id="L377">            hashCode = temp;</span>
+        }
+<span class="fc" id="L379">        return hashCode;</span>
+    }
+
+    /**
+     * &lt;p&gt;Gets the range as a &lt;code&gt;String&lt;/code&gt;.&lt;/p&gt;
+     *
+     * &lt;p&gt;The format of the String is 'Range[&lt;i&gt;min&lt;/i&gt;,&lt;i&gt;max&lt;/i&gt;]'.&lt;/p&gt;
+     *
+     * @return the &lt;code&gt;String&lt;/code&gt; representation of this range
+     */
+    @Override
+    public String toString() {
+<span class="fc bfc" id="L391" title="All 2 branches covered.">        if (toString == null) {</span>
+<span class="fc" id="L392">            StringBuilder buf = new StringBuilder(32);</span>
+<span class="fc" id="L393">            buf.append(&quot;Range[&quot;);</span>
+<span class="fc" id="L394">            buf.append(min);</span>
+<span class="fc" id="L395">            buf.append(',');</span>
+<span class="fc" id="L396">            buf.append(max);</span>
+<span class="fc" id="L397">            buf.append(']');</span>
+<span class="fc" id="L398">            toString = buf.toString();</span>
+        }
+<span class="fc" id="L400">        return toString;</span>
+    }
+
+    /**
+     * &lt;p&gt;Returns an array containing all the integer values in the range.&lt;/p&gt;
+     *
+     * @return the &lt;code&gt;int[]&lt;/code&gt; representation of this range
+     * @since 2.4
+     */
+    public int[] toArray() {
+<span class="fc" id="L410">        int[] array = new int[max - min + 1];</span>
+<span class="fc bfc" id="L411" title="All 2 branches covered.">        for (int i = 0; i &lt; array.length; i++) {</span>
+<span class="fc" id="L412">            array[i] = min + i;</span>
+        }
+
+<span class="fc" id="L415">        return array;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

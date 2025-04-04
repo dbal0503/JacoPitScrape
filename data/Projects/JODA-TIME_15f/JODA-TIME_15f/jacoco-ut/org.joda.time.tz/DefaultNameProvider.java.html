@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DefaultNameProvider.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Joda time</a> &gt; <a href="index.source.html" class="el_package">org.joda.time.tz</a> &gt; <span class="el_source">DefaultNameProvider.java</span></div><h1>DefaultNameProvider.java</h1><pre class="source lang-java linenums">/*
+ *  Copyright 2001-2011 Stephen Colebourne
+ *
+ *  Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+package org.joda.time.tz;
+
+import java.text.DateFormatSymbols;
+import java.util.HashMap;
+import java.util.Locale;
+import java.util.Map;
+
+import org.joda.time.DateTimeUtils;
+
+/**
+ * The default name provider acquires localized names from
+ * {@link DateFormatSymbols java.text.DateFormatSymbols}.
+ * &lt;p&gt;
+ * DefaultNameProvider is thread-safe and immutable.
+ *
+ * @author Brian S O'Neill
+ * @since 1.0
+ */
+@SuppressWarnings(&quot;unchecked&quot;)
+public class DefaultNameProvider implements NameProvider {
+    // locale -&gt; (id -&gt; (nameKey -&gt; [shortName, name]))
+<span class="fc" id="L37">    private HashMap&lt;Locale, Map&lt;String, Map&lt;String, Object&gt;&gt;&gt; iByLocaleCache = createCache();</span>
+
+<span class="fc" id="L39">    public DefaultNameProvider() {</span>
+<span class="fc" id="L40">    }</span>
+
+    public String getShortName(Locale locale, String id, String nameKey) {
+<span class="fc" id="L43">        String[] nameSet = getNameSet(locale, id, nameKey);</span>
+<span class="pc bpc" id="L44" title="1 of 2 branches missed.">        return nameSet == null ? null : nameSet[0];</span>
+    }
+    
+    public String getName(Locale locale, String id, String nameKey) {
+<span class="fc" id="L48">        String[] nameSet = getNameSet(locale, id, nameKey);</span>
+<span class="pc bpc" id="L49" title="1 of 2 branches missed.">        return nameSet == null ? null : nameSet[1];</span>
+    }
+
+    private synchronized String[] getNameSet(Locale locale, String id, String nameKey) {
+<span class="fc bfc" id="L53" title="All 6 branches covered.">        if (locale == null || id == null || nameKey == null) {</span>
+<span class="fc" id="L54">            return null;</span>
+        }
+
+<span class="fc" id="L57">        Map&lt;String, Map&lt;String, Object&gt;&gt; byIdCache = iByLocaleCache.get(locale);</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">        if (byIdCache == null) {</span>
+<span class="fc" id="L59">            iByLocaleCache.put(locale, byIdCache = createCache());</span>
+        }
+
+<span class="fc" id="L62">        Map&lt;String, Object&gt; byNameKeyCache = byIdCache.get(id);</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">        if (byNameKeyCache == null) {</span>
+<span class="fc" id="L64">            byIdCache.put(id, byNameKeyCache = createCache());</span>
+            
+<span class="fc" id="L66">            String[][] zoneStringsEn = DateTimeUtils.getDateFormatSymbols(Locale.ENGLISH).getZoneStrings();</span>
+<span class="fc" id="L67">            String[] setEn = null;</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">            for (String[] strings : zoneStringsEn) {</span>
+<span class="pc bpc" id="L69" title="4 of 6 branches missed.">              if (strings != null &amp;&amp; strings.length == 5 &amp;&amp; id.equals(strings[0])) {</span>
+<span class="nc" id="L70">                setEn = strings;</span>
+<span class="nc" id="L71">                break;</span>
+              }
+            }
+<span class="fc" id="L74">            String[][] zoneStringsLoc = DateTimeUtils.getDateFormatSymbols(locale).getZoneStrings();</span>
+<span class="fc" id="L75">            String[] setLoc = null;</span>
+<span class="fc bfc" id="L76" title="All 2 branches covered.">            for (String[] strings : zoneStringsLoc) {</span>
+<span class="pc bpc" id="L77" title="4 of 6 branches missed.">              if (strings != null &amp;&amp; strings.length == 5 &amp;&amp; id.equals(strings[0])) {</span>
+<span class="nc" id="L78">                setLoc = strings;</span>
+<span class="nc" id="L79">                break;</span>
+              }
+            }
+            
+<span class="pc bpc" id="L83" title="3 of 4 branches missed.">            if (setEn != null &amp;&amp; setLoc != null) {</span>
+<span class="nc" id="L84">              byNameKeyCache.put(setEn[2], new String[] {setLoc[2], setLoc[1]});</span>
+              // need to handle case where summer and winter have the same
+              // abbreviation, such as EST in Australia [1716305]
+              // we handle this by appending &quot;-Summer&quot;, cf ZoneInfoCompiler
+<span class="nc bnc" id="L88" title="All 2 branches missed.">              if (setEn[2].equals(setEn[4])) {</span>
+<span class="nc" id="L89">                  byNameKeyCache.put(setEn[4] + &quot;-Summer&quot;, new String[] {setLoc[4], setLoc[3]});</span>
+              } else {
+<span class="nc" id="L91">                  byNameKeyCache.put(setEn[4], new String[] {setLoc[4], setLoc[3]});</span>
+              }
+            }
+        }
+<span class="fc" id="L95">        return (String[]) byNameKeyCache.get(nameKey);</span>
+    }
+
+    private HashMap createCache() {
+<span class="fc" id="L99">        return new HashMap(7);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

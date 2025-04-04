@@ -1,0 +1,207 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PolynomialSplineFunction.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Commons Math</a> &gt; <a href="index.source.html" class="el_package">org.apache.commons.math.analysis.polynomials</a> &gt; <span class="el_source">PolynomialSplineFunction.java</span></div><h1>PolynomialSplineFunction.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.commons.math.analysis.polynomials;
+
+import java.util.Arrays;
+
+import org.apache.commons.math.util.MathArrays;
+import org.apache.commons.math.analysis.DifferentiableUnivariateFunction;
+import org.apache.commons.math.analysis.UnivariateFunction;
+import org.apache.commons.math.exception.OutOfRangeException;
+import org.apache.commons.math.exception.NumberIsTooSmallException;
+import org.apache.commons.math.exception.DimensionMismatchException;
+import org.apache.commons.math.exception.NullArgumentException;
+import org.apache.commons.math.exception.util.LocalizedFormats;
+
+/**
+ * Represents a polynomial spline function.
+ * &lt;p&gt;
+ * A &lt;strong&gt;polynomial spline function&lt;/strong&gt; consists of a set of
+ * &lt;i&gt;interpolating polynomials&lt;/i&gt; and an ascending array of domain
+ * &lt;i&gt;knot points&lt;/i&gt;, determining the intervals over which the spline function
+ * is defined by the constituent polynomials.  The polynomials are assumed to
+ * have been computed to match the values of another function at the knot
+ * points.  The value consistency constraints are not currently enforced by
+ * &lt;code&gt;PolynomialSplineFunction&lt;/code&gt; itself, but are assumed to hold among
+ * the polynomials and knot points passed to the constructor.&lt;/p&gt;
+ * &lt;p&gt;
+ * N.B.:  The polynomials in the &lt;code&gt;polynomials&lt;/code&gt; property must be
+ * centered on the knot points to compute the spline function values.
+ * See below.&lt;/p&gt;
+ * &lt;p&gt;
+ * The domain of the polynomial spline function is
+ * &lt;code&gt;[smallest knot, largest knot]&lt;/code&gt;.  Attempts to evaluate the
+ * function at values outside of this range generate IllegalArgumentExceptions.
+ * &lt;/p&gt;
+ * &lt;p&gt;
+ * The value of the polynomial spline function for an argument &lt;code&gt;x&lt;/code&gt;
+ * is computed as follows:
+ * &lt;ol&gt;
+ * &lt;li&gt;The knot array is searched to find the segment to which &lt;code&gt;x&lt;/code&gt;
+ * belongs.  If &lt;code&gt;x&lt;/code&gt; is less than the smallest knot point or greater
+ * than the largest one, an &lt;code&gt;IllegalArgumentException&lt;/code&gt;
+ * is thrown.&lt;/li&gt;
+ * &lt;li&gt; Let &lt;code&gt;j&lt;/code&gt; be the index of the largest knot point that is less
+ * than or equal to &lt;code&gt;x&lt;/code&gt;.  The value returned is &lt;br&gt;
+ * &lt;code&gt;polynomials[j](x - knot[j])&lt;/code&gt;&lt;/li&gt;&lt;/ol&gt;&lt;/p&gt;
+ *
+ * @version $Id$
+ */
+public class PolynomialSplineFunction implements DifferentiableUnivariateFunction {
+    /**
+     * Spline segment interval delimiters (knots).
+     * Size is n + 1 for n segments.
+     */
+    private final double knots[];
+    /**
+     * The polynomial functions that make up the spline.  The first element
+     * determines the value of the spline over the first subinterval, the
+     * second over the second, etc.   Spline function values are determined by
+     * evaluating these functions at {@code (x - knot[i])} where i is the
+     * knot segment to which x belongs.
+     */
+    private final PolynomialFunction polynomials[];
+    /**
+     * Number of spline segments. It is equal to the number of polynomials and
+     * to the number of partition points - 1.
+     */
+    private final int n;
+
+
+    /**
+     * Construct a polynomial spline function with the given segment delimiters
+     * and interpolating polynomials.
+     * The constructor copies both arrays and assigns the copies to the knots
+     * and polynomials properties, respectively.
+     *
+     * @param knots Spline segment interval delimiters.
+     * @param polynomials Polynomial functions that make up the spline.
+     * @throws NullArgumentException if either of the input arrays is {@code null}.
+     * @throws NumberIsTooSmallException if knots has length less than 2.
+     * @throws DimensionMismatchException if {@code polynomials.length != knots.length - 1}.
+     * @throws org.apache.commons.math.exception.NonMonotonicSequenceException if
+     * the {@code knots} array is not strictly increasing.
+     *
+     */
+<span class="fc" id="L100">    public PolynomialSplineFunction(double knots[], PolynomialFunction polynomials[]) {</span>
+<span class="pc bpc" id="L101" title="2 of 4 branches missed.">        if (knots == null ||</span>
+            polynomials == null) {
+<span class="nc" id="L103">            throw new NullArgumentException();</span>
+        }
+<span class="fc bfc" id="L105" title="All 2 branches covered.">        if (knots.length &lt; 2) {</span>
+<span class="fc" id="L106">            throw new NumberIsTooSmallException(LocalizedFormats.NOT_ENOUGH_POINTS_IN_SPLINE_PARTITION,</span>
+<span class="fc" id="L107">                                                2, knots.length, false);</span>
+        }
+<span class="fc bfc" id="L109" title="All 2 branches covered.">        if (knots.length - 1 != polynomials.length) {</span>
+<span class="fc" id="L110">            throw new DimensionMismatchException(polynomials.length, knots.length);</span>
+        }
+<span class="fc" id="L112">        MathArrays.checkOrder(knots);</span>
+
+<span class="fc" id="L114">        this.n = knots.length -1;</span>
+<span class="fc" id="L115">        this.knots = new double[n + 1];</span>
+<span class="fc" id="L116">        System.arraycopy(knots, 0, this.knots, 0, n + 1);</span>
+<span class="fc" id="L117">        this.polynomials = new PolynomialFunction[n];</span>
+<span class="fc" id="L118">        System.arraycopy(polynomials, 0, this.polynomials, 0, n);</span>
+<span class="fc" id="L119">    }</span>
+
+    /**
+     * Compute the value for the function.
+     * See {@link PolynomialSplineFunction} for details on the algorithm for
+     * computing the value of the function.
+     *
+     * @param v Point for which the function value should be computed.
+     * @return the value.
+     * @throws OutOfRangeException if {@code v} is outside of the domain of the
+     * spline function (smaller than the smallest knot point or larger than the
+     * largest knot point).
+     */
+    public double value(double v) {
+<span class="fc bfc" id="L133" title="All 4 branches covered.">        if (v &lt; knots[0] || v &gt; knots[n]) {</span>
+<span class="fc" id="L134">            throw new OutOfRangeException(v, knots[0], knots[n]);</span>
+        }
+<span class="fc" id="L136">        int i = Arrays.binarySearch(knots, v);</span>
+<span class="fc bfc" id="L137" title="All 2 branches covered.">        if (i &lt; 0) {</span>
+<span class="fc" id="L138">            i = -i - 2;</span>
+        }
+        // This will handle the case where v is the last knot value
+        // There are only n-1 polynomials, so if v is the last knot
+        // then we will use the last polynomial to calculate the value.
+<span class="fc bfc" id="L143" title="All 2 branches covered.">        if ( i &gt;= polynomials.length ) {</span>
+<span class="fc" id="L144">            i--;</span>
+        }
+<span class="fc" id="L146">        return polynomials[i].value(v - knots[i]);</span>
+    }
+
+    /**
+     * Get the derivative of the polynomial spline function.
+     *
+     * @return the derivative function.
+     */
+    public UnivariateFunction derivative() {
+<span class="fc" id="L155">        return polynomialSplineDerivative();</span>
+    }
+
+    /**
+     * Get the derivative of the polynomial spline function.
+     *
+     * @return the derivative function.
+     */
+    public PolynomialSplineFunction polynomialSplineDerivative() {
+<span class="fc" id="L164">        PolynomialFunction derivativePolynomials[] = new PolynomialFunction[n];</span>
+<span class="fc bfc" id="L165" title="All 2 branches covered.">        for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L166">            derivativePolynomials[i] = polynomials[i].polynomialDerivative();</span>
+        }
+<span class="fc" id="L168">        return new PolynomialSplineFunction(knots, derivativePolynomials);</span>
+    }
+
+    /**
+     * Get the number of spline segments.
+     * It is also the number of polynomials and the number of knot points - 1.
+     *
+     * @return the number of spline segments.
+     */
+    public int getN() {
+<span class="fc" id="L178">        return n;</span>
+    }
+
+    /**
+     * Get a copy of the interpolating polynomials array.
+     * It returns a fresh copy of the array. Changes made to the copy will
+     * not affect the polynomials property.
+     *
+     * @return the interpolating polynomials.
+     */
+    public PolynomialFunction[] getPolynomials() {
+<span class="fc" id="L189">        PolynomialFunction p[] = new PolynomialFunction[n];</span>
+<span class="fc" id="L190">        System.arraycopy(polynomials, 0, p, 0, n);</span>
+<span class="fc" id="L191">        return p;</span>
+    }
+
+    /**
+     * Get an array copy of the knot points.
+     * It returns a fresh copy of the array. Changes made to the copy
+     * will not affect the knots property.
+     *
+     * @return the knot points.
+     */
+    public double[] getKnots() {
+<span class="fc" id="L202">        double out[] = new double[n + 1];</span>
+<span class="fc" id="L203">        System.arraycopy(knots, 0, out, 0, n + 1);</span>
+<span class="fc" id="L204">        return out;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>XmlRootNameLookup.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Jackson-dataformat-XML</a> &gt; <a href="index.source.html" class="el_package">com.fasterxml.jackson.dataformat.xml.util</a> &gt; <span class="el_source">XmlRootNameLookup.java</span></div><h1>XmlRootNameLookup.java</h1><pre class="source lang-java linenums">package com.fasterxml.jackson.dataformat.xml.util;
+
+import javax.xml.namespace.QName;
+
+import com.fasterxml.jackson.databind.*;
+import com.fasterxml.jackson.databind.cfg.MapperConfig;
+import com.fasterxml.jackson.databind.introspect.AnnotatedClass;
+import com.fasterxml.jackson.databind.type.ClassKey;
+import com.fasterxml.jackson.databind.util.LRUMap;
+import com.fasterxml.jackson.dataformat.xml.XmlAnnotationIntrospector;
+
+/**
+ * Helper class used for efficiently finding root element name used with
+ * XML serializations.
+ */
+public class XmlRootNameLookup
+    implements java.io.Serializable
+{
+    private static final long serialVersionUID = 1L;
+
+    /**
+     * For efficient operation, let's try to minimize number of times we
+     * need to introspect root element name to use.
+     *&lt;p&gt;
+     * Note: changed to &lt;code&gt;transient&lt;/code&gt; for 2.3; no point in serializing such
+     * state
+     */
+<span class="fc" id="L28">    protected final transient LRUMap&lt;ClassKey,QName&gt; _rootNames = new LRUMap&lt;ClassKey,QName&gt;(40, 200);</span>
+
+<span class="fc" id="L30">    public XmlRootNameLookup() { }</span>
+    
+    protected Object readResolve() {
+        // just need to make 100% sure it gets set to non-null, that's all
+<span class="pc bpc" id="L34" title="1 of 2 branches missed.">        if (_rootNames == null) {</span>
+<span class="fc" id="L35">            return new XmlRootNameLookup();</span>
+        }
+<span class="nc" id="L37">        return this;</span>
+    }
+
+    public QName findRootName(JavaType rootType, MapperConfig&lt;?&gt; config) {
+<span class="fc" id="L41">        return findRootName(rootType.getRawClass(), config);</span>
+    }
+
+    public QName findRootName(Class&lt;?&gt; rootType, MapperConfig&lt;?&gt; config)
+    {
+<span class="fc" id="L46">        ClassKey key = new ClassKey(rootType);</span>
+        QName name;
+<span class="fc" id="L48">        synchronized (_rootNames) {</span>
+<span class="fc" id="L49">            name = _rootNames.get(key);</span>
+<span class="fc" id="L50">        }</span>
+<span class="fc bfc" id="L51" title="All 2 branches covered.">        if (name != null) {</span>
+<span class="fc" id="L52">            return name;</span>
+        }
+<span class="fc" id="L54">        name = _findRootName(rootType, config);</span>
+<span class="fc" id="L55">        synchronized (_rootNames) {</span>
+<span class="fc" id="L56">            _rootNames.put(key, name);</span>
+<span class="fc" id="L57">        }</span>
+<span class="fc" id="L58">        return name;</span>
+    }
+    
+    // NOTE: needed to be synchronized in 2.6.4, but 2.7.0 adds a proper fix
+    // for annotation introspection hence not needed any more
+    protected QName _findRootName(Class&lt;?&gt; rootType, MapperConfig&lt;?&gt; config)
+    {
+<span class="fc" id="L65">        BeanDescription beanDesc = config.introspectClassAnnotations(rootType);</span>
+<span class="fc" id="L66">        AnnotationIntrospector intr = config.getAnnotationIntrospector();</span>
+<span class="fc" id="L67">        AnnotatedClass ac = beanDesc.getClassInfo();</span>
+<span class="fc" id="L68">        String localName = null;</span>
+<span class="fc" id="L69">        String ns = null;</span>
+
+<span class="fc" id="L71">        PropertyName root = intr.findRootName(ac);</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">        if (root != null) {</span>
+<span class="fc" id="L73">            localName = root.getSimpleName();</span>
+<span class="fc" id="L74">            ns = root.getNamespace();</span>
+        }
+        // No answer so far? Let's just default to using simple class name
+<span class="pc bpc" id="L77" title="1 of 4 branches missed.">        if (localName == null || localName.length() == 0) {</span>
+            // Should we strip out enclosing class tho? For now, nope:
+            // one caveat: array simple names end with &quot;[]&quot;; also, &quot;$&quot; needs replacing
+<span class="fc" id="L80">            localName = StaxUtil.sanitizeXmlTypeName(rootType.getSimpleName());</span>
+<span class="fc" id="L81">            return new QName(&quot;&quot;, localName);</span>
+        }
+        // Otherwise let's see if there's namespace, too (if we are missing it)
+<span class="fc bfc" id="L84" title="All 4 branches covered.">        if (ns == null || ns.length() == 0) {</span>
+<span class="fc" id="L85">            ns = findNamespace(intr, ac);</span>
+        }
+<span class="fc bfc" id="L87" title="All 2 branches covered.">        if (ns == null) { // some QName impls barf on nulls...</span>
+<span class="fc" id="L88">            ns = &quot;&quot;;</span>
+        }
+<span class="fc" id="L90">        return new QName(ns, localName);</span>
+    }
+
+    private String findNamespace(AnnotationIntrospector ai, AnnotatedClass ann)
+    {
+<span class="fc bfc" id="L95" title="All 2 branches covered.">        for (AnnotationIntrospector intr : ai.allIntrospectors()) {</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">            if (intr instanceof XmlAnnotationIntrospector) {</span>
+<span class="fc" id="L97">                String ns = ((XmlAnnotationIntrospector) intr).findNamespace(ann);</span>
+<span class="pc bpc" id="L98" title="1 of 2 branches missed.">                if (ns != null) {</span>
+<span class="nc" id="L99">                    return ns;</span>
+                }
+            }
+<span class="fc" id="L102">        }</span>
+<span class="fc" id="L103">        return null;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

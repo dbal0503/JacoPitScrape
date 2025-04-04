@@ -1,0 +1,1105 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GJChronology.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Joda time</a> &gt; <a href="index.source.html" class="el_package">org.joda.time.chrono</a> &gt; <span class="el_source">GJChronology.java</span></div><h1>GJChronology.java</h1><pre class="source lang-java linenums">/*
+ *  Copyright 2001-2009 Stephen Colebourne
+ *
+ *  Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+package org.joda.time.chrono;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Locale;
+import java.util.Map;
+
+import org.joda.time.Chronology;
+import org.joda.time.DateTimeField;
+import org.joda.time.DateTimeUtils;
+import org.joda.time.DateTimeZone;
+import org.joda.time.DurationField;
+import org.joda.time.IllegalFieldValueException;
+import org.joda.time.Instant;
+import org.joda.time.ReadableInstant;
+import org.joda.time.ReadablePartial;
+import org.joda.time.field.BaseDateTimeField;
+import org.joda.time.field.DecoratedDurationField;
+import org.joda.time.format.DateTimeFormatter;
+import org.joda.time.format.ISODateTimeFormat;
+
+/**
+ * Implements the Gregorian/Julian calendar system which is the calendar system
+ * used in most of the world. Wherever possible, it is recommended to use the
+ * {@link ISOChronology} instead.
+ * &lt;p&gt;
+ * The Gregorian calendar replaced the Julian calendar, and the point in time
+ * when this chronology switches can be controlled using the second parameter
+ * of the getInstance method. By default this cutover is set to the date the
+ * Gregorian calendar was first instituted, October 15, 1582.
+ * &lt;p&gt;
+ * Before this date, this chronology uses the proleptic Julian calendar
+ * (proleptic means extending indefinitely). The Julian calendar has leap years
+ * every four years, whereas the Gregorian has special rules for 100 and 400
+ * years. A meaningful result will thus be obtained for all input values.
+ * However before 8 CE, Julian leap years were irregular, and before 45 BCE
+ * there was no Julian calendar.
+ * &lt;p&gt;
+ * This chronology differs from
+ * {@link java.util.GregorianCalendar GregorianCalendar} in that years
+ * in BCE are returned correctly. Thus year 1 BCE is returned as -1 instead of 1.
+ * The yearOfEra field produces results compatible with GregorianCalendar.
+ * &lt;p&gt;
+ * The Julian calendar does not have a year zero, and so year -1 is followed by
+ * year 1. If the Gregorian cutover date is specified at or before year -1
+ * (Julian), year zero is defined. In other words, the proleptic Gregorian
+ * chronology used by this class has a year zero.
+ * &lt;p&gt;
+ * To create a pure proleptic Julian chronology, use {@link JulianChronology},
+ * and to create a pure proleptic Gregorian chronology, use
+ * {@link GregorianChronology}.
+ * &lt;p&gt;
+ * GJChronology is thread-safe and immutable.
+ * 
+ * @author Brian S O'Neill
+ * @author Stephen Colebourne
+ * @since 1.0
+ */
+public final class GJChronology extends AssembledChronology {
+
+    /** Serialization lock */
+    private static final long serialVersionUID = -2545574827706931671L;
+
+    /**
+     * Convert a datetime from one chronology to another.
+     */
+    private static long convertByYear(long instant, Chronology from, Chronology to) {
+<span class="fc" id="L83">        return to.getDateTimeMillis</span>
+<span class="fc" id="L84">            (from.year().get(instant),</span>
+<span class="fc" id="L85">             from.monthOfYear().get(instant),</span>
+<span class="fc" id="L86">             from.dayOfMonth().get(instant),</span>
+<span class="fc" id="L87">             from.millisOfDay().get(instant));</span>
+    }
+
+    /**
+     * Convert a datetime from one chronology to another.
+     */
+    private static long convertByWeekyear(final long instant, Chronology from, Chronology to) {
+        long newInstant;
+<span class="fc" id="L95">        newInstant = to.weekyear().set(0, from.weekyear().get(instant));</span>
+<span class="fc" id="L96">        newInstant = to.weekOfWeekyear().set(newInstant, from.weekOfWeekyear().get(instant));</span>
+<span class="fc" id="L97">        newInstant = to.dayOfWeek().set(newInstant, from.dayOfWeek().get(instant));</span>
+<span class="fc" id="L98">        newInstant = to.millisOfDay().set(newInstant, from.millisOfDay().get(instant));</span>
+<span class="fc" id="L99">        return newInstant;</span>
+    }
+
+    /**
+     * The default GregorianJulian cutover point.
+     */
+<span class="fc" id="L105">    static final Instant DEFAULT_CUTOVER = new Instant(-12219292800000L);</span>
+
+    /** Cache of zone to chronology list */
+<span class="fc" id="L108">    private static final Map&lt;DateTimeZone, ArrayList&lt;GJChronology&gt;&gt; cCache = new HashMap&lt;DateTimeZone, ArrayList&lt;GJChronology&gt;&gt;();</span>
+
+    /**
+     * Factory method returns instances of the default GJ cutover
+     * chronology. This uses a cutover date of October 15, 1582 (Gregorian)
+     * 00:00:00 UTC. For this value, October 4, 1582 (Julian) is followed by
+     * October 15, 1582 (Gregorian).
+     *
+     * &lt;p&gt;The first day of the week is designated to be
+     * {@link org.joda.time.DateTimeConstants#MONDAY Monday},
+     * and the minimum days in the first week of the year is 4.
+     *
+     * &lt;p&gt;The time zone of the returned instance is UTC.
+     */
+    public static GJChronology getInstanceUTC() {
+<span class="fc" id="L123">        return getInstance(DateTimeZone.UTC, DEFAULT_CUTOVER, 4);</span>
+    }
+
+    /**
+     * Factory method returns instances of the default GJ cutover
+     * chronology. This uses a cutover date of October 15, 1582 (Gregorian)
+     * 00:00:00 UTC. For this value, October 4, 1582 (Julian) is followed by
+     * October 15, 1582 (Gregorian).
+     *
+     * &lt;p&gt;The first day of the week is designated to be
+     * {@link org.joda.time.DateTimeConstants#MONDAY Monday},
+     * and the minimum days in the first week of the year is 4.
+     *
+     * &lt;p&gt;The returned chronology is in the default time zone.
+     */
+    public static GJChronology getInstance() {
+<span class="fc" id="L139">        return getInstance(DateTimeZone.getDefault(), DEFAULT_CUTOVER, 4);</span>
+    }
+
+    /**
+     * Factory method returns instances of the GJ cutover chronology. This uses
+     * a cutover date of October 15, 1582 (Gregorian) 00:00:00 UTC. For this
+     * value, October 4, 1582 (Julian) is followed by October 15, 1582
+     * (Gregorian).
+     *
+     * &lt;p&gt;The first day of the week is designated to be
+     * {@link org.joda.time.DateTimeConstants#MONDAY Monday},
+     * and the minimum days in the first week of the year is 4.
+     *
+     * @param zone  the time zone to use, null is default
+     */
+    public static GJChronology getInstance(DateTimeZone zone) {
+<span class="fc" id="L155">        return getInstance(zone, DEFAULT_CUTOVER, 4);</span>
+    }
+
+    /**
+     * Factory method returns instances of the GJ cutover chronology. Any
+     * cutover date may be specified.
+     *
+     * &lt;p&gt;The first day of the week is designated to be
+     * {@link org.joda.time.DateTimeConstants#MONDAY Monday},
+     * and the minimum days in the first week of the year is 4.
+     *
+     * @param zone  the time zone to use, null is default
+     * @param gregorianCutover  the cutover to use, null means default
+     */
+    public static GJChronology getInstance(
+            DateTimeZone zone,
+            ReadableInstant gregorianCutover) {
+        
+<span class="fc" id="L173">        return getInstance(zone, gregorianCutover, 4);</span>
+    }
+    
+    /**
+     * Factory method returns instances of the GJ cutover chronology. Any
+     * cutover date may be specified.
+     *
+     * @param zone  the time zone to use, null is default
+     * @param gregorianCutover  the cutover to use, null means default
+     * @param minDaysInFirstWeek  minimum number of days in first week of the year; default is 4
+     */
+    public static synchronized GJChronology getInstance(
+            DateTimeZone zone,
+            ReadableInstant gregorianCutover,
+            int minDaysInFirstWeek) {
+        
+<span class="fc" id="L189">        zone = DateTimeUtils.getZone(zone);</span>
+        Instant cutoverInstant;
+<span class="fc bfc" id="L191" title="All 2 branches covered.">        if (gregorianCutover == null) {</span>
+<span class="fc" id="L192">            cutoverInstant = DEFAULT_CUTOVER;</span>
+        } else {
+<span class="fc" id="L194">            cutoverInstant = gregorianCutover.toInstant();</span>
+        }
+
+        GJChronology chrono;
+
+<span class="fc" id="L199">        ArrayList&lt;GJChronology&gt; chronos = cCache.get(zone);</span>
+<span class="fc bfc" id="L200" title="All 2 branches covered.">        if (chronos == null) {</span>
+<span class="fc" id="L201">            chronos = new ArrayList&lt;GJChronology&gt;(2);</span>
+<span class="fc" id="L202">            cCache.put(zone, chronos);</span>
+        } else {
+<span class="fc bfc" id="L204" title="All 2 branches covered.">            for (int i=chronos.size(); --i&gt;=0; ) {</span>
+<span class="fc" id="L205">                chrono = chronos.get(i);</span>
+<span class="fc bfc" id="L206" title="All 2 branches covered.">                if (minDaysInFirstWeek == chrono.getMinimumDaysInFirstWeek() &amp;&amp;</span>
+<span class="fc bfc" id="L207" title="All 2 branches covered.">                    cutoverInstant.equals(chrono.getGregorianCutover())) {</span>
+                    
+<span class="fc" id="L209">                    return chrono;</span>
+                }
+            }
+        }
+
+<span class="fc bfc" id="L214" title="All 2 branches covered.">        if (zone == DateTimeZone.UTC) {</span>
+<span class="fc" id="L215">            chrono = new GJChronology</span>
+<span class="fc" id="L216">                (JulianChronology.getInstance(zone, minDaysInFirstWeek),</span>
+<span class="fc" id="L217">                 GregorianChronology.getInstance(zone, minDaysInFirstWeek),</span>
+                 cutoverInstant);
+        } else {
+<span class="fc" id="L220">            chrono = getInstance(DateTimeZone.UTC, cutoverInstant, minDaysInFirstWeek);</span>
+<span class="fc" id="L221">            chrono = new GJChronology</span>
+<span class="fc" id="L222">                (ZonedChronology.getInstance(chrono, zone),</span>
+                 chrono.iJulianChronology,
+                 chrono.iGregorianChronology,
+                 chrono.iCutoverInstant);
+        }
+
+<span class="fc" id="L228">        chronos.add(chrono);</span>
+
+<span class="fc" id="L230">        return chrono;</span>
+    }
+
+    /**
+     * Factory method returns instances of the GJ cutover chronology. Any
+     * cutover date may be specified.
+     *
+     * @param zone  the time zone to use, null is default
+     * @param gregorianCutover  the cutover to use
+     * @param minDaysInFirstWeek  minimum number of days in first week of the year; default is 4
+     */
+    public static GJChronology getInstance(
+            DateTimeZone zone,
+            long gregorianCutover,
+            int minDaysInFirstWeek) {
+        
+        Instant cutoverInstant;
+<span class="fc bfc" id="L247" title="All 2 branches covered.">        if (gregorianCutover == DEFAULT_CUTOVER.getMillis()) {</span>
+<span class="fc" id="L248">            cutoverInstant = null;</span>
+        } else {
+<span class="fc" id="L250">            cutoverInstant = new Instant(gregorianCutover);</span>
+        }
+<span class="fc" id="L252">        return getInstance(zone, cutoverInstant, minDaysInFirstWeek);</span>
+    }
+
+    //-----------------------------------------------------------------------
+    private JulianChronology iJulianChronology;
+    private GregorianChronology iGregorianChronology;
+    private Instant iCutoverInstant;
+
+    private long iCutoverMillis;
+    private long iGapDuration;
+
+    /**
+     * @param julian chronology used before the cutover instant
+     * @param gregorian chronology used at and after the cutover instant
+     * @param cutoverInstant instant when the gregorian chronology began
+     */
+    private GJChronology(JulianChronology julian,
+                         GregorianChronology gregorian,
+                         Instant cutoverInstant) {
+<span class="fc" id="L271">        super(null, new Object[] {julian, gregorian, cutoverInstant});</span>
+<span class="fc" id="L272">    }</span>
+
+    /**
+     * Called when applying a time zone.
+     */
+    private GJChronology(Chronology base,
+                         JulianChronology julian,
+                         GregorianChronology gregorian,
+                         Instant cutoverInstant) {
+<span class="fc" id="L281">        super(base, new Object[] {julian, gregorian, cutoverInstant});</span>
+<span class="fc" id="L282">    }</span>
+
+    /**
+     * Serialization singleton
+     */
+    private Object readResolve() {
+<span class="fc" id="L288">        return getInstance(getZone(), iCutoverInstant, getMinimumDaysInFirstWeek());</span>
+    }
+
+    public DateTimeZone getZone() {
+        Chronology base;
+<span class="fc bfc" id="L293" title="All 2 branches covered.">        if ((base = getBase()) != null) {</span>
+<span class="fc" id="L294">            return base.getZone();</span>
+        }
+<span class="fc" id="L296">        return DateTimeZone.UTC;</span>
+    }
+
+    // Conversion
+    //-----------------------------------------------------------------------
+    /**
+     * Gets the Chronology in the UTC time zone.
+     * 
+     * @return the chronology in UTC
+     */
+    public Chronology withUTC() {
+<span class="fc" id="L307">        return withZone(DateTimeZone.UTC);</span>
+    }
+
+    /**
+     * Gets the Chronology in a specific time zone.
+     * 
+     * @param zone  the zone to get the chronology in, null is default
+     * @return the chronology
+     */
+    public Chronology withZone(DateTimeZone zone) {
+<span class="fc bfc" id="L317" title="All 2 branches covered.">        if (zone == null) {</span>
+<span class="fc" id="L318">            zone = DateTimeZone.getDefault();</span>
+        }
+<span class="fc bfc" id="L320" title="All 2 branches covered.">        if (zone == getZone()) {</span>
+<span class="fc" id="L321">            return this;</span>
+        }
+<span class="fc" id="L323">        return getInstance(zone, iCutoverInstant, getMinimumDaysInFirstWeek());</span>
+    }
+
+    public long getDateTimeMillis(int year, int monthOfYear, int dayOfMonth,
+                                  int millisOfDay)
+        throws IllegalArgumentException
+    {
+        Chronology base;
+<span class="pc bpc" id="L331" title="1 of 2 branches missed.">        if ((base = getBase()) != null) {</span>
+<span class="nc" id="L332">            return base.getDateTimeMillis(year, monthOfYear, dayOfMonth, millisOfDay);</span>
+        }
+
+        // Assume date is Gregorian.
+<span class="fc" id="L336">        long instant = iGregorianChronology.getDateTimeMillis</span>
+<span class="fc" id="L337">            (year, monthOfYear, dayOfMonth, millisOfDay);</span>
+<span class="fc bfc" id="L338" title="All 2 branches covered.">        if (instant &lt; iCutoverMillis) {</span>
+            // Maybe it's Julian.
+<span class="fc" id="L340">            instant = iJulianChronology.getDateTimeMillis</span>
+<span class="fc" id="L341">                (year, monthOfYear, dayOfMonth, millisOfDay);</span>
+<span class="pc bpc" id="L342" title="1 of 2 branches missed.">            if (instant &gt;= iCutoverMillis) {</span>
+                // Okay, it's in the illegal cutover gap.
+<span class="nc" id="L344">                throw new IllegalArgumentException(&quot;Specified date does not exist&quot;);</span>
+            }
+        }
+<span class="fc" id="L347">        return instant;</span>
+    }
+
+    public long getDateTimeMillis(int year, int monthOfYear, int dayOfMonth,
+                                  int hourOfDay, int minuteOfHour,
+                                  int secondOfMinute, int millisOfSecond)
+        throws IllegalArgumentException
+    {
+        Chronology base;
+<span class="fc bfc" id="L356" title="All 2 branches covered.">        if ((base = getBase()) != null) {</span>
+<span class="fc" id="L357">            return base.getDateTimeMillis</span>
+<span class="fc" id="L358">                (year, monthOfYear, dayOfMonth,</span>
+                 hourOfDay, minuteOfHour, secondOfMinute, millisOfSecond);
+        }
+
+        // Assume date is Gregorian.
+        long instant;
+        try {
+<span class="fc" id="L365">            instant = iGregorianChronology.getDateTimeMillis</span>
+<span class="fc" id="L366">                (year, monthOfYear, dayOfMonth,</span>
+                 hourOfDay, minuteOfHour, secondOfMinute, millisOfSecond);
+<span class="fc" id="L368">        } catch (IllegalFieldValueException ex) {</span>
+<span class="pc bpc" id="L369" title="1 of 4 branches missed.">            if (monthOfYear != 2 || dayOfMonth != 29) {</span>
+<span class="fc" id="L370">                throw ex;</span>
+            }
+<span class="fc" id="L372">            instant = iGregorianChronology.getDateTimeMillis</span>
+<span class="fc" id="L373">                (year, monthOfYear, 28,</span>
+                 hourOfDay, minuteOfHour, secondOfMinute, millisOfSecond);
+<span class="pc bpc" id="L375" title="1 of 2 branches missed.">            if (instant &gt;= iCutoverMillis) {</span>
+<span class="nc" id="L376">                throw ex;</span>
+            }
+<span class="fc" id="L378">        }</span>
+<span class="fc bfc" id="L379" title="All 2 branches covered.">        if (instant &lt; iCutoverMillis) {</span>
+            // Maybe it's Julian.
+<span class="fc" id="L381">            instant = iJulianChronology.getDateTimeMillis</span>
+<span class="fc" id="L382">                (year, monthOfYear, dayOfMonth,</span>
+                 hourOfDay, minuteOfHour, secondOfMinute, millisOfSecond);
+<span class="fc bfc" id="L384" title="All 2 branches covered.">            if (instant &gt;= iCutoverMillis) {</span>
+                // Okay, it's in the illegal cutover gap.
+<span class="fc" id="L386">                throw new IllegalArgumentException(&quot;Specified date does not exist&quot;);</span>
+            }
+        }
+<span class="fc" id="L389">        return instant;</span>
+    }
+
+    /**
+     * Gets the cutover instant between Gregorian and Julian chronologies.
+     * @return the cutover instant
+     */
+    public Instant getGregorianCutover() {
+<span class="fc" id="L397">        return iCutoverInstant;</span>
+    }
+
+    /**
+     * Gets the minimum days needed for a week to be the first week in a year.
+     * 
+     * @return the minimum days
+     */
+    public int getMinimumDaysInFirstWeek() {
+<span class="fc" id="L406">        return iGregorianChronology.getMinimumDaysInFirstWeek();</span>
+    }
+
+    /**
+     * Checks if this chronology instance equals another.
+     * 
+     * @param obj  the object to compare to
+     * @return true if equal
+     * @since 1.6
+     */
+    public boolean equals(Object obj) {
+<span class="fc" id="L417">        return super.equals(obj);</span>
+    }
+
+    /**
+     * A suitable hash code for the chronology.
+     * 
+     * @return the hash code
+     * @since 1.6
+     */
+    public int hashCode() {
+<span class="fc" id="L427">        return &quot;GJ&quot;.hashCode() * 11 + iJulianChronology.hashCode() +</span>
+<span class="fc" id="L428">            iGregorianChronology.hashCode() + iCutoverInstant.hashCode();</span>
+    }
+
+    // Output
+    //-----------------------------------------------------------------------
+    /**
+     * Gets a debugging toString.
+     * 
+     * @return a debugging string
+     */
+    public String toString() {
+<span class="fc" id="L439">        StringBuffer sb = new StringBuffer(60);</span>
+<span class="fc" id="L440">        sb.append(&quot;GJChronology&quot;);</span>
+<span class="fc" id="L441">        sb.append('[');</span>
+<span class="fc" id="L442">        sb.append(getZone().getID());</span>
+        
+<span class="fc bfc" id="L444" title="All 2 branches covered.">        if (iCutoverMillis != DEFAULT_CUTOVER.getMillis()) {</span>
+<span class="fc" id="L445">            sb.append(&quot;,cutover=&quot;);</span>
+            DateTimeFormatter printer;
+<span class="fc bfc" id="L447" title="All 2 branches covered.">            if (withUTC().dayOfYear().remainder(iCutoverMillis) == 0) {</span>
+<span class="fc" id="L448">                printer = ISODateTimeFormat.date();</span>
+            } else {
+<span class="fc" id="L450">                printer = ISODateTimeFormat.dateTime();</span>
+            }
+<span class="fc" id="L452">            printer.withChronology(withUTC()).printTo(sb, iCutoverMillis);</span>
+        }
+        
+<span class="fc bfc" id="L455" title="All 2 branches covered.">        if (getMinimumDaysInFirstWeek() != 4) {</span>
+<span class="fc" id="L456">            sb.append(&quot;,mdfw=&quot;);</span>
+<span class="fc" id="L457">            sb.append(getMinimumDaysInFirstWeek());</span>
+        }
+<span class="fc" id="L459">        sb.append(']');</span>
+        
+<span class="fc" id="L461">        return sb.toString();</span>
+    }
+
+    protected void assemble(Fields fields) {
+<span class="fc" id="L465">        Object[] params = (Object[])getParam();</span>
+
+<span class="fc" id="L467">        JulianChronology julian = (JulianChronology)params[0];</span>
+<span class="fc" id="L468">        GregorianChronology gregorian = (GregorianChronology)params[1];</span>
+<span class="fc" id="L469">        Instant cutoverInstant = (Instant)params[2];</span>
+<span class="fc" id="L470">        iCutoverMillis = cutoverInstant.getMillis();</span>
+
+<span class="fc" id="L472">        iJulianChronology = julian;</span>
+<span class="fc" id="L473">        iGregorianChronology = gregorian;</span>
+<span class="fc" id="L474">        iCutoverInstant = cutoverInstant;</span>
+
+<span class="fc bfc" id="L476" title="All 2 branches covered.">        if (getBase() != null) {</span>
+<span class="fc" id="L477">            return;</span>
+        }
+
+<span class="pc bpc" id="L480" title="1 of 2 branches missed.">        if (julian.getMinimumDaysInFirstWeek() != gregorian.getMinimumDaysInFirstWeek()) {</span>
+<span class="nc" id="L481">            throw new IllegalArgumentException();</span>
+        }
+
+        // Compute difference between the chronologies at the cutover instant
+<span class="fc" id="L485">        iGapDuration = iCutoverMillis - julianToGregorianByYear(iCutoverMillis);</span>
+
+        // Begin field definitions.
+
+        // First just copy all the Gregorian fields and then override those
+        // that need special attention.
+<span class="fc" id="L491">        fields.copyFieldsFrom(gregorian);</span>
+        
+        // Assuming cutover is at midnight, all time of day fields can be
+        // gregorian since they are unaffected by cutover.
+
+        // Verify assumption.
+<span class="fc bfc" id="L497" title="All 2 branches covered.">        if (gregorian.millisOfDay().get(iCutoverMillis) == 0) {</span>
+            // Cutover is sometime in the day, so cutover fields are required
+            // for time of day.
+
+<span class="fc" id="L501">            fields.millisOfSecond = new CutoverField(julian.millisOfSecond(), fields.millisOfSecond, iCutoverMillis);</span>
+<span class="fc" id="L502">            fields.millisOfDay = new CutoverField(julian.millisOfDay(), fields.millisOfDay, iCutoverMillis);</span>
+<span class="fc" id="L503">            fields.secondOfMinute = new CutoverField(julian.secondOfMinute(), fields.secondOfMinute, iCutoverMillis);</span>
+<span class="fc" id="L504">            fields.secondOfDay = new CutoverField(julian.secondOfDay(), fields.secondOfDay, iCutoverMillis);</span>
+<span class="fc" id="L505">            fields.minuteOfHour = new CutoverField(julian.minuteOfHour(), fields.minuteOfHour, iCutoverMillis);</span>
+<span class="fc" id="L506">            fields.minuteOfDay = new CutoverField(julian.minuteOfDay(), fields.minuteOfDay, iCutoverMillis);</span>
+<span class="fc" id="L507">            fields.hourOfDay = new CutoverField(julian.hourOfDay(), fields.hourOfDay, iCutoverMillis);</span>
+<span class="fc" id="L508">            fields.hourOfHalfday = new CutoverField(julian.hourOfHalfday(), fields.hourOfHalfday, iCutoverMillis);</span>
+<span class="fc" id="L509">            fields.clockhourOfDay = new CutoverField(julian.clockhourOfDay(), fields.clockhourOfDay, iCutoverMillis);</span>
+<span class="fc" id="L510">            fields.clockhourOfHalfday = new CutoverField(julian.clockhourOfHalfday(),</span>
+                                                         fields.clockhourOfHalfday, iCutoverMillis);
+<span class="fc" id="L512">            fields.halfdayOfDay = new CutoverField(julian.halfdayOfDay(), fields.halfdayOfDay, iCutoverMillis);</span>
+        }
+
+        // These fields just require basic cutover support.
+        {
+<span class="fc" id="L517">            fields.era = new CutoverField(julian.era(), fields.era, iCutoverMillis);</span>
+        }
+
+        // DayOfYear and weekOfWeekyear require special handling since cutover
+        // year has fewer days and weeks. Extend the cutover to the start of
+        // the next year or weekyear. This keeps the sequence unbroken during
+        // the cutover year.
+
+        {
+<span class="fc" id="L526">            long cutover = gregorian.year().roundCeiling(iCutoverMillis);</span>
+<span class="fc" id="L527">            fields.dayOfYear = new CutoverField(</span>
+<span class="fc" id="L528">                julian.dayOfYear(), fields.dayOfYear, cutover);</span>
+        }
+
+        {
+<span class="fc" id="L532">            long cutover = gregorian.weekyear().roundCeiling(iCutoverMillis);</span>
+<span class="fc" id="L533">            fields.weekOfWeekyear = new CutoverField(</span>
+<span class="fc" id="L534">                julian.weekOfWeekyear(), fields.weekOfWeekyear, cutover, true);</span>
+        }
+
+        // These fields are special because they have imprecise durations. The
+        // family of addition methods need special attention. Override affected
+        // duration fields as well.
+        {
+<span class="fc" id="L541">            fields.year = new ImpreciseCutoverField(</span>
+<span class="fc" id="L542">                julian.year(), fields.year, iCutoverMillis);</span>
+<span class="fc" id="L543">            fields.years = fields.year.getDurationField();</span>
+<span class="fc" id="L544">            fields.yearOfEra = new ImpreciseCutoverField(</span>
+<span class="fc" id="L545">                julian.yearOfEra(), fields.yearOfEra, fields.years, iCutoverMillis);</span>
+<span class="fc" id="L546">            fields.yearOfCentury = new ImpreciseCutoverField(</span>
+<span class="fc" id="L547">                julian.yearOfCentury(), fields.yearOfCentury, fields.years, iCutoverMillis);</span>
+            
+<span class="fc" id="L549">            fields.centuryOfEra = new ImpreciseCutoverField(</span>
+<span class="fc" id="L550">                julian.centuryOfEra(), fields.centuryOfEra, iCutoverMillis);</span>
+<span class="fc" id="L551">            fields.centuries = fields.centuryOfEra.getDurationField();</span>
+            
+<span class="fc" id="L553">            fields.monthOfYear = new ImpreciseCutoverField(</span>
+<span class="fc" id="L554">                julian.monthOfYear(), fields.monthOfYear, iCutoverMillis);</span>
+<span class="fc" id="L555">            fields.months = fields.monthOfYear.getDurationField();</span>
+            
+<span class="fc" id="L557">            fields.weekyear = new ImpreciseCutoverField(</span>
+<span class="fc" id="L558">                julian.weekyear(), fields.weekyear, null, iCutoverMillis, true);</span>
+<span class="fc" id="L559">            fields.weekyearOfCentury = new ImpreciseCutoverField(</span>
+<span class="fc" id="L560">                julian.weekyearOfCentury(), fields.weekyearOfCentury, fields.weekyears, iCutoverMillis);</span>
+<span class="fc" id="L561">            fields.weekyears = fields.weekyear.getDurationField();</span>
+        }
+
+        // These fields require basic cutover support, except they must link to
+        // imprecise durations.
+        {
+<span class="fc" id="L567">            CutoverField cf = new CutoverField</span>
+<span class="fc" id="L568">                (julian.dayOfMonth(), fields.dayOfMonth, iCutoverMillis);</span>
+<span class="fc" id="L569">            cf.iRangeDurationField = fields.months;</span>
+<span class="fc" id="L570">            fields.dayOfMonth = cf;</span>
+        }
+<span class="fc" id="L572">    }</span>
+
+    long julianToGregorianByYear(long instant) {
+<span class="fc" id="L575">        return convertByYear(instant, iJulianChronology, iGregorianChronology);</span>
+    }
+
+    long gregorianToJulianByYear(long instant) {
+<span class="fc" id="L579">        return convertByYear(instant, iGregorianChronology, iJulianChronology);</span>
+    }
+
+    long julianToGregorianByWeekyear(long instant) {
+<span class="fc" id="L583">        return convertByWeekyear(instant, iJulianChronology, iGregorianChronology);</span>
+    }
+
+    long gregorianToJulianByWeekyear(long instant) {
+<span class="fc" id="L587">        return convertByWeekyear(instant, iGregorianChronology, iJulianChronology);</span>
+    }
+
+    //-----------------------------------------------------------------------
+    /**
+     * This basic cutover field adjusts calls to 'get' and 'set' methods, and
+     * assumes that calls to add and addWrapField are unaffected by the cutover.
+     */
+    private class CutoverField extends BaseDateTimeField {
+        private static final long serialVersionUID = 3528501219481026402L;
+
+        final DateTimeField iJulianField;
+        final DateTimeField iGregorianField;
+        final long iCutover;
+        final boolean iConvertByWeekyear;
+
+        protected DurationField iDurationField;
+        protected DurationField iRangeDurationField;
+
+        /**
+         * @param julianField field from the chronology used before the cutover instant
+         * @param gregorianField field from the chronology used at and after the cutover
+         * @param cutoverMillis  the millis of the cutover
+         */
+        CutoverField(DateTimeField julianField, DateTimeField gregorianField, long cutoverMillis) {
+<span class="fc" id="L612">            this(julianField, gregorianField, cutoverMillis, false);</span>
+<span class="fc" id="L613">        }</span>
+
+        /**
+         * @param julianField field from the chronology used before the cutover instant
+         * @param gregorianField field from the chronology used at and after the cutover
+         * @param cutoverMillis  the millis of the cutover
+         * @param convertByWeekyear
+         */
+        CutoverField(DateTimeField julianField, DateTimeField gregorianField,
+<span class="fc" id="L622">                     long cutoverMillis, boolean convertByWeekyear) {</span>
+<span class="fc" id="L623">            super(gregorianField.getType());</span>
+<span class="fc" id="L624">            iJulianField = julianField;</span>
+<span class="fc" id="L625">            iGregorianField = gregorianField;</span>
+<span class="fc" id="L626">            iCutover = cutoverMillis;</span>
+<span class="fc" id="L627">            iConvertByWeekyear = convertByWeekyear;</span>
+            // Although average length of Julian and Gregorian years differ,
+            // use the Gregorian duration field because it is more accurate.
+<span class="fc" id="L630">            iDurationField = gregorianField.getDurationField();</span>
+
+<span class="fc" id="L632">            DurationField rangeField = gregorianField.getRangeDurationField();</span>
+<span class="fc bfc" id="L633" title="All 2 branches covered.">            if (rangeField == null) {</span>
+<span class="fc" id="L634">                rangeField = julianField.getRangeDurationField();</span>
+            }
+<span class="fc" id="L636">            iRangeDurationField = rangeField;</span>
+<span class="fc" id="L637">        }</span>
+
+        public boolean isLenient() {
+<span class="nc" id="L640">            return false;</span>
+        }
+
+        public int get(long instant) {
+<span class="fc bfc" id="L644" title="All 2 branches covered.">            if (instant &gt;= iCutover) {</span>
+<span class="fc" id="L645">                return iGregorianField.get(instant);</span>
+            } else {
+<span class="fc" id="L647">                return iJulianField.get(instant);</span>
+            }
+        }
+
+        public String getAsText(long instant, Locale locale) {
+<span class="nc bnc" id="L652" title="All 2 branches missed.">            if (instant &gt;= iCutover) {</span>
+<span class="nc" id="L653">                return iGregorianField.getAsText(instant, locale);</span>
+            } else {
+<span class="nc" id="L655">                return iJulianField.getAsText(instant, locale);</span>
+            }
+        }
+
+        public String getAsText(int fieldValue, Locale locale) {
+<span class="fc" id="L660">            return iGregorianField.getAsText(fieldValue, locale);</span>
+        }
+
+        public String getAsShortText(long instant, Locale locale) {
+<span class="nc bnc" id="L664" title="All 2 branches missed.">            if (instant &gt;= iCutover) {</span>
+<span class="nc" id="L665">                return iGregorianField.getAsShortText(instant, locale);</span>
+            } else {
+<span class="nc" id="L667">                return iJulianField.getAsShortText(instant, locale);</span>
+            }
+        }
+
+        public String getAsShortText(int fieldValue, Locale locale) {
+<span class="fc" id="L672">            return iGregorianField.getAsShortText(fieldValue, locale);</span>
+        }
+
+        public long add(long instant, int value) {
+<span class="fc" id="L676">            return iGregorianField.add(instant, value);</span>
+        }
+
+        public long add(long instant, long value) {
+<span class="nc" id="L680">            return iGregorianField.add(instant, value);</span>
+        }
+
+        public int[] add(ReadablePartial partial, int fieldIndex, int[] values, int valueToAdd) {
+            // overridden as superclass algorithm can't handle
+            // 2004-02-29 + 48 months -&gt; 2008-02-29 type dates
+<span class="fc bfc" id="L686" title="All 2 branches covered.">            if (valueToAdd == 0) {</span>
+<span class="fc" id="L687">                return values;</span>
+            }
+<span class="pc bpc" id="L689" title="1 of 2 branches missed.">            if (DateTimeUtils.isContiguous(partial)) {</span>
+<span class="fc" id="L690">                long instant = 0L;</span>
+<span class="fc bfc" id="L691" title="All 2 branches covered.">                for (int i = 0, isize = partial.size(); i &lt; isize; i++) {</span>
+<span class="fc" id="L692">                    instant = partial.getFieldType(i).getField(GJChronology.this).set(instant, values[i]);</span>
+                }
+<span class="fc" id="L694">                instant = add(instant, valueToAdd);</span>
+<span class="fc" id="L695">                return GJChronology.this.get(partial, instant);</span>
+            } else {
+<span class="nc" id="L697">                return super.add(partial, fieldIndex, values, valueToAdd);</span>
+            }
+        }
+
+        public int getDifference(long minuendInstant, long subtrahendInstant) {
+<span class="nc" id="L702">            return iGregorianField.getDifference(minuendInstant, subtrahendInstant);</span>
+        }
+
+        public long getDifferenceAsLong(long minuendInstant, long subtrahendInstant) {
+<span class="nc" id="L706">            return iGregorianField.getDifferenceAsLong(minuendInstant, subtrahendInstant);</span>
+        }
+
+        public long set(long instant, int value) {
+<span class="fc bfc" id="L710" title="All 2 branches covered.">            if (instant &gt;= iCutover) {</span>
+<span class="fc" id="L711">                instant = iGregorianField.set(instant, value);</span>
+<span class="fc bfc" id="L712" title="All 2 branches covered.">                if (instant &lt; iCutover) {</span>
+                    // Only adjust if gap fully crossed.
+<span class="fc bfc" id="L714" title="All 2 branches covered.">                    if (instant + iGapDuration &lt; iCutover) {</span>
+<span class="fc" id="L715">                        instant = gregorianToJulian(instant);</span>
+                    }
+                    // Verify that new value stuck.
+<span class="fc bfc" id="L718" title="All 2 branches covered.">                    if (get(instant) != value) {</span>
+<span class="fc" id="L719">                        throw new IllegalFieldValueException</span>
+<span class="fc" id="L720">                            (iGregorianField.getType(), Integer.valueOf(value), null, null);</span>
+                    }
+                }
+            } else {
+<span class="fc" id="L724">                instant = iJulianField.set(instant, value);</span>
+<span class="fc bfc" id="L725" title="All 2 branches covered.">                if (instant &gt;= iCutover) {</span>
+                    // Only adjust if gap fully crossed.
+<span class="fc bfc" id="L727" title="All 2 branches covered.">                    if (instant - iGapDuration &gt;= iCutover) {</span>
+<span class="fc" id="L728">                        instant = julianToGregorian(instant);</span>
+                    }
+                    // Verify that new value stuck.
+<span class="fc bfc" id="L731" title="All 2 branches covered.">                    if (get(instant) != value) {</span>
+<span class="fc" id="L732">                       throw new IllegalFieldValueException</span>
+<span class="fc" id="L733">                            (iJulianField.getType(), Integer.valueOf(value), null, null);</span>
+                    }
+                }
+            }
+<span class="fc" id="L737">            return instant;</span>
+        }
+
+        public long set(long instant, String text, Locale locale) {
+<span class="fc bfc" id="L741" title="All 2 branches covered.">            if (instant &gt;= iCutover) {</span>
+<span class="fc" id="L742">                instant = iGregorianField.set(instant, text, locale);</span>
+<span class="fc bfc" id="L743" title="All 2 branches covered.">                if (instant &lt; iCutover) {</span>
+                    // Only adjust if gap fully crossed.
+<span class="pc bpc" id="L745" title="1 of 2 branches missed.">                    if (instant + iGapDuration &lt; iCutover) {</span>
+<span class="fc" id="L746">                        instant = gregorianToJulian(instant);</span>
+                    }
+                    // Cannot verify that new value stuck because set may be lenient.
+                }
+            } else {
+<span class="fc" id="L751">                instant = iJulianField.set(instant, text, locale);</span>
+<span class="pc bpc" id="L752" title="1 of 2 branches missed.">                if (instant &gt;= iCutover) {</span>
+                    // Only adjust if gap fully crossed.
+<span class="nc bnc" id="L754" title="All 2 branches missed.">                    if (instant - iGapDuration &gt;= iCutover) {</span>
+<span class="nc" id="L755">                        instant = julianToGregorian(instant);</span>
+                    }
+                    // Cannot verify that new value stuck because set may be lenient.
+                }
+            }
+<span class="fc" id="L760">            return instant;</span>
+        }
+
+        public DurationField getDurationField() {
+<span class="fc" id="L764">            return iDurationField;</span>
+        }
+
+        public DurationField getRangeDurationField() {
+<span class="fc" id="L768">            return iRangeDurationField;</span>
+        }
+
+        public boolean isLeap(long instant) {
+<span class="nc bnc" id="L772" title="All 2 branches missed.">            if (instant &gt;= iCutover) {</span>
+<span class="nc" id="L773">                return iGregorianField.isLeap(instant);</span>
+            } else {
+<span class="nc" id="L775">                return iJulianField.isLeap(instant);</span>
+            }
+        }
+
+        public int getLeapAmount(long instant) {
+<span class="nc bnc" id="L780" title="All 2 branches missed.">            if (instant &gt;= iCutover) {</span>
+<span class="nc" id="L781">                return iGregorianField.getLeapAmount(instant);</span>
+            } else {
+<span class="nc" id="L783">                return iJulianField.getLeapAmount(instant);</span>
+            }
+        }
+
+        public DurationField getLeapDurationField() {
+<span class="fc" id="L788">            return iGregorianField.getLeapDurationField();</span>
+        }
+
+
+        public int getMinimumValue() {
+            // For all precise fields, the Julian and Gregorian limits are
+            // identical. Choose Julian to tighten up the year limits.
+<span class="fc" id="L795">            return iJulianField.getMinimumValue();</span>
+        }
+
+        public int getMinimumValue(ReadablePartial partial) {
+<span class="nc" id="L799">            return iJulianField.getMinimumValue(partial);</span>
+        }
+
+        public int getMinimumValue(ReadablePartial partial, int[] values) {
+<span class="fc" id="L803">            return iJulianField.getMinimumValue(partial, values);</span>
+        }
+
+        public int getMinimumValue(long instant) {
+<span class="nc bnc" id="L807" title="All 2 branches missed.">            if (instant &lt; iCutover) {</span>
+<span class="nc" id="L808">                return iJulianField.getMinimumValue(instant);</span>
+            }
+
+<span class="nc" id="L811">            int min = iGregorianField.getMinimumValue(instant);</span>
+
+            // Because the cutover may reduce the length of this field, verify
+            // the minimum by setting it.
+<span class="nc" id="L815">            instant = iGregorianField.set(instant, min);</span>
+<span class="nc bnc" id="L816" title="All 2 branches missed.">            if (instant &lt; iCutover) {</span>
+<span class="nc" id="L817">                min = iGregorianField.get(iCutover);</span>
+            }
+
+<span class="nc" id="L820">            return min;</span>
+        }
+
+        public int getMaximumValue() {
+            // For all precise fields, the Julian and Gregorian limits are
+            // identical.
+<span class="fc" id="L826">            return iGregorianField.getMaximumValue();</span>
+        }
+
+        public int getMaximumValue(long instant) {
+<span class="fc bfc" id="L830" title="All 2 branches covered.">            if (instant &gt;= iCutover) {</span>
+<span class="fc" id="L831">                return iGregorianField.getMaximumValue(instant);</span>
+            }
+
+<span class="fc" id="L834">            int max = iJulianField.getMaximumValue(instant);</span>
+
+            // Because the cutover may reduce the length of this field, verify
+            // the maximum by setting it.
+<span class="fc" id="L838">            instant = iJulianField.set(instant, max);</span>
+<span class="fc bfc" id="L839" title="All 2 branches covered.">            if (instant &gt;= iCutover) {</span>
+<span class="fc" id="L840">                max = iJulianField.get(iJulianField.add(iCutover, -1));</span>
+            }
+
+<span class="fc" id="L843">            return max;</span>
+        }
+
+        public int getMaximumValue(ReadablePartial partial) {
+<span class="fc" id="L847">            long instant = GJChronology.getInstanceUTC().set(partial, 0L);</span>
+<span class="fc" id="L848">            return getMaximumValue(instant);</span>
+        }
+
+        public int getMaximumValue(ReadablePartial partial, int[] values) {
+<span class="fc" id="L852">            Chronology chrono = GJChronology.getInstanceUTC();</span>
+<span class="fc" id="L853">            long instant = 0L;</span>
+<span class="fc bfc" id="L854" title="All 2 branches covered.">            for (int i = 0, isize = partial.size(); i &lt; isize; i++) {</span>
+<span class="fc" id="L855">                DateTimeField field = partial.getFieldType(i).getField(chrono);</span>
+<span class="pc bpc" id="L856" title="1 of 2 branches missed.">                if (values[i] &lt;= field.getMaximumValue(instant)) {</span>
+<span class="fc" id="L857">                    instant = field.set(instant, values[i]);</span>
+                }
+            }
+<span class="fc" id="L860">            return getMaximumValue(instant);</span>
+        }
+
+        public long roundFloor(long instant) {
+<span class="fc bfc" id="L864" title="All 2 branches covered.">            if (instant &gt;= iCutover) {</span>
+<span class="fc" id="L865">                instant = iGregorianField.roundFloor(instant);</span>
+<span class="fc bfc" id="L866" title="All 2 branches covered.">                if (instant &lt; iCutover) {</span>
+                    // Only adjust if gap fully crossed.
+<span class="pc bpc" id="L868" title="1 of 2 branches missed.">                    if (instant + iGapDuration &lt; iCutover) {</span>
+<span class="fc" id="L869">                        instant = gregorianToJulian(instant);</span>
+                    }
+                }
+            } else {
+<span class="fc" id="L873">                instant = iJulianField.roundFloor(instant);</span>
+            }
+<span class="fc" id="L875">            return instant;</span>
+        }
+
+        public long roundCeiling(long instant) {
+<span class="nc bnc" id="L879" title="All 2 branches missed.">            if (instant &gt;= iCutover) {</span>
+<span class="nc" id="L880">                instant = iGregorianField.roundCeiling(instant);</span>
+            } else {
+<span class="nc" id="L882">                instant = iJulianField.roundCeiling(instant);</span>
+<span class="nc bnc" id="L883" title="All 2 branches missed.">                if (instant &gt;= iCutover) {</span>
+                    // Only adjust if gap fully crossed.
+<span class="nc bnc" id="L885" title="All 2 branches missed.">                    if (instant - iGapDuration &gt;= iCutover) {</span>
+<span class="nc" id="L886">                        instant = julianToGregorian(instant);</span>
+                    }
+                }
+            }
+<span class="nc" id="L890">            return instant;</span>
+        }
+
+        public int getMaximumTextLength(Locale locale) {
+<span class="nc" id="L894">            return Math.max(iJulianField.getMaximumTextLength(locale),</span>
+<span class="nc" id="L895">                            iGregorianField.getMaximumTextLength(locale));</span>
+        }
+
+        public int getMaximumShortTextLength(Locale locale) {
+<span class="nc" id="L899">            return Math.max(iJulianField.getMaximumShortTextLength(locale),</span>
+<span class="nc" id="L900">                            iGregorianField.getMaximumShortTextLength(locale));</span>
+        }
+
+        protected long julianToGregorian(long instant) {
+<span class="fc bfc" id="L904" title="All 2 branches covered.">            if (iConvertByWeekyear) {</span>
+<span class="fc" id="L905">                return julianToGregorianByWeekyear(instant);</span>
+            } else {
+<span class="fc" id="L907">                return julianToGregorianByYear(instant);</span>
+            }
+        }
+
+        protected long gregorianToJulian(long instant) {
+<span class="fc bfc" id="L912" title="All 2 branches covered.">            if (iConvertByWeekyear) {</span>
+<span class="fc" id="L913">                return gregorianToJulianByWeekyear(instant);</span>
+            } else {
+<span class="fc" id="L915">                return gregorianToJulianByYear(instant);</span>
+            }
+        }
+    }
+
+    //-----------------------------------------------------------------------
+    /**
+     * Cutover field for variable length fields. These fields internally call
+     * set whenever add is called. As a result, the same correction applied to
+     * set must be applied to add and addWrapField. Knowing when to use this
+     * field requires specific knowledge of how the GJ fields are implemented.
+     */
+    private final class ImpreciseCutoverField extends CutoverField {
+        private static final long serialVersionUID = 3410248757173576441L;
+
+        /**
+         * Creates a duration field that links back to this.
+         */
+        ImpreciseCutoverField(DateTimeField julianField, DateTimeField gregorianField, long cutoverMillis) {
+<span class="fc" id="L934">            this(julianField, gregorianField, null, cutoverMillis, false);</span>
+<span class="fc" id="L935">        }</span>
+
+        /**
+         * Uses a shared duration field rather than creating a new one.
+         *
+         * @param durationField shared duration field
+         */
+        ImpreciseCutoverField(DateTimeField julianField, DateTimeField gregorianField,
+                              DurationField durationField, long cutoverMillis)
+        {
+<span class="fc" id="L945">            this(julianField, gregorianField, durationField, cutoverMillis, false);</span>
+<span class="fc" id="L946">        }</span>
+
+        /**
+         * Uses a shared duration field rather than creating a new one.
+         *
+         * @param durationField shared duration field
+         */
+        ImpreciseCutoverField(DateTimeField julianField, DateTimeField gregorianField,
+                              DurationField durationField,
+                              long cutoverMillis, boolean convertByWeekyear)
+<span class="fc" id="L956">        {</span>
+<span class="fc" id="L957">            super(julianField, gregorianField, cutoverMillis, convertByWeekyear);</span>
+<span class="fc bfc" id="L958" title="All 2 branches covered.">            if (durationField == null) {</span>
+<span class="fc" id="L959">                durationField = new LinkedDurationField(iDurationField, this);</span>
+            }
+<span class="fc" id="L961">            iDurationField = durationField;</span>
+<span class="fc" id="L962">        }</span>
+
+        public long add(long instant, int value) {
+<span class="fc bfc" id="L965" title="All 2 branches covered.">            if (instant &gt;= iCutover) {</span>
+<span class="fc" id="L966">                instant = iGregorianField.add(instant, value);</span>
+<span class="fc bfc" id="L967" title="All 2 branches covered.">                if (instant &lt; iCutover) {</span>
+                    // Only adjust if gap fully crossed.
+<span class="pc bpc" id="L969" title="1 of 2 branches missed.">                    if (instant + iGapDuration &lt; iCutover) {</span>
+<span class="fc" id="L970">                        instant = gregorianToJulian(instant);</span>
+                    }
+                }
+            } else {
+<span class="fc" id="L974">                instant = iJulianField.add(instant, value);</span>
+<span class="fc bfc" id="L975" title="All 2 branches covered.">                if (instant &gt;= iCutover) {</span>
+                    // Only adjust if gap fully crossed.
+<span class="pc bpc" id="L977" title="1 of 2 branches missed.">                    if (instant - iGapDuration &gt;= iCutover) {</span>
+<span class="fc" id="L978">                        instant = julianToGregorian(instant);</span>
+                    }
+                }
+            }
+<span class="fc" id="L982">            return instant;</span>
+        }
+        
+        public long add(long instant, long value) {
+<span class="fc bfc" id="L986" title="All 2 branches covered.">            if (instant &gt;= iCutover) {</span>
+<span class="fc" id="L987">                instant = iGregorianField.add(instant, value);</span>
+<span class="pc bpc" id="L988" title="1 of 2 branches missed.">                if (instant &lt; iCutover) {</span>
+                    // Only adjust if gap fully crossed.
+<span class="nc bnc" id="L990" title="All 2 branches missed.">                    if (instant + iGapDuration &lt; iCutover) {</span>
+<span class="nc" id="L991">                        instant = gregorianToJulian(instant);</span>
+                    }
+                }
+            } else {
+<span class="fc" id="L995">                instant = iJulianField.add(instant, value);</span>
+<span class="pc bpc" id="L996" title="1 of 2 branches missed.">                if (instant &gt;= iCutover) {</span>
+                    // Only adjust if gap fully crossed.
+<span class="nc bnc" id="L998" title="All 2 branches missed.">                    if (instant - iGapDuration &gt;= iCutover) {</span>
+<span class="nc" id="L999">                        instant = julianToGregorian(instant);</span>
+                    }
+                }
+            }
+<span class="fc" id="L1003">            return instant;</span>
+        }
+
+        public int getDifference(long minuendInstant, long subtrahendInstant) {
+<span class="fc bfc" id="L1007" title="All 2 branches covered.">            if (minuendInstant &gt;= iCutover) {</span>
+<span class="fc bfc" id="L1008" title="All 2 branches covered.">                if (subtrahendInstant &gt;= iCutover) {</span>
+<span class="fc" id="L1009">                    return iGregorianField.getDifference(minuendInstant, subtrahendInstant);</span>
+                }
+                // Remember, the add is being reversed. Since subtrahend is
+                // Julian, convert minuend to Julian to match.
+<span class="fc" id="L1013">                minuendInstant = gregorianToJulian(minuendInstant);</span>
+<span class="fc" id="L1014">                return iJulianField.getDifference(minuendInstant, subtrahendInstant);</span>
+            } else {
+<span class="pc bpc" id="L1016" title="1 of 2 branches missed.">                if (subtrahendInstant &lt; iCutover) {</span>
+<span class="fc" id="L1017">                    return iJulianField.getDifference(minuendInstant, subtrahendInstant);</span>
+                }
+                // Remember, the add is being reversed. Since subtrahend is
+                // Gregorian, convert minuend to Gregorian to match.
+<span class="nc" id="L1021">                minuendInstant = julianToGregorian(minuendInstant);</span>
+<span class="nc" id="L1022">                return iGregorianField.getDifference(minuendInstant, subtrahendInstant);</span>
+            }
+        }
+
+        public long getDifferenceAsLong(long minuendInstant, long subtrahendInstant) {
+<span class="nc bnc" id="L1027" title="All 2 branches missed.">            if (minuendInstant &gt;= iCutover) {</span>
+<span class="nc bnc" id="L1028" title="All 2 branches missed.">                if (subtrahendInstant &gt;= iCutover) {</span>
+<span class="nc" id="L1029">                    return iGregorianField.getDifferenceAsLong(minuendInstant, subtrahendInstant);</span>
+                }
+                // Remember, the add is being reversed. Since subtrahend is
+                // Julian, convert minuend to Julian to match.
+<span class="nc" id="L1033">                minuendInstant = gregorianToJulian(minuendInstant);</span>
+<span class="nc" id="L1034">                return iJulianField.getDifferenceAsLong(minuendInstant, subtrahendInstant);</span>
+            } else {
+<span class="nc bnc" id="L1036" title="All 2 branches missed.">                if (subtrahendInstant &lt; iCutover) {</span>
+<span class="nc" id="L1037">                    return iJulianField.getDifferenceAsLong(minuendInstant, subtrahendInstant);</span>
+                }
+                // Remember, the add is being reversed. Since subtrahend is
+                // Gregorian, convert minuend to Gregorian to match.
+<span class="nc" id="L1041">                minuendInstant = julianToGregorian(minuendInstant);</span>
+<span class="nc" id="L1042">                return iGregorianField.getDifferenceAsLong(minuendInstant, subtrahendInstant);</span>
+            }
+        }
+
+        // Since the imprecise fields have durations longer than the gap
+        // duration, keep these methods simple. The inherited implementations
+        // produce incorrect results.
+        //
+        // Degenerate case: If this field is a month, and the cutover is set
+        // far into the future, then the gap duration may be so large as to
+        // reduce the number of months in a year. If the missing month(s) are
+        // at the beginning or end of the year, then the minimum and maximum
+        // values are not 1 and 12. I don't expect this case to ever occur.
+
+        public int getMinimumValue(long instant) {
+<span class="nc bnc" id="L1057" title="All 2 branches missed.">            if (instant &gt;= iCutover) {</span>
+<span class="nc" id="L1058">                return iGregorianField.getMinimumValue(instant);</span>
+            } else {
+<span class="nc" id="L1060">                return iJulianField.getMinimumValue(instant);</span>
+            }
+        }
+
+        public int getMaximumValue(long instant) {
+<span class="fc bfc" id="L1065" title="All 2 branches covered.">            if (instant &gt;= iCutover) {</span>
+<span class="fc" id="L1066">                return iGregorianField.getMaximumValue(instant);</span>
+            } else {
+<span class="fc" id="L1068">                return iJulianField.getMaximumValue(instant);</span>
+            }
+        }
+    }
+
+    //-----------------------------------------------------------------------
+    /**
+     * Links the duration back to a ImpreciseCutoverField.
+     */
+    private static class LinkedDurationField extends DecoratedDurationField {
+        private static final long serialVersionUID = 4097975388007713084L;
+
+        private final ImpreciseCutoverField iField;
+
+        LinkedDurationField(DurationField durationField, ImpreciseCutoverField dateTimeField) {
+<span class="fc" id="L1083">            super(durationField, durationField.getType());</span>
+<span class="fc" id="L1084">            iField = dateTimeField;</span>
+<span class="fc" id="L1085">        }</span>
+
+        public long add(long instant, int value) {
+<span class="fc" id="L1088">            return iField.add(instant, value);</span>
+        }
+
+        public long add(long instant, long value) {
+<span class="fc" id="L1092">            return iField.add(instant, value);</span>
+        }
+
+        public int getDifference(long minuendInstant, long subtrahendInstant) {
+<span class="fc" id="L1096">            return iField.getDifference(minuendInstant, subtrahendInstant);</span>
+        }
+
+        public long getDifferenceAsLong(long minuendInstant, long subtrahendInstant) {
+<span class="nc" id="L1100">            return iField.getDifferenceAsLong(minuendInstant, subtrahendInstant);</span>
+        }
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

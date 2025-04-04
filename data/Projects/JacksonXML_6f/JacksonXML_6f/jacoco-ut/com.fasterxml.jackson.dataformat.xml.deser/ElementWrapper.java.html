@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ElementWrapper.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Jackson-dataformat-XML</a> &gt; <a href="index.source.html" class="el_package">com.fasterxml.jackson.dataformat.xml.deser</a> &gt; <span class="el_source">ElementWrapper.java</span></div><h1>ElementWrapper.java</h1><pre class="source lang-java linenums">package com.fasterxml.jackson.dataformat.xml.deser;
+
+/**
+ * Helper class needed to keep track of virtual wrapper elements
+ * added in the logical XML token stream.
+ */
+class ElementWrapper
+{
+    protected final ElementWrapper _parent;
+    protected final String _wrapperName;
+    protected final String _wrapperNamespace;
+
+    /*
+    /**********************************************************
+    /* Life-cycle
+    /**********************************************************
+     */
+    
+<span class="nc" id="L19">    private ElementWrapper(ElementWrapper parent) {</span>
+<span class="nc" id="L20">        _parent = parent;</span>
+<span class="nc" id="L21">        _wrapperName = null;</span>
+<span class="nc" id="L22">        _wrapperNamespace = &quot;&quot;;</span>
+<span class="nc" id="L23">    }</span>
+    
+    private ElementWrapper(ElementWrapper parent,
+            String wrapperLocalName, String wrapperNamespace)
+<span class="fc" id="L27">    {</span>
+<span class="fc" id="L28">        _parent = parent;</span>
+<span class="fc" id="L29">        _wrapperName = wrapperLocalName;</span>
+<span class="fc bfc" id="L30" title="All 2 branches covered.">        _wrapperNamespace = (wrapperNamespace == null) ? &quot;&quot; : wrapperNamespace;</span>
+<span class="fc" id="L31">    }</span>
+
+    /**
+     * Factory method called to construct a new &quot;matching&quot; wrapper element,
+     * at level where virtual wrapping is needed.
+     */
+    public static ElementWrapper matchingWrapper(ElementWrapper parent,
+            String wrapperLocalName, String wrapperNamespace)
+    {
+<span class="fc" id="L40">        return new ElementWrapper(parent, wrapperLocalName, wrapperNamespace);</span>
+    }
+
+    /**
+     * Factory method used for creating intermediate wrapper level, which
+     * is only used for purpose of keeping track of physical element
+     * nesting.
+     */
+    public ElementWrapper intermediateWrapper() {
+<span class="fc" id="L49">        return new ElementWrapper(this, null, null);</span>
+    }
+    
+    /*
+    /**********************************************************
+    /* API
+    /**********************************************************
+     */
+
+<span class="fc bfc" id="L58" title="All 2 branches covered.">    public boolean isMatching() { return _wrapperName != null; }</span>
+    
+<span class="fc" id="L60">    public String getWrapperLocalName() { return _wrapperName; }</span>
+<span class="fc" id="L61">    public String getWrapperNamespace() { return _wrapperNamespace; }</span>
+
+<span class="fc" id="L63">    public ElementWrapper getParent() { return _parent; }</span>
+
+    public boolean matchesWrapper(String localName, String ns)
+    {
+        // null means &quot;anything goes&quot;, so:
+<span class="fc bfc" id="L68" title="All 2 branches covered.">        if (_wrapperName == null) {</span>
+<span class="fc" id="L69">            return true;</span>
+        }
+<span class="pc bpc" id="L71" title="1 of 2 branches missed.">        if (ns == null) {</span>
+<span class="nc" id="L72">            ns = &quot;&quot;;</span>
+        }
+<span class="pc bpc" id="L74" title="1 of 4 branches missed.">        return _wrapperName.equals(localName) &amp;&amp; _wrapperNamespace.equals(ns);</span>
+    }
+
+    /*
+    /**********************************************************
+    /* Overrides
+    /**********************************************************
+     */
+
+    @Override
+    public String toString()
+    {
+<span class="nc bnc" id="L86" title="All 2 branches missed.">        if (_parent == null) {</span>
+<span class="nc" id="L87">            return &quot;Wrapper: ROOT, matching: &quot;+_wrapperName;</span>
+        }
+<span class="nc bnc" id="L89" title="All 2 branches missed.">        if (_wrapperName == null) {</span>
+<span class="nc" id="L90">            return &quot;Wrapper: empty&quot;;</span>
+        }
+<span class="nc" id="L92">        return &quot;Wrapper: branch, matching: &quot;+_wrapperName;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

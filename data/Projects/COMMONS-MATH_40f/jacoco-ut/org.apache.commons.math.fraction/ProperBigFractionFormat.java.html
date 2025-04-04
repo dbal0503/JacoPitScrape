@@ -1,0 +1,240 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ProperBigFractionFormat.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Commons Math</a> &gt; <a href="index.source.html" class="el_package">org.apache.commons.math.fraction</a> &gt; <span class="el_source">ProperBigFractionFormat.java</span></div><h1>ProperBigFractionFormat.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.commons.math.fraction;
+
+import java.math.BigInteger;
+import java.text.FieldPosition;
+import java.text.NumberFormat;
+import java.text.ParsePosition;
+
+import org.apache.commons.math.exception.util.LocalizedFormats;
+import org.apache.commons.math.exception.NullArgumentException;
+
+/**
+ * Formats a BigFraction number in proper format.  The number format for each of
+ * the whole number, numerator and, denominator can be configured.
+ * &lt;p&gt;
+ * Minus signs are only allowed in the whole number part - i.e.,
+ * &quot;-3 1/2&quot; is legitimate and denotes -7/2, but &quot;-3 -1/2&quot; is invalid and
+ * will result in a &lt;code&gt;ParseException&lt;/code&gt;.&lt;/p&gt;
+ *
+ * @since 1.1
+ * @version $Id$
+ */
+public class ProperBigFractionFormat extends BigFractionFormat {
+
+    /** Serializable version identifier */
+    private static final long serialVersionUID = -6337346779577272307L;
+
+    /** The format used for the whole number. */
+    private NumberFormat wholeFormat;
+
+    /**
+     * Create a proper formatting instance with the default number format for
+     * the whole, numerator, and denominator.
+     */
+    public ProperBigFractionFormat() {
+<span class="nc" id="L51">        this(getDefaultNumberFormat());</span>
+<span class="nc" id="L52">    }</span>
+
+    /**
+     * Create a proper formatting instance with a custom number format for the
+     * whole, numerator, and denominator.
+     * @param format the custom format for the whole, numerator, and
+     *        denominator.
+     */
+    public ProperBigFractionFormat(final NumberFormat format) {
+<span class="fc" id="L61">        this(format, (NumberFormat)format.clone(), (NumberFormat)format.clone());</span>
+<span class="fc" id="L62">    }</span>
+
+    /**
+     * Create a proper formatting instance with a custom number format for each
+     * of the whole, numerator, and denominator.
+     * @param wholeFormat the custom format for the whole.
+     * @param numeratorFormat the custom format for the numerator.
+     * @param denominatorFormat the custom format for the denominator.
+     */
+    public ProperBigFractionFormat(final NumberFormat wholeFormat,
+                                   final NumberFormat numeratorFormat,
+                                   final NumberFormat denominatorFormat) {
+<span class="fc" id="L74">        super(numeratorFormat, denominatorFormat);</span>
+<span class="fc" id="L75">        setWholeFormat(wholeFormat);</span>
+<span class="fc" id="L76">    }</span>
+
+    /**
+     * Formats a {@link BigFraction} object to produce a string.  The BigFraction
+     * is output in proper format.
+     *
+     * @param fraction the object to format.
+     * @param toAppendTo where the text is to be appended
+     * @param pos On input: an alignment field, if desired. On output: the
+     *            offsets of the alignment field
+     * @return the value passed in as toAppendTo.
+     */
+    @Override
+    public StringBuffer format(final BigFraction fraction,
+                               final StringBuffer toAppendTo, final FieldPosition pos) {
+
+<span class="fc" id="L92">        pos.setBeginIndex(0);</span>
+<span class="fc" id="L93">        pos.setEndIndex(0);</span>
+
+<span class="fc" id="L95">        BigInteger num = fraction.getNumerator();</span>
+<span class="fc" id="L96">        BigInteger den = fraction.getDenominator();</span>
+<span class="fc" id="L97">        BigInteger whole = num.divide(den);</span>
+<span class="fc" id="L98">        num = num.remainder(den);</span>
+
+<span class="fc bfc" id="L100" title="All 2 branches covered.">        if (!BigInteger.ZERO.equals(whole)) {</span>
+<span class="fc" id="L101">            getWholeFormat().format(whole, toAppendTo, pos);</span>
+<span class="fc" id="L102">            toAppendTo.append(' ');</span>
+<span class="fc bfc" id="L103" title="All 2 branches covered.">            if (num.compareTo(BigInteger.ZERO) &lt; 0) {</span>
+<span class="fc" id="L104">                num = num.negate();</span>
+            }
+        }
+<span class="fc" id="L107">        getNumeratorFormat().format(num, toAppendTo, pos);</span>
+<span class="fc" id="L108">        toAppendTo.append(&quot; / &quot;);</span>
+<span class="fc" id="L109">        getDenominatorFormat().format(den, toAppendTo, pos);</span>
+
+<span class="fc" id="L111">        return toAppendTo;</span>
+    }
+
+    /**
+     * Access the whole format.
+     * @return the whole format.
+     */
+    public NumberFormat getWholeFormat() {
+<span class="fc" id="L119">        return wholeFormat;</span>
+    }
+
+    /**
+     * Parses a string to produce a {@link BigFraction} object.  This method
+     * expects the string to be formatted as a proper BigFraction.
+     * &lt;p&gt;
+     * Minus signs are only allowed in the whole number part - i.e.,
+     * &quot;-3 1/2&quot; is legitimate and denotes -7/2, but &quot;-3 -1/2&quot; is invalid and
+     * will result in a &lt;code&gt;ParseException&lt;/code&gt;.&lt;/p&gt;
+     *
+     * @param source the string to parse
+     * @param pos input/ouput parsing parameter.
+     * @return the parsed {@link BigFraction} object.
+     */
+    @Override
+    public BigFraction parse(final String source, final ParsePosition pos) {
+        // try to parse improper BigFraction
+<span class="fc" id="L137">        BigFraction ret = super.parse(source, pos);</span>
+<span class="fc bfc" id="L138" title="All 2 branches covered.">        if (ret != null) {</span>
+<span class="fc" id="L139">            return ret;</span>
+        }
+
+<span class="fc" id="L142">        final int initialIndex = pos.getIndex();</span>
+
+        // parse whitespace
+<span class="fc" id="L145">        parseAndIgnoreWhitespace(source, pos);</span>
+
+        // parse whole
+<span class="fc" id="L148">        BigInteger whole = parseNextBigInteger(source, pos);</span>
+<span class="fc bfc" id="L149" title="All 2 branches covered.">        if (whole == null) {</span>
+            // invalid integer number
+            // set index back to initial, error index should already be set
+            // character examined.
+<span class="fc" id="L153">            pos.setIndex(initialIndex);</span>
+<span class="fc" id="L154">            return null;</span>
+        }
+
+        // parse whitespace
+<span class="fc" id="L158">        parseAndIgnoreWhitespace(source, pos);</span>
+
+        // parse numerator
+<span class="fc" id="L161">        BigInteger num = parseNextBigInteger(source, pos);</span>
+<span class="fc bfc" id="L162" title="All 2 branches covered.">        if (num == null) {</span>
+            // invalid integer number
+            // set index back to initial, error index should already be set
+            // character examined.
+<span class="fc" id="L166">            pos.setIndex(initialIndex);</span>
+<span class="fc" id="L167">            return null;</span>
+        }
+
+<span class="fc bfc" id="L170" title="All 2 branches covered.">        if (num.compareTo(BigInteger.ZERO) &lt; 0) {</span>
+            // minus signs should be leading, invalid expression
+<span class="fc" id="L172">            pos.setIndex(initialIndex);</span>
+<span class="fc" id="L173">            return null;</span>
+        }
+
+        // parse '/'
+<span class="fc" id="L177">        final int startIndex = pos.getIndex();</span>
+<span class="fc" id="L178">        final char c = parseNextCharacter(source, pos);</span>
+<span class="pc bpc" id="L179" title="2 of 3 branches missed.">        switch (c) {</span>
+        case 0 :
+            // no '/'
+            // return num as a BigFraction
+<span class="nc" id="L183">            return new BigFraction(num);</span>
+        case '/' :
+            // found '/', continue parsing denominator
+<span class="fc" id="L186">            break;</span>
+        default :
+            // invalid '/'
+            // set index back to initial, error index should be the last
+            // character examined.
+<span class="nc" id="L191">            pos.setIndex(initialIndex);</span>
+<span class="nc" id="L192">            pos.setErrorIndex(startIndex);</span>
+<span class="nc" id="L193">            return null;</span>
+        }
+
+        // parse whitespace
+<span class="fc" id="L197">        parseAndIgnoreWhitespace(source, pos);</span>
+
+        // parse denominator
+<span class="fc" id="L200">        final BigInteger den = parseNextBigInteger(source, pos);</span>
+<span class="pc bpc" id="L201" title="1 of 2 branches missed.">        if (den == null) {</span>
+            // invalid integer number
+            // set index back to initial, error index should already be set
+            // character examined.
+<span class="nc" id="L205">            pos.setIndex(initialIndex);</span>
+<span class="nc" id="L206">            return null;</span>
+        }
+
+<span class="fc bfc" id="L209" title="All 2 branches covered.">        if (den.compareTo(BigInteger.ZERO) &lt; 0) {</span>
+            // minus signs must be leading, invalid
+<span class="fc" id="L211">            pos.setIndex(initialIndex);</span>
+<span class="fc" id="L212">            return null;</span>
+        }
+
+<span class="fc bfc" id="L215" title="All 2 branches covered.">        boolean wholeIsNeg = whole.compareTo(BigInteger.ZERO) &lt; 0;</span>
+<span class="fc bfc" id="L216" title="All 2 branches covered.">        if (wholeIsNeg) {</span>
+<span class="fc" id="L217">            whole = whole.negate();</span>
+        }
+<span class="fc" id="L219">        num = whole.multiply(den).add(num);</span>
+<span class="fc bfc" id="L220" title="All 2 branches covered.">        if (wholeIsNeg) {</span>
+<span class="fc" id="L221">            num = num.negate();</span>
+        }
+
+<span class="fc" id="L224">        return new BigFraction(num, den);</span>
+
+    }
+
+    /**
+     * Modify the whole format.
+     * @param format The new whole format value.
+     * @throws NullArgumentException if {@code format} is {@code null}.
+     */
+    public void setWholeFormat(final NumberFormat format) {
+<span class="pc bpc" id="L234" title="1 of 2 branches missed.">        if (format == null) {</span>
+<span class="nc" id="L235">            throw new NullArgumentException(LocalizedFormats.WHOLE_FORMAT);</span>
+        }
+<span class="fc" id="L237">        this.wholeFormat = format;</span>
+<span class="fc" id="L238">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

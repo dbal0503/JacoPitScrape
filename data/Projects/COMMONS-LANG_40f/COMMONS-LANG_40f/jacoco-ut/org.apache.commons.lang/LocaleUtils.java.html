@@ -1,0 +1,319 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LocaleUtils.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Commons Lang</a> &gt; <a href="index.source.html" class="el_package">org.apache.commons.lang</a> &gt; <span class="el_source">LocaleUtils.java</span></div><h1>LocaleUtils.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ * 
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.commons.lang;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+
+/**
+ * &lt;p&gt;Operations to assist when working with a {@link Locale}.&lt;/p&gt;
+ *
+ * &lt;p&gt;This class tries to handle &lt;code&gt;null&lt;/code&gt; input gracefully.
+ * An exception will not be thrown for a &lt;code&gt;null&lt;/code&gt; input.
+ * Each method documents its behaviour in more detail.&lt;/p&gt;
+ *
+ * @author Stephen Colebourne
+ * @since 2.2
+ * @version $Id$
+ */
+public class LocaleUtils {
+
+    /** Unmodifiable list of available locales. */
+    //@GuardedBy(&quot;this&quot;)
+    private static List&lt;Locale&gt; cAvailableLocaleList; // lazily created by availableLocaleList()
+
+    /** Unmodifiable set of available locales. */
+    //@GuardedBy(&quot;this&quot;)
+    private static Set&lt;Locale&gt; cAvailableLocaleSet;   // lazily created by availableLocaleSet()
+
+    /** Unmodifiable map of language locales by country. */
+<span class="fc" id="L51">    private static final Map&lt;String, List&lt;Locale&gt;&gt; cLanguagesByCountry = Collections.synchronizedMap(new HashMap&lt;String, List&lt;Locale&gt;&gt;());</span>
+
+    /** Unmodifiable map of country locales by language. */
+<span class="fc" id="L54">    private static final Map&lt;String, List&lt;Locale&gt;&gt; cCountriesByLanguage = Collections.synchronizedMap(new HashMap&lt;String, List&lt;Locale&gt;&gt;());</span>
+
+    /**
+     * &lt;p&gt;&lt;code&gt;LocaleUtils&lt;/code&gt; instances should NOT be constructed in standard programming.
+     * Instead, the class should be used as &lt;code&gt;LocaleUtils.toLocale(&quot;en_GB&quot;);&lt;/code&gt;.&lt;/p&gt;
+     *
+     * &lt;p&gt;This constructor is public to permit tools that require a JavaBean instance
+     * to operate.&lt;/p&gt;
+     */
+    public LocaleUtils() {
+<span class="fc" id="L64">      super();</span>
+<span class="fc" id="L65">    }</span>
+
+    //-----------------------------------------------------------------------
+    /**
+     * &lt;p&gt;Converts a String to a Locale.&lt;/p&gt;
+     *
+     * &lt;p&gt;This method takes the string format of a locale and creates the
+     * locale object from it.&lt;/p&gt;
+     *
+     * &lt;pre&gt;
+     *   LocaleUtils.toLocale(&quot;en&quot;)         = new Locale(&quot;en&quot;, &quot;&quot;)
+     *   LocaleUtils.toLocale(&quot;en_GB&quot;)      = new Locale(&quot;en&quot;, &quot;GB&quot;)
+     *   LocaleUtils.toLocale(&quot;en_GB_xxx&quot;)  = new Locale(&quot;en&quot;, &quot;GB&quot;, &quot;xxx&quot;)   (#)
+     * &lt;/pre&gt;
+     *
+     * &lt;p&gt;(#) The behaviour of the JDK variant constructor changed between JDK1.3 and JDK1.4.
+     * In JDK1.3, the constructor upper cases the variant, in JDK1.4, it doesn't.
+     * Thus, the result from getVariant() may vary depending on your JDK.&lt;/p&gt;
+     *
+     * &lt;p&gt;This method validates the input strictly.
+     * The language code must be lowercase.
+     * The country code must be uppercase.
+     * The separator must be an underscore.
+     * The length must be correct.
+     * &lt;/p&gt;
+     *
+     * @param str  the locale String to convert, null returns null
+     * @return a Locale, null if null input
+     * @throws IllegalArgumentException if the string is an invalid format
+     */
+    public static Locale toLocale(String str) {
+<span class="fc bfc" id="L96" title="All 2 branches covered.">        if (str == null) {</span>
+<span class="fc" id="L97">            return null;</span>
+        }
+<span class="fc" id="L99">        int len = str.length();</span>
+<span class="fc bfc" id="L100" title="All 6 branches covered.">        if (len != 2 &amp;&amp; len != 5 &amp;&amp; len &lt; 7) {</span>
+<span class="fc" id="L101">            throw new IllegalArgumentException(&quot;Invalid locale format: &quot; + str);</span>
+        }
+<span class="fc" id="L103">        char ch0 = str.charAt(0);</span>
+<span class="fc" id="L104">        char ch1 = str.charAt(1);</span>
+<span class="pc bpc" id="L105" title="2 of 8 branches missed.">        if (ch0 &lt; 'a' || ch0 &gt; 'z' || ch1 &lt; 'a' || ch1 &gt; 'z') {</span>
+<span class="fc" id="L106">            throw new IllegalArgumentException(&quot;Invalid locale format: &quot; + str);</span>
+        }
+<span class="fc bfc" id="L108" title="All 2 branches covered.">        if (len == 2) {</span>
+<span class="fc" id="L109">            return new Locale(str, &quot;&quot;);</span>
+        } else {
+<span class="fc bfc" id="L111" title="All 2 branches covered.">            if (str.charAt(2) != '_') {</span>
+<span class="fc" id="L112">                throw new IllegalArgumentException(&quot;Invalid locale format: &quot; + str);</span>
+            }
+<span class="fc" id="L114">            char ch3 = str.charAt(3);</span>
+<span class="fc bfc" id="L115" title="All 2 branches covered.">            if (ch3 == '_') {</span>
+<span class="fc" id="L116">                return new Locale(str.substring(0, 2), &quot;&quot;, str.substring(4));</span>
+            }
+<span class="fc" id="L118">            char ch4 = str.charAt(4);</span>
+<span class="pc bpc" id="L119" title="1 of 8 branches missed.">            if (ch3 &lt; 'A' || ch3 &gt; 'Z' || ch4 &lt; 'A' || ch4 &gt; 'Z') {</span>
+<span class="fc" id="L120">                throw new IllegalArgumentException(&quot;Invalid locale format: &quot; + str);</span>
+            }
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">            if (len == 5) {</span>
+<span class="fc" id="L123">                return new Locale(str.substring(0, 2), str.substring(3, 5));</span>
+            } else {
+<span class="nc bnc" id="L125" title="All 2 branches missed.">                if (str.charAt(5) != '_') {</span>
+<span class="nc" id="L126">                    throw new IllegalArgumentException(&quot;Invalid locale format: &quot; + str);</span>
+                }
+<span class="nc" id="L128">                return new Locale(str.substring(0, 2), str.substring(3, 5), str.substring(6));</span>
+            }
+        }
+    }
+
+    //-----------------------------------------------------------------------
+    /**
+     * &lt;p&gt;Obtains the list of locales to search through when performing
+     * a locale search.&lt;/p&gt;
+     *
+     * &lt;pre&gt;
+     * localeLookupList(Locale(&quot;fr&quot;,&quot;CA&quot;,&quot;xxx&quot;))
+     *   = [Locale(&quot;fr&quot;,&quot;CA&quot;,&quot;xxx&quot;), Locale(&quot;fr&quot;,&quot;CA&quot;), Locale(&quot;fr&quot;)]
+     * &lt;/pre&gt;
+     *
+     * @param locale  the locale to start from
+     * @return the unmodifiable list of Locale objects, 0 being locale, never null
+     */
+    public static List&lt;Locale&gt; localeLookupList(Locale locale) {
+<span class="fc" id="L147">        return localeLookupList(locale, locale);</span>
+    }
+
+    //-----------------------------------------------------------------------
+    /**
+     * &lt;p&gt;Obtains the list of locales to search through when performing
+     * a locale search.&lt;/p&gt;
+     *
+     * &lt;pre&gt;
+     * localeLookupList(Locale(&quot;fr&quot;, &quot;CA&quot;, &quot;xxx&quot;), Locale(&quot;en&quot;))
+     *   = [Locale(&quot;fr&quot;,&quot;CA&quot;,&quot;xxx&quot;), Locale(&quot;fr&quot;,&quot;CA&quot;), Locale(&quot;fr&quot;), Locale(&quot;en&quot;]
+     * &lt;/pre&gt;
+     *
+     * &lt;p&gt;The result list begins with the most specific locale, then the
+     * next more general and so on, finishing with the default locale.
+     * The list will never contain the same locale twice.&lt;/p&gt;
+     *
+     * @param locale  the locale to start from, null returns empty list
+     * @param defaultLocale  the default locale to use if no other is found
+     * @return the unmodifiable list of Locale objects, 0 being locale, never null
+     */
+    public static List&lt;Locale&gt; localeLookupList(Locale locale, Locale defaultLocale) {
+<span class="fc" id="L169">        List&lt;Locale&gt; list = new ArrayList&lt;Locale&gt;(4);</span>
+<span class="fc bfc" id="L170" title="All 2 branches covered.">        if (locale != null) {</span>
+<span class="fc" id="L171">            list.add(locale);</span>
+<span class="fc bfc" id="L172" title="All 2 branches covered.">            if (locale.getVariant().length() &gt; 0) {</span>
+<span class="fc" id="L173">                list.add(new Locale(locale.getLanguage(), locale.getCountry()));</span>
+            }
+<span class="fc bfc" id="L175" title="All 2 branches covered.">            if (locale.getCountry().length() &gt; 0) {</span>
+<span class="fc" id="L176">                list.add(new Locale(locale.getLanguage(), &quot;&quot;));</span>
+            }
+<span class="fc bfc" id="L178" title="All 2 branches covered.">            if (list.contains(defaultLocale) == false) {</span>
+<span class="fc" id="L179">                list.add(defaultLocale);</span>
+            }
+        }
+<span class="fc" id="L182">        return Collections.unmodifiableList(list);</span>
+    }
+
+    //-----------------------------------------------------------------------
+    /**
+     * &lt;p&gt;Obtains an unmodifiable list of installed locales.&lt;/p&gt;
+     * 
+     * &lt;p&gt;This method is a wrapper around {@link Locale#getAvailableLocales()}.
+     * It is more efficient, as the JDK method must create a new array each
+     * time it is called.&lt;/p&gt;
+     *
+     * @return the unmodifiable list of available locales
+     */
+    public static List&lt;Locale&gt; availableLocaleList() {
+<span class="fc bfc" id="L196" title="All 2 branches covered.">        if(cAvailableLocaleList == null) { </span>
+<span class="fc" id="L197">            initAvailableLocaleList(); </span>
+        }
+<span class="fc" id="L199">        return cAvailableLocaleList;</span>
+    }
+
+    /**
+     * Initializes the availableLocaleList. It is separate from availableLocaleList() 
+     * to avoid the synchronized block affecting normal use, yet synchronized and 
+     * lazy loading to avoid a static block affecting other methods in this class. 
+     */
+    private static synchronized void initAvailableLocaleList() {
+<span class="pc bpc" id="L208" title="1 of 2 branches missed.">        if(cAvailableLocaleList == null) {</span>
+<span class="fc" id="L209">            List&lt;Locale&gt; list = Arrays.asList(Locale.getAvailableLocales());</span>
+<span class="fc" id="L210">            cAvailableLocaleList = Collections.unmodifiableList(list);</span>
+        }
+<span class="fc" id="L212">    }</span>
+
+    //-----------------------------------------------------------------------
+    /**
+     * &lt;p&gt;Obtains an unmodifiable set of installed locales.&lt;/p&gt;
+     * 
+     * &lt;p&gt;This method is a wrapper around {@link Locale#getAvailableLocales()}.
+     * It is more efficient, as the JDK method must create a new array each
+     * time it is called.&lt;/p&gt;
+     *
+     * @return the unmodifiable set of available locales
+     */
+    public static Set&lt;Locale&gt; availableLocaleSet() {
+<span class="fc bfc" id="L225" title="All 2 branches covered.">        if(cAvailableLocaleSet == null) { </span>
+<span class="fc" id="L226">            initAvailableLocaleSet(); </span>
+        }
+<span class="fc" id="L228">        return cAvailableLocaleSet;</span>
+    }
+
+    /**
+     * Initializes the availableLocaleSet. It is separate from availableLocaleSet() 
+     * to avoid the synchronized block affecting normal use, yet synchronized and 
+     * lazy loading to avoid a static block affecting other methods in this class. 
+     */
+    private static synchronized void initAvailableLocaleSet() {
+<span class="pc bpc" id="L237" title="1 of 2 branches missed.">        if(cAvailableLocaleSet == null) {</span>
+<span class="fc" id="L238">            cAvailableLocaleSet = Collections.unmodifiableSet( new HashSet&lt;Locale&gt;(availableLocaleList()) );</span>
+        }
+<span class="fc" id="L240">    }</span>
+
+    //-----------------------------------------------------------------------
+    /**
+     * &lt;p&gt;Checks if the locale specified is in the list of available locales.&lt;/p&gt;
+     *
+     * @param locale the Locale object to check if it is available
+     * @return true if the locale is a known locale
+     */
+    public static boolean isAvailableLocale(Locale locale) {
+<span class="fc" id="L250">        return availableLocaleList().contains(locale);</span>
+    }
+
+    //-----------------------------------------------------------------------
+    /**
+     * &lt;p&gt;Obtains the list of languages supported for a given country.&lt;/p&gt;
+     *
+     * &lt;p&gt;This method takes a country code and searches to find the
+     * languages available for that country. Variant locales are removed.&lt;/p&gt;
+     *
+     * @param countryCode  the 2 letter country code, null returns empty
+     * @return an unmodifiable List of Locale objects, never null
+     */
+    public static List&lt;Locale&gt; languagesByCountry(String countryCode) {
+<span class="fc" id="L264">        List&lt;Locale&gt; langs = cLanguagesByCountry.get(countryCode);  //syncd</span>
+<span class="fc bfc" id="L265" title="All 2 branches covered.">        if (langs == null) {</span>
+<span class="fc bfc" id="L266" title="All 2 branches covered.">            if (countryCode != null) {</span>
+<span class="fc" id="L267">                langs = new ArrayList&lt;Locale&gt;();</span>
+<span class="fc" id="L268">                List&lt;Locale&gt; locales = availableLocaleList();</span>
+<span class="fc bfc" id="L269" title="All 2 branches covered.">                for (int i = 0; i &lt; locales.size(); i++) {</span>
+<span class="fc" id="L270">                    Locale locale = locales.get(i);</span>
+<span class="fc bfc" id="L271" title="All 2 branches covered.">                    if (countryCode.equals(locale.getCountry()) &amp;&amp;</span>
+<span class="pc bpc" id="L272" title="1 of 2 branches missed.">                            locale.getVariant().length() == 0) {</span>
+<span class="fc" id="L273">                        langs.add(locale);</span>
+                    }
+                }
+<span class="fc" id="L276">                langs = Collections.unmodifiableList(langs);</span>
+<span class="fc" id="L277">            } else {</span>
+<span class="fc" id="L278">                langs = Collections.emptyList();</span>
+            }
+<span class="fc" id="L280">            cLanguagesByCountry.put(countryCode, langs);  //syncd</span>
+        }
+<span class="fc" id="L282">        return langs;</span>
+    }
+
+    //-----------------------------------------------------------------------
+    /**
+     * &lt;p&gt;Obtains the list of countries supported for a given language.&lt;/p&gt;
+     * 
+     * &lt;p&gt;This method takes a language code and searches to find the
+     * countries available for that language. Variant locales are removed.&lt;/p&gt;
+     *
+     * @param languageCode  the 2 letter language code, null returns empty
+     * @return an unmodifiable List of Locale objects, never null
+     */
+    public static List&lt;Locale&gt; countriesByLanguage(String languageCode) {
+<span class="fc" id="L296">        List&lt;Locale&gt; countries = cCountriesByLanguage.get(languageCode);  //syncd</span>
+<span class="fc bfc" id="L297" title="All 2 branches covered.">        if (countries == null) {</span>
+<span class="fc bfc" id="L298" title="All 2 branches covered.">            if (languageCode != null) {</span>
+<span class="fc" id="L299">                countries = new ArrayList&lt;Locale&gt;();</span>
+<span class="fc" id="L300">                List&lt;Locale&gt; locales = availableLocaleList();</span>
+<span class="fc bfc" id="L301" title="All 2 branches covered.">                for (int i = 0; i &lt; locales.size(); i++) {</span>
+<span class="fc" id="L302">                    Locale locale = locales.get(i);</span>
+<span class="fc bfc" id="L303" title="All 2 branches covered.">                    if (languageCode.equals(locale.getLanguage()) &amp;&amp;</span>
+<span class="fc bfc" id="L304" title="All 2 branches covered.">                            locale.getCountry().length() != 0 &amp;&amp;</span>
+<span class="pc bpc" id="L305" title="1 of 2 branches missed.">                            locale.getVariant().length() == 0) {</span>
+<span class="fc" id="L306">                        countries.add(locale);</span>
+                    }
+                }
+<span class="fc" id="L309">                countries = Collections.unmodifiableList(countries);</span>
+<span class="fc" id="L310">            } else {</span>
+<span class="fc" id="L311">                countries = Collections.emptyList();</span>
+            }
+<span class="fc" id="L313">            cCountriesByLanguage.put(languageCode, countries);  //syncd</span>
+        }
+<span class="fc" id="L315">        return countries;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

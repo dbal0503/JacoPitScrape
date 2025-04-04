@@ -1,0 +1,269 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UnivariateRealIntegratorImpl.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Commons Math</a> &gt; <a href="index.source.html" class="el_package">org.apache.commons.math.analysis.integration</a> &gt; <span class="el_source">UnivariateRealIntegratorImpl.java</span></div><h1>UnivariateRealIntegratorImpl.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.commons.math.analysis.integration;
+
+import org.apache.commons.math.analysis.UnivariateFunction;
+import org.apache.commons.math.analysis.solvers.UnivariateRealSolverUtils;
+import org.apache.commons.math.exception.MathIllegalArgumentException;
+import org.apache.commons.math.exception.MaxCountExceededException;
+import org.apache.commons.math.exception.NotStrictlyPositiveException;
+import org.apache.commons.math.exception.NullArgumentException;
+import org.apache.commons.math.exception.NumberIsTooSmallException;
+import org.apache.commons.math.exception.TooManyEvaluationsException;
+import org.apache.commons.math.util.Incrementor;
+import org.apache.commons.math.util.MathUtils;
+
+/**
+ * Provide a default implementation for several generic functions.
+ *
+ * @version $Id$
+ * @since 1.2
+ */
+public abstract class UnivariateRealIntegratorImpl implements UnivariateRealIntegrator {
+
+    /** Default absolute accuracy. */
+    public static final double DEFAULT_ABSOLUTE_ACCURACY = 1.0e-15;
+
+    /** Default relative accuracy. */
+    public static final double DEFAULT_RELATIVE_ACCURACY = 1.0e-6;
+
+    /** Default minimal iteration count. */
+    public static final int DEFAULT_MIN_ITERATIONS_COUNT = 3;
+
+    /** Default maximal iteration count. */
+    public static final int DEFAULT_MAX_ITERATIONS_COUNT = Integer.MAX_VALUE;
+
+    /** Maximum absolute error. */
+    protected double absoluteAccuracy;
+
+    /** Maximum relative error. */
+    protected double relativeAccuracy;
+
+    /** minimum number of iterations */
+    protected int minimalIterationCount;
+
+    /** The iteration count. */
+    protected Incrementor iterations;
+
+    /** The functions evaluation count. */
+    protected Incrementor evaluations;
+
+    /** Function to integrate. */
+    protected UnivariateFunction function;
+
+    /** Lower bound for the interval. */
+    protected double min;
+
+    /** Upper bound for the interval. */
+    protected double max;
+
+    /**
+     * Construct an integrator with given accuracies and iteration counts.
+     * &lt;p&gt;
+     * The meanings of the various parameters are:
+     * &lt;ul&gt;
+     *   &lt;li&gt;relative accuracy:
+     *       this is used to stop iterations if the absolute accuracy can't be
+     *       achieved due to large values or short mantissa length. If this
+     *       should be the primary criterion for convergence rather then a
+     *       safety measure, set the absolute accuracy to a ridiculously small value,
+     *       like {@link org.apache.commons.math.util.Precision#SAFE_MIN Precision.SAFE_MIN}.&lt;/li&gt;
+     *   &lt;li&gt;absolute accuracy:
+     *       The default is usually chosen so that results in the interval
+     *       -10..-0.1 and +0.1..+10 can be found with a reasonable accuracy. If the
+     *       expected absolute value of your results is of much smaller magnitude, set
+     *       this to a smaller value.&lt;/li&gt;
+     *   &lt;li&gt;minimum number of iterations:
+     *       minimal iteration is needed to avoid false early convergence, e.g.
+     *       the sample points happen to be zeroes of the function. Users can
+     *       use the default value or choose one that they see as appropriate.&lt;/li&gt;
+     *   &lt;li&gt;maximum number of iterations:
+     *       usually a high iteration count indicates convergence problems. However,
+     *       the &quot;reasonable value&quot; varies widely for different algorithms. Users are
+     *       advised to use the default value supplied by the algorithm.&lt;/li&gt;
+     * &lt;/ul&gt;
+     * &lt;/p&gt;
+     * @param relativeAccuracy relative accuracy of the result
+     * @param absoluteAccuracy absolute accuracy of the result
+     * @param minimalIterationCount minimum number of iterations
+     * @param maximalIterationCount maximum number of iterations
+     * @exception NotStrictlyPositiveException if minimal number of iterations
+     * is not strictly positive
+     * @exception NumberIsTooSmallException if maximal number of iterations
+     * is lesser than or equal to the minimal number of iterations
+     */
+    protected UnivariateRealIntegratorImpl(final double relativeAccuracy,
+                                           final double absoluteAccuracy,
+                                           final int minimalIterationCount,
+                                           final int maximalIterationCount)
+<span class="fc" id="L113">        throws NotStrictlyPositiveException, NumberIsTooSmallException {</span>
+
+        // accuracy settings
+<span class="fc" id="L116">        this.relativeAccuracy      = relativeAccuracy;</span>
+<span class="fc" id="L117">        this.absoluteAccuracy      = absoluteAccuracy;</span>
+
+        // iterations count settings
+<span class="pc bpc" id="L120" title="1 of 2 branches missed.">        if (minimalIterationCount &lt;= 0) {</span>
+<span class="nc" id="L121">            throw new NotStrictlyPositiveException(minimalIterationCount);</span>
+        }
+<span class="fc bfc" id="L123" title="All 2 branches covered.">        if (maximalIterationCount &lt;= minimalIterationCount) {</span>
+<span class="fc" id="L124">            throw new NumberIsTooSmallException(maximalIterationCount, minimalIterationCount, false);</span>
+        }
+<span class="fc" id="L126">        this.minimalIterationCount = minimalIterationCount;</span>
+<span class="fc" id="L127">        this.iterations            = new Incrementor();</span>
+<span class="fc" id="L128">        iterations.setMaximalCount(maximalIterationCount);</span>
+
+        // prepare evaluations counter, but do not set it yet
+<span class="fc" id="L131">        evaluations = new Incrementor();</span>
+
+<span class="fc" id="L133">    }</span>
+
+    /**
+     * Construct an integrator with given accuracies.
+     * @param relativeAccuracy relative accuracy of the result
+     * @param absoluteAccuracy absolute accuracy of the result
+     */
+    protected UnivariateRealIntegratorImpl(final double relativeAccuracy,
+                                           final double absoluteAccuracy) {
+<span class="nc" id="L142">        this(relativeAccuracy, absoluteAccuracy,</span>
+             DEFAULT_MIN_ITERATIONS_COUNT, DEFAULT_MAX_ITERATIONS_COUNT);
+<span class="nc" id="L144">    }</span>
+
+    /**
+     * Construct an integrator with given iteration counts.
+     * @param minimalIterationCount minimum number of iterations
+     * @param maximalIterationCount maximum number of iterations
+     * @exception NotStrictlyPositiveException if minimal number of iterations
+     * is not strictly positive
+     * @exception NumberIsTooSmallException if maximal number of iterations
+     * is lesser than or equal to the minimal number of iterations
+     */
+    protected UnivariateRealIntegratorImpl(final int minimalIterationCount,
+                                           final int maximalIterationCount)
+        throws NotStrictlyPositiveException, NumberIsTooSmallException {
+<span class="fc" id="L158">        this(DEFAULT_RELATIVE_ACCURACY, DEFAULT_ABSOLUTE_ACCURACY,</span>
+             minimalIterationCount, maximalIterationCount);
+<span class="fc" id="L160">    }</span>
+
+    /** {@inheritDoc} */
+    public double getRelativeAccuracy() {
+<span class="fc" id="L164">        return relativeAccuracy;</span>
+    }
+
+    /** {@inheritDoc} */
+    public double getAbsoluteAccuracy() {
+<span class="fc" id="L169">        return absoluteAccuracy;</span>
+    }
+
+    /** {@inheritDoc} */
+    public int getMinimalIterationCount() {
+<span class="nc" id="L174">        return minimalIterationCount;</span>
+    }
+
+    /** {@inheritDoc} */
+    public int getMaximalIterationCount() {
+<span class="nc" id="L179">        return iterations.getMaximalCount();</span>
+    }
+
+    /** {@inheritDoc} */
+    public int getEvaluations() {
+<span class="fc" id="L184">        return evaluations.getCount();</span>
+    }
+
+    /** {@inheritDoc} */
+    public int getIterations() {
+<span class="fc" id="L189">        return iterations.getCount();</span>
+    }
+
+    /**
+     * Compute the objective function value.
+     *
+     * @param point Point at which the objective function must be evaluated.
+     * @return the objective function value at specified point.
+     * @throws TooManyEvaluationsException if the maximal number of function
+     * evaluations is exceeded.
+     */
+    protected double computeObjectiveValue(final double point)
+        throws TooManyEvaluationsException {
+        try {
+<span class="fc" id="L203">            evaluations.incrementCount();</span>
+<span class="fc" id="L204">        } catch (MaxCountExceededException e) {</span>
+<span class="fc" id="L205">            throw new TooManyEvaluationsException(e.getMax());</span>
+<span class="fc" id="L206">        }</span>
+<span class="fc" id="L207">        return function.value(point);</span>
+    }
+
+    /**
+     * Prepare for computation.
+     * Subclasses must call this method if they override any of the
+     * {@code solve} methods.
+     *
+     * @param maxEval Maximum number of evaluations.
+     * @param f the integrand function
+     * @param lower the min bound for the interval
+     * @param upper the upper bound for the interval
+     * @throws NullArgumentException if {@code f} is {@code null}.
+     * @throws MathIllegalArgumentException if {@code min &gt;= max}.
+     */
+    protected void setup(final int maxEval,
+                         final UnivariateFunction f,
+                         final double lower, final double upper)
+        throws NullArgumentException, MathIllegalArgumentException {
+
+        // Checks.
+<span class="fc" id="L228">        MathUtils.checkNotNull(f);</span>
+<span class="fc" id="L229">        UnivariateRealSolverUtils.verifyInterval(lower, upper);</span>
+
+        // Reset.
+<span class="fc" id="L232">        this.min = lower;</span>
+<span class="fc" id="L233">        this.max = upper;</span>
+<span class="fc" id="L234">        function = f;</span>
+<span class="fc" id="L235">        evaluations.setMaximalCount(maxEval);</span>
+<span class="fc" id="L236">        evaluations.resetCount();</span>
+<span class="fc" id="L237">        iterations.resetCount();</span>
+
+<span class="fc" id="L239">    }</span>
+
+    /** {@inheritDoc} */
+    public double integrate(final int maxEval, final UnivariateFunction f,
+                            final double lower, final double upper)
+        throws TooManyEvaluationsException, MaxCountExceededException,
+               MathIllegalArgumentException, NullArgumentException {
+
+        // Initialization.
+<span class="fc" id="L248">        setup(maxEval, f, lower, upper);</span>
+
+        // Perform computation.
+<span class="fc" id="L251">        return doIntegrate();</span>
+
+    }
+
+    /**
+     * Method for implementing actual integration algorithms in derived
+     * classes.
+     *
+     * @return the root.
+     * @throws TooManyEvaluationsException if the maximal number of evaluations
+     * is exceeded.
+     * @throws MaxCountExceededException if the maximum iteration count is exceeded
+     * or the integrator detects convergence problems otherwise
+     */
+    protected abstract double doIntegrate()
+        throws TooManyEvaluationsException, MaxCountExceededException;
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

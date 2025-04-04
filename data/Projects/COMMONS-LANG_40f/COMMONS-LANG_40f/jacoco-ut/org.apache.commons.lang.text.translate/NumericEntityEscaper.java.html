@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>NumericEntityEscaper.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Commons Lang</a> &gt; <a href="index.source.html" class="el_package">org.apache.commons.lang.text.translate</a> &gt; <span class="el_source">NumericEntityEscaper.java</span></div><h1>NumericEntityEscaper.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ * 
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.commons.lang.text.translate;
+
+import java.io.IOException;
+import java.io.Writer;
+
+/**
+ * Translates codepoints to their XML numeric entity escaped value. 
+ * @since 3.0
+ */
+public class NumericEntityEscaper extends CodePointTranslator {
+
+    private final int below;
+    private final int above;
+    private final boolean between;
+
+<span class="fc" id="L32">    private NumericEntityEscaper(int below, int above, boolean between) {</span>
+<span class="fc" id="L33">        this.below = below;</span>
+<span class="fc" id="L34">        this.above = above;</span>
+<span class="fc" id="L35">        this.between = between;</span>
+<span class="fc" id="L36">    }</span>
+
+    public static NumericEntityEscaper below(int codepoint) {
+<span class="fc" id="L39">        return outsideOf(codepoint, Integer.MAX_VALUE);</span>
+    }
+
+    public static NumericEntityEscaper above(int codepoint) {
+<span class="fc" id="L43">        return outsideOf(0, codepoint);</span>
+    }
+
+    public static NumericEntityEscaper between(int codepointLow, int codepointHigh) {
+<span class="fc" id="L47">        return new NumericEntityEscaper(codepointLow, codepointHigh, true);</span>
+    }
+
+    public static NumericEntityEscaper outsideOf(int codepointLow, int codepointHigh) {
+<span class="fc" id="L51">        return new NumericEntityEscaper(codepointLow, codepointHigh, false);</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public boolean translate(int codepoint, Writer out) throws IOException {
+<span class="fc bfc" id="L59" title="All 2 branches covered.">        if(between) {</span>
+<span class="fc bfc" id="L60" title="All 4 branches covered.">            if (codepoint &lt; below || codepoint &gt; above) {</span>
+<span class="fc" id="L61">                return false;</span>
+            }
+        } else {
+<span class="fc bfc" id="L64" title="All 4 branches covered.">            if (codepoint &gt;= below &amp;&amp; codepoint &lt;= above) {</span>
+<span class="fc" id="L65">                return false;</span>
+            }
+        }
+
+        // TODO: if (codepoint &gt; 0xffff) ?
+<span class="fc" id="L70">        out.write(&quot;&amp;#&quot;);</span>
+<span class="fc" id="L71">        out.write(Integer.toString(codepoint, 10));</span>
+<span class="fc" id="L72">        out.write(';');</span>
+<span class="fc" id="L73">        return true;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

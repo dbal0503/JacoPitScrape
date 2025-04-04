@@ -1,0 +1,207 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AbstractDuration.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Joda time</a> &gt; <a href="index.source.html" class="el_package">org.joda.time.base</a> &gt; <span class="el_source">AbstractDuration.java</span></div><h1>AbstractDuration.java</h1><pre class="source lang-java linenums">/*
+ *  Copyright 2001-2010 Stephen Colebourne
+ *
+ *  Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+package org.joda.time.base;
+
+import org.joda.convert.ToString;
+import org.joda.time.Duration;
+import org.joda.time.Period;
+import org.joda.time.ReadableDuration;
+import org.joda.time.ReadableInstant;
+import org.joda.time.format.FormatUtils;
+
+/**
+ * AbstractDuration provides the common behaviour for duration classes.
+ * &lt;p&gt;
+ * This class should generally not be used directly by API users. The 
+ * {@link ReadableDuration} interface should be used when different 
+ * kinds of durations are to be referenced.
+ * &lt;p&gt;
+ * AbstractDuration subclasses may be mutable and not thread-safe.
+ *
+ * @author Brian S O'Neill
+ * @author Stephen Colebourne
+ * @since 1.0
+ */
+public abstract class AbstractDuration implements ReadableDuration {
+
+    /**
+     * Constructor.
+     */
+    protected AbstractDuration() {
+<span class="fc" id="L44">        super();</span>
+<span class="fc" id="L45">    }</span>
+
+    //-----------------------------------------------------------------------
+    /**
+     * Get this duration as an immutable &lt;code&gt;Duration&lt;/code&gt; object.
+     * 
+     * @return a Duration created using the millisecond duration from this instance
+     */
+    public Duration toDuration() {
+<span class="fc" id="L54">        return new Duration(getMillis());</span>
+    }
+
+    //-----------------------------------------------------------------------
+    /**
+     * Converts this duration to a Period instance using the standard period type
+     * and the ISO chronology.
+     * &lt;p&gt;
+     * Only precise fields in the period type will be used. Thus, only the hour,
+     * minute, second and millisecond fields on the period will be used.
+     * The year, month, week and day fields will not be populated.
+     * &lt;p&gt;
+     * If the duration is small, less than one day, then this method will perform
+     * as you might expect and split the fields evenly.
+     * If the duration is larger than one day then all the remaining duration will
+     * be stored in the largest available field, hours in this case.
+     * &lt;p&gt;
+     * For example, a duration effectively equal to (365 + 60 + 5) days will be
+     * converted to ((365 + 60 + 5) * 24) hours by this constructor.
+     * &lt;p&gt;
+     * For more control over the conversion process, you must pair the duration with
+     * an instant, see {@link Period#Period(ReadableInstant,ReadableDuration)}.
+     * 
+     * @return a Period created using the millisecond duration from this instance
+     */
+    public Period toPeriod() {
+<span class="fc" id="L80">        return new Period(getMillis());</span>
+    }
+
+    //-----------------------------------------------------------------------
+    /**
+     * Compares this duration with the specified duration based on length.
+     *
+     * @param other  a duration to check against
+     * @return negative value if this is less, 0 if equal, or positive value if greater
+     * @throws NullPointerException if the object is null
+     * @throws ClassCastException if the given object is not supported
+     */
+    public int compareTo(ReadableDuration other) {
+<span class="fc" id="L93">        long thisMillis = this.getMillis();</span>
+<span class="fc" id="L94">        long otherMillis = other.getMillis();</span>
+        
+        // cannot do (thisMillis - otherMillis) as it can overflow
+<span class="fc bfc" id="L97" title="All 2 branches covered.">        if (thisMillis &lt; otherMillis) {</span>
+<span class="fc" id="L98">            return -1;</span>
+        }
+<span class="fc bfc" id="L100" title="All 2 branches covered.">        if (thisMillis &gt; otherMillis) {</span>
+<span class="fc" id="L101">            return 1;</span>
+        }
+<span class="fc" id="L103">        return 0;</span>
+    }
+
+    /**
+     * Is the length of this duration equal to the duration passed in.
+     *
+     * @param duration  another duration to compare to, null means zero milliseconds
+     * @return true if this duration is equal to than the duration passed in
+     */
+    public boolean isEqual(ReadableDuration duration) {
+<span class="fc bfc" id="L113" title="All 2 branches covered.">        if (duration == null) {</span>
+<span class="fc" id="L114">            duration = Duration.ZERO;</span>
+        }
+<span class="fc bfc" id="L116" title="All 2 branches covered.">        return compareTo(duration) == 0;</span>
+    }
+
+    /**
+     * Is the length of this duration longer than the duration passed in.
+     *
+     * @param duration  another duration to compare to, null means zero milliseconds
+     * @return true if this duration is equal to than the duration passed in
+     */
+    public boolean isLongerThan(ReadableDuration duration) {
+<span class="fc bfc" id="L126" title="All 2 branches covered.">        if (duration == null) {</span>
+<span class="fc" id="L127">            duration = Duration.ZERO;</span>
+        }
+<span class="fc bfc" id="L129" title="All 2 branches covered.">        return compareTo(duration) &gt; 0;</span>
+    }
+
+    /**
+     * Is the length of this duration shorter than the duration passed in.
+     *
+     * @param duration  another duration to compare to, null means zero milliseconds
+     * @return true if this duration is equal to than the duration passed in
+     */
+    public boolean isShorterThan(ReadableDuration duration) {
+<span class="fc bfc" id="L139" title="All 2 branches covered.">        if (duration == null) {</span>
+<span class="fc" id="L140">            duration = Duration.ZERO;</span>
+        }
+<span class="fc bfc" id="L142" title="All 2 branches covered.">        return compareTo(duration) &lt; 0;</span>
+    }
+
+    //-----------------------------------------------------------------------
+    /**
+     * Compares this object with the specified object for equality based
+     * on the millisecond length. All ReadableDuration instances are accepted.
+     *
+     * @param duration  a readable duration to check against
+     * @return true if the length of the duration is equal
+     */
+    public boolean equals(Object duration) {
+<span class="fc bfc" id="L154" title="All 2 branches covered.">        if (this == duration) {</span>
+<span class="fc" id="L155">            return true;</span>
+        }
+<span class="fc bfc" id="L157" title="All 2 branches covered.">        if (duration instanceof ReadableDuration == false) {</span>
+<span class="fc" id="L158">            return false;</span>
+        }
+<span class="fc" id="L160">        ReadableDuration other = (ReadableDuration) duration;</span>
+<span class="fc bfc" id="L161" title="All 2 branches covered.">        return (getMillis() == other.getMillis());</span>
+    }
+
+    /**
+     * Gets a hash code for the duration that is compatible with the 
+     * equals method.
+     *
+     * @return a hash code
+     */
+    public int hashCode() {
+<span class="fc" id="L171">        long len = getMillis();</span>
+<span class="fc" id="L172">        return (int) (len ^ (len &gt;&gt;&gt; 32));</span>
+    }
+
+    //-----------------------------------------------------------------------
+    /**
+     * Gets the value as a String in the ISO8601 duration format including
+     * only seconds and milliseconds.
+     * &lt;p&gt;
+     * For example, &quot;PT72.345S&quot; represents 1 minute, 12 seconds and 345 milliseconds.
+     * &lt;p&gt;
+     * For more control over the output, see
+     * {@link org.joda.time.format.PeriodFormatterBuilder PeriodFormatterBuilder}.
+     *
+     * @return the value as an ISO8601 string
+     */
+    @ToString
+    public String toString() {
+<span class="fc" id="L189">        long millis = getMillis();</span>
+<span class="fc" id="L190">        StringBuffer buf = new StringBuffer();</span>
+<span class="fc" id="L191">        buf.append(&quot;PT&quot;);</span>
+<span class="fc bfc" id="L192" title="All 2 branches covered.">        boolean negative = (millis &lt; 0);</span>
+<span class="fc" id="L193">        FormatUtils.appendUnpaddedInteger(buf, millis);</span>
+<span class="fc bfc" id="L194" title="All 4 branches covered.">        while (buf.length() &lt; (negative ? 7 : 6)) {</span>
+<span class="fc bfc" id="L195" title="All 2 branches covered.">            buf.insert(negative ? 3 : 2, &quot;0&quot;);</span>
+        }
+<span class="fc bfc" id="L197" title="All 2 branches covered.">        if ((millis / 1000) * 1000 == millis) {</span>
+<span class="fc" id="L198">            buf.setLength(buf.length() - 3);</span>
+        } else {
+<span class="fc" id="L200">            buf.insert(buf.length() - 3, &quot;.&quot;);</span>
+        }
+<span class="fc" id="L202">        buf.append('S');</span>
+<span class="fc" id="L203">        return buf.toString();</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

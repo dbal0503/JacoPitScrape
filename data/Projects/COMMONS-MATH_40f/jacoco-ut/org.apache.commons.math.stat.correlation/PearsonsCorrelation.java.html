@@ -1,0 +1,285 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PearsonsCorrelation.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Commons Math</a> &gt; <a href="index.source.html" class="el_package">org.apache.commons.math.stat.correlation</a> &gt; <span class="el_source">PearsonsCorrelation.java</span></div><h1>PearsonsCorrelation.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.commons.math.stat.correlation;
+
+import org.apache.commons.math.MathException;
+import org.apache.commons.math.MathRuntimeException;
+import org.apache.commons.math.distribution.TDistribution;
+import org.apache.commons.math.exception.util.LocalizedFormats;
+import org.apache.commons.math.exception.NullArgumentException;
+import org.apache.commons.math.exception.DimensionMismatchException;
+import org.apache.commons.math.linear.RealMatrix;
+import org.apache.commons.math.linear.BlockRealMatrix;
+import org.apache.commons.math.stat.regression.SimpleRegression;
+import org.apache.commons.math.util.FastMath;
+
+/**
+ * Computes Pearson's product-moment correlation coefficients for pairs of arrays
+ * or columns of a matrix.
+ *
+ * &lt;p&gt;The constructors that take &lt;code&gt;RealMatrix&lt;/code&gt; or
+ * &lt;code&gt;double[][]&lt;/code&gt; arguments generate correlation matrices.  The
+ * columns of the input matrices are assumed to represent variable values.
+ * Correlations are given by the formula&lt;/p&gt;
+ * &lt;code&gt;cor(X, Y) = &amp;Sigma;[(x&lt;sub&gt;i&lt;/sub&gt; - E(X))(y&lt;sub&gt;i&lt;/sub&gt; - E(Y))] / [(n - 1)s(X)s(Y)]&lt;/code&gt;
+ * where &lt;code&gt;E(X)&lt;/code&gt; is the mean of &lt;code&gt;X&lt;/code&gt;, &lt;code&gt;E(Y)&lt;/code&gt;
+ * is the mean of the &lt;code&gt;Y&lt;/code&gt; values and s(X), s(Y) are standard deviations.
+ *
+ * @version $Id$
+ * @since 2.0
+ */
+public class PearsonsCorrelation {
+
+    /** correlation matrix */
+    private final RealMatrix correlationMatrix;
+
+    /** number of observations */
+    private final int nObs;
+
+    /**
+     * Create a PearsonsCorrelation instance without data
+     */
+    public PearsonsCorrelation() {
+<span class="fc" id="L57">        super();</span>
+<span class="fc" id="L58">        correlationMatrix = null;</span>
+<span class="fc" id="L59">        nObs = 0;</span>
+<span class="fc" id="L60">    }</span>
+
+    /**
+     * Create a PearsonsCorrelation from a rectangular array
+     * whose columns represent values of variables to be correlated.
+     *
+     * @param data rectangular array with columns representing variables
+     * @throws IllegalArgumentException if the input data array is not
+     * rectangular with at least two rows and two columns.
+     */
+    public PearsonsCorrelation(double[][] data) {
+<span class="fc" id="L71">        this(new BlockRealMatrix(data));</span>
+<span class="fc" id="L72">    }</span>
+
+    /**
+     * Create a PearsonsCorrelation from a RealMatrix whose columns
+     * represent variables to be correlated.
+     *
+     * @param matrix matrix with columns representing variables to correlate
+     */
+<span class="fc" id="L80">    public PearsonsCorrelation(RealMatrix matrix) {</span>
+<span class="fc" id="L81">        checkSufficientData(matrix);</span>
+<span class="fc" id="L82">        nObs = matrix.getRowDimension();</span>
+<span class="fc" id="L83">        correlationMatrix = computeCorrelationMatrix(matrix);</span>
+<span class="fc" id="L84">    }</span>
+
+    /**
+     * Create a PearsonsCorrelation from a {@link Covariance}.  The correlation
+     * matrix is computed by scaling the Covariance's covariance matrix.
+     * The Covariance instance must have been created from a data matrix with
+     * columns representing variable values.
+     *
+     * @param covariance Covariance instance
+     */
+<span class="fc" id="L94">    public PearsonsCorrelation(Covariance covariance) {</span>
+<span class="fc" id="L95">        RealMatrix covarianceMatrix = covariance.getCovarianceMatrix();</span>
+<span class="pc bpc" id="L96" title="1 of 2 branches missed.">        if (covarianceMatrix == null) {</span>
+<span class="nc" id="L97">            throw new NullArgumentException(LocalizedFormats.COVARIANCE_MATRIX);</span>
+        }
+<span class="fc" id="L99">        nObs = covariance.getN();</span>
+<span class="fc" id="L100">        correlationMatrix = covarianceToCorrelation(covarianceMatrix);</span>
+<span class="fc" id="L101">    }</span>
+
+    /**
+     * Create a PearsonsCorrelation from a covariance matrix.  The correlation
+     * matrix is computed by scaling the covariance matrix.
+     *
+     * @param covarianceMatrix covariance matrix
+     * @param numberOfObservations the number of observations in the dataset used to compute
+     * the covariance matrix
+     */
+<span class="fc" id="L111">    public PearsonsCorrelation(RealMatrix covarianceMatrix, int numberOfObservations) {</span>
+<span class="fc" id="L112">        nObs = numberOfObservations;</span>
+<span class="fc" id="L113">        correlationMatrix = covarianceToCorrelation(covarianceMatrix);</span>
+
+<span class="fc" id="L115">    }</span>
+
+    /**
+     * Returns the correlation matrix
+     *
+     * @return correlation matrix
+     */
+    public RealMatrix getCorrelationMatrix() {
+<span class="fc" id="L123">        return correlationMatrix;</span>
+    }
+
+    /**
+     * Returns a matrix of standard errors associated with the estimates
+     * in the correlation matrix.&lt;br/&gt;
+     * &lt;code&gt;getCorrelationStandardErrors().getEntry(i,j)&lt;/code&gt; is the standard
+     * error associated with &lt;code&gt;getCorrelationMatrix.getEntry(i,j)&lt;/code&gt;
+     * &lt;p&gt;The formula used to compute the standard error is &lt;br/&gt;
+     * &lt;code&gt;SE&lt;sub&gt;r&lt;/sub&gt; = ((1 - r&lt;sup&gt;2&lt;/sup&gt;) / (n - 2))&lt;sup&gt;1/2&lt;/sup&gt;&lt;/code&gt;
+     * where &lt;code&gt;r&lt;/code&gt; is the estimated correlation coefficient and
+     * &lt;code&gt;n&lt;/code&gt; is the number of observations in the source dataset.&lt;/p&gt;
+     *
+     * @return matrix of correlation standard errors
+     */
+    public RealMatrix getCorrelationStandardErrors() {
+<span class="fc" id="L139">        int nVars = correlationMatrix.getColumnDimension();</span>
+<span class="fc" id="L140">        double[][] out = new double[nVars][nVars];</span>
+<span class="fc bfc" id="L141" title="All 2 branches covered.">        for (int i = 0; i &lt; nVars; i++) {</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">            for (int j = 0; j &lt; nVars; j++) {</span>
+<span class="fc" id="L143">                double r = correlationMatrix.getEntry(i, j);</span>
+<span class="fc" id="L144">                out[i][j] = FastMath.sqrt((1 - r * r) /(nObs - 2));</span>
+            }
+        }
+<span class="fc" id="L147">        return new BlockRealMatrix(out);</span>
+    }
+
+    /**
+     * Returns a matrix of p-values associated with the (two-sided) null
+     * hypothesis that the corresponding correlation coefficient is zero.
+     * &lt;p&gt;&lt;code&gt;getCorrelationPValues().getEntry(i,j)&lt;/code&gt; is the probability
+     * that a random variable distributed as &lt;code&gt;t&lt;sub&gt;n-2&lt;/sub&gt;&lt;/code&gt; takes
+     * a value with absolute value greater than or equal to &lt;br&gt;
+     * &lt;code&gt;|r|((n - 2) / (1 - r&lt;sup&gt;2&lt;/sup&gt;))&lt;sup&gt;1/2&lt;/sup&gt;&lt;/code&gt;&lt;/p&gt;
+     * &lt;p&gt;The values in the matrix are sometimes referred to as the
+     * &lt;i&gt;significance&lt;/i&gt; of the corresponding correlation coefficients.&lt;/p&gt;
+     *
+     * @return matrix of p-values
+     * @throws MathException if an error occurs estimating probabilities
+     */
+    public RealMatrix getCorrelationPValues() throws MathException {
+<span class="fc" id="L164">        TDistribution tDistribution = new TDistribution(nObs - 2);</span>
+<span class="fc" id="L165">        int nVars = correlationMatrix.getColumnDimension();</span>
+<span class="fc" id="L166">        double[][] out = new double[nVars][nVars];</span>
+<span class="fc bfc" id="L167" title="All 2 branches covered.">        for (int i = 0; i &lt; nVars; i++) {</span>
+<span class="fc bfc" id="L168" title="All 2 branches covered.">            for (int j = 0; j &lt; nVars; j++) {</span>
+<span class="fc bfc" id="L169" title="All 2 branches covered.">                if (i == j) {</span>
+<span class="fc" id="L170">                    out[i][j] = 0d;</span>
+                } else {
+<span class="fc" id="L172">                    double r = correlationMatrix.getEntry(i, j);</span>
+<span class="fc" id="L173">                    double t = FastMath.abs(r * FastMath.sqrt((nObs - 2)/(1 - r * r)));</span>
+<span class="fc" id="L174">                    out[i][j] = 2 * tDistribution.cumulativeProbability(-t);</span>
+                }
+            }
+        }
+<span class="fc" id="L178">        return new BlockRealMatrix(out);</span>
+    }
+
+
+    /**
+     * Computes the correlation matrix for the columns of the
+     * input matrix.
+     *
+     * @param matrix matrix with columns representing variables to correlate
+     * @return correlation matrix
+     */
+    public RealMatrix computeCorrelationMatrix(RealMatrix matrix) {
+<span class="fc" id="L190">        int nVars = matrix.getColumnDimension();</span>
+<span class="fc" id="L191">        RealMatrix outMatrix = new BlockRealMatrix(nVars, nVars);</span>
+<span class="fc bfc" id="L192" title="All 2 branches covered.">        for (int i = 0; i &lt; nVars; i++) {</span>
+<span class="fc bfc" id="L193" title="All 2 branches covered.">            for (int j = 0; j &lt; i; j++) {</span>
+<span class="fc" id="L194">              double corr = correlation(matrix.getColumn(i), matrix.getColumn(j));</span>
+<span class="fc" id="L195">              outMatrix.setEntry(i, j, corr);</span>
+<span class="fc" id="L196">              outMatrix.setEntry(j, i, corr);</span>
+            }
+<span class="fc" id="L198">            outMatrix.setEntry(i, i, 1d);</span>
+        }
+<span class="fc" id="L200">        return outMatrix;</span>
+    }
+
+    /**
+     * Computes the correlation matrix for the columns of the
+     * input rectangular array.  The colums of the array represent values
+     * of variables to be correlated.
+     *
+     * @param data matrix with columns representing variables to correlate
+     * @return correlation matrix
+     */
+    public RealMatrix computeCorrelationMatrix(double[][] data) {
+<span class="fc" id="L212">       return computeCorrelationMatrix(new BlockRealMatrix(data));</span>
+    }
+
+    /**
+     * Computes the Pearson's product-moment correlation coefficient between the two arrays.
+     *
+     * &lt;/p&gt;Throws IllegalArgumentException if the arrays do not have the same length
+     * or their common length is less than 2&lt;/p&gt;
+     *
+     * @param xArray first data array
+     * @param yArray second data array
+     * @return Returns Pearson's correlation coefficient for the two arrays
+     * @throws  IllegalArgumentException if the arrays lengths do not match or
+     * there is insufficient data
+     */
+    public double correlation(final double[] xArray, final double[] yArray) throws IllegalArgumentException {
+<span class="fc" id="L228">        SimpleRegression regression = new SimpleRegression();</span>
+<span class="pc bpc" id="L229" title="1 of 2 branches missed.">        if (xArray.length != yArray.length) {</span>
+<span class="nc" id="L230">            throw new DimensionMismatchException(xArray.length, yArray.length);</span>
+<span class="fc bfc" id="L231" title="All 2 branches covered.">        } else if (xArray.length &lt; 2) {</span>
+<span class="fc" id="L232">            throw MathRuntimeException.createIllegalArgumentException(</span>
+<span class="fc" id="L233">                  LocalizedFormats.INSUFFICIENT_DIMENSION, xArray.length, 2);</span>
+        } else {
+<span class="fc bfc" id="L235" title="All 2 branches covered.">            for(int i=0; i&lt;xArray.length; i++) {</span>
+<span class="fc" id="L236">                regression.addData(xArray[i], yArray[i]);</span>
+            }
+<span class="fc" id="L238">            return regression.getR();</span>
+        }
+    }
+
+    /**
+     * Derives a correlation matrix from a covariance matrix.
+     *
+     * &lt;p&gt;Uses the formula &lt;br/&gt;
+     * &lt;code&gt;r(X,Y) = cov(X,Y)/s(X)s(Y)&lt;/code&gt; where
+     * &lt;code&gt;r(&amp;middot,&amp;middot;)&lt;/code&gt; is the correlation coefficient and
+     * &lt;code&gt;s(&amp;middot;)&lt;/code&gt; means standard deviation.&lt;/p&gt;
+     *
+     * @param covarianceMatrix the covariance matrix
+     * @return correlation matrix
+     */
+    public RealMatrix covarianceToCorrelation(RealMatrix covarianceMatrix) {
+<span class="fc" id="L254">        int nVars = covarianceMatrix.getColumnDimension();</span>
+<span class="fc" id="L255">        RealMatrix outMatrix = new BlockRealMatrix(nVars, nVars);</span>
+<span class="fc bfc" id="L256" title="All 2 branches covered.">        for (int i = 0; i &lt; nVars; i++) {</span>
+<span class="fc" id="L257">            double sigma = FastMath.sqrt(covarianceMatrix.getEntry(i, i));</span>
+<span class="fc" id="L258">            outMatrix.setEntry(i, i, 1d);</span>
+<span class="fc bfc" id="L259" title="All 2 branches covered.">            for (int j = 0; j &lt; i; j++) {</span>
+<span class="fc" id="L260">                double entry = covarianceMatrix.getEntry(i, j) /</span>
+<span class="fc" id="L261">                       (sigma * FastMath.sqrt(covarianceMatrix.getEntry(j, j)));</span>
+<span class="fc" id="L262">                outMatrix.setEntry(i, j, entry);</span>
+<span class="fc" id="L263">                outMatrix.setEntry(j, i, entry);</span>
+            }
+        }
+<span class="fc" id="L266">        return outMatrix;</span>
+    }
+
+    /**
+     * Throws IllegalArgumentException of the matrix does not have at least
+     * two columns and two rows
+     *
+     * @param matrix matrix to check for sufficiency
+     */
+    private void checkSufficientData(final RealMatrix matrix) {
+<span class="fc" id="L276">        int nRows = matrix.getRowDimension();</span>
+<span class="fc" id="L277">        int nCols = matrix.getColumnDimension();</span>
+<span class="pc bpc" id="L278" title="1 of 4 branches missed.">        if (nRows &lt; 2 || nCols &lt; 2) {</span>
+<span class="fc" id="L279">            throw MathRuntimeException.createIllegalArgumentException(</span>
+                    LocalizedFormats.INSUFFICIENT_ROWS_AND_COLUMNS,
+<span class="fc" id="L281">                    nRows, nCols);</span>
+        }
+<span class="fc" id="L283">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

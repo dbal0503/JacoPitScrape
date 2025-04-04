@@ -1,0 +1,294 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FunctionUtils.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Commons Math</a> &gt; <a href="index.source.html" class="el_package">org.apache.commons.math.analysis</a> &gt; <span class="el_source">FunctionUtils.java</span></div><h1>FunctionUtils.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.commons.math.analysis;
+
+import org.apache.commons.math.analysis.function.Identity;
+
+/**
+ * Utilities for manipulating function objects.
+ *
+ * @version $Id$
+ * @since 3.0
+ */
+public class FunctionUtils {
+    /**
+     * Class only contains static methods.
+     */
+    private FunctionUtils() {}
+
+    /**
+     * Compose functions.  The functions in the argument list are composed
+     * sequentially, in the order given.  For example, compose(f1,f2,f3)
+     * acts like f1(f2(f3(x))).
+     *
+     * @param f List of functions.
+     * @return the composite function.
+     */
+    public static UnivariateFunction compose(final UnivariateFunction ... f) {
+<span class="fc" id="L43">        return new UnivariateFunction() {</span>
+            /** {@inheritDoc} */
+            public double value(double x) {
+<span class="fc" id="L46">                double r = x;</span>
+<span class="fc bfc" id="L47" title="All 2 branches covered.">                for (int i = f.length - 1; i &gt;= 0; i--) {</span>
+<span class="fc" id="L48">                    r = f[i].value(r);</span>
+                }
+<span class="fc" id="L50">                return r;</span>
+            }
+        };
+    }
+
+    /**
+     * Compose functions.  The functions in the argument list are composed
+     * sequentially, in the order given.  For example, compose(f1,f2,f3)
+     * acts like f1(f2(f3(x))).
+     *
+     * @param f List of functions.
+     * @return the composite function.
+     */
+    public static DifferentiableUnivariateFunction compose(final DifferentiableUnivariateFunction ... f) {
+<span class="fc" id="L64">        return new DifferentiableUnivariateFunction() {</span>
+            /** {@inheritDoc} */
+            public double value(double x) {
+<span class="fc" id="L67">                double r = x;</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">                for (int i = f.length - 1; i &gt;= 0; i--) {</span>
+<span class="fc" id="L69">                    r = f[i].value(r);</span>
+                }
+<span class="fc" id="L71">                return r;</span>
+            }
+
+            /** {@inheritDoc} */
+            public UnivariateFunction derivative() {
+<span class="fc" id="L76">                return new UnivariateFunction() {</span>
+                    /** {@inheritDoc} */
+                    public double value(double x) {
+<span class="fc" id="L79">                        double p = 1;</span>
+<span class="fc" id="L80">                        double r = x;</span>
+<span class="fc bfc" id="L81" title="All 2 branches covered.">                        for (int i = f.length - 1; i &gt;= 0; i--) {</span>
+<span class="fc" id="L82">                            p *= f[i].derivative().value(r);</span>
+<span class="fc" id="L83">                            r = f[i].value(r);</span>
+                        }
+<span class="fc" id="L85">                        return p;</span>
+                    }
+                };
+            }
+        };
+    }
+
+    /**
+     * Add functions.
+     *
+     * @param f List of functions.
+     * @return a function that computes the sum of the functions.
+     */
+    public static UnivariateFunction add(final UnivariateFunction ... f) {
+<span class="fc" id="L99">        return new UnivariateFunction() {</span>
+            /** {@inheritDoc} */
+            public double value(double x) {
+<span class="fc" id="L102">                double r = f[0].value(x);</span>
+<span class="fc bfc" id="L103" title="All 2 branches covered.">                for (int i = 1; i &lt; f.length; i++) {</span>
+<span class="fc" id="L104">                    r += f[i].value(x);</span>
+                }
+<span class="fc" id="L106">                return r;</span>
+            }
+        };
+    }
+
+    /**
+     * Add functions.
+     *
+     * @param f List of functions.
+     * @return a function that computes the sum of the functions.
+     */
+    public static DifferentiableUnivariateFunction add(final DifferentiableUnivariateFunction ... f) {
+<span class="fc" id="L118">        return new DifferentiableUnivariateFunction() {</span>
+            /** {@inheritDoc} */
+            public double value(double x) {
+<span class="nc" id="L121">                double r = f[0].value(x);</span>
+<span class="nc bnc" id="L122" title="All 2 branches missed.">                for (int i = 1; i &lt; f.length; i++) {</span>
+<span class="nc" id="L123">                    r += f[i].value(x);</span>
+                }
+<span class="nc" id="L125">                return r;</span>
+            }
+
+            /** {@inheritDoc} */
+            public UnivariateFunction derivative() {
+<span class="fc" id="L130">                return new UnivariateFunction() {</span>
+                    /** {@inheritDoc} */
+                    public double value(double x) {
+<span class="fc" id="L133">                        double r = f[0].derivative().value(x);</span>
+<span class="fc bfc" id="L134" title="All 2 branches covered.">                        for (int i = 1; i &lt; f.length; i++) {</span>
+<span class="fc" id="L135">                            r += f[i].derivative().value(x);</span>
+                        }
+<span class="fc" id="L137">                        return r;</span>
+                    }
+                };
+            }
+        };
+    }
+
+    /**
+     * Multiply functions.
+     *
+     * @param f List of functions.
+     * @return a function that computes the product of the functions.
+     */
+    public static UnivariateFunction multiply(final UnivariateFunction ... f) {
+<span class="fc" id="L151">        return new UnivariateFunction() {</span>
+            /** {@inheritDoc} */
+            public double value(double x) {
+<span class="fc" id="L154">                double r = f[0].value(x);</span>
+<span class="fc bfc" id="L155" title="All 2 branches covered.">                for (int i = 1; i &lt; f.length; i++) {</span>
+<span class="fc" id="L156">                    r *= f[i].value(x);</span>
+                }
+<span class="fc" id="L158">                return r;</span>
+            }
+        };
+    }
+
+    /**
+     * Multiply functions.
+     *
+     * @param f List of functions.
+     * @return a function that computes the product of the functions.
+     */
+    public static DifferentiableUnivariateFunction multiply(final DifferentiableUnivariateFunction ... f) {
+<span class="fc" id="L170">        return new DifferentiableUnivariateFunction() {</span>
+            /** {@inheritDoc} */
+            public double value(double x) {
+<span class="nc" id="L173">                double r = f[0].value(x);</span>
+<span class="nc bnc" id="L174" title="All 2 branches missed.">                for (int i = 1; i &lt; f.length; i++) {</span>
+<span class="nc" id="L175">                    r *= f[i].value(x);</span>
+                }
+<span class="nc" id="L177">                return r;</span>
+            }
+
+            /** {@inheritDoc} */
+            public UnivariateFunction derivative() {
+<span class="fc" id="L182">                return new UnivariateFunction() {</span>
+                    /** {@inheritDoc} */
+                    public double value(double x) {
+<span class="fc" id="L185">                        double sum = 0;</span>
+<span class="fc bfc" id="L186" title="All 2 branches covered.">                        for (int i = 0; i &lt; f.length; i++) {</span>
+<span class="fc" id="L187">                            double prod = f[i].derivative().value(x);</span>
+<span class="fc bfc" id="L188" title="All 2 branches covered.">                            for (int j = 0; j &lt; f.length; j++) {</span>
+<span class="fc bfc" id="L189" title="All 2 branches covered.">                                if (i != j) {</span>
+<span class="fc" id="L190">                                    prod *= f[j].value(x);</span>
+                                }
+                            }
+<span class="fc" id="L193">                            sum += prod;</span>
+                        }
+<span class="fc" id="L195">                        return sum;</span>
+                    }
+                };
+            }
+        };
+    }
+
+    /**
+     * Returns the univariate function &lt;br/&gt;
+     * {@code h(x) = combiner(f(x), g(x))}.
+     *
+     * @param combiner Combiner function.
+     * @param f Function.
+     * @param g Function.
+     * @return the composite function.
+     */
+    public static UnivariateFunction combine(final BivariateRealFunction combiner,
+                                                 final UnivariateFunction f,
+                                                 final UnivariateFunction g) {
+<span class="fc" id="L214">        return new UnivariateFunction() {</span>
+            /** {@inheritDoc} */
+            public double value(double x) {
+<span class="fc" id="L217">                return combiner.value(f.value(x), g.value(x));</span>
+            }
+        };
+    }
+
+    /**
+     * Returns a MultivariateFunction h(x[]) defined by &lt;pre&gt; &lt;code&gt;
+     * h(x[]) = combiner(...combiner(combiner(initialValue,f(x[0])),f(x[1]))...),f(x[x.length-1]))
+     * &lt;/code&gt;&lt;/pre&gt;
+     *
+     * @param combiner Combiner function.
+     * @param f Function.
+     * @param initialValue Initial value.
+     * @return a collector function.
+     */
+    public static MultivariateFunction collector(final BivariateRealFunction combiner,
+                                                     final UnivariateFunction f,
+                                                     final double initialValue) {
+<span class="fc" id="L235">        return new MultivariateFunction() {</span>
+            /** {@inheritDoc} */
+            public double value(double[] point) {
+<span class="fc" id="L238">                double result = combiner.value(initialValue, f.value(point[0]));</span>
+<span class="fc bfc" id="L239" title="All 2 branches covered.">                for (int i = 1; i &lt; point.length; i++) {</span>
+<span class="fc" id="L240">                    result = combiner.value(result, f.value(point[i]));</span>
+                }
+<span class="fc" id="L242">                return result;</span>
+            }
+        };
+    }
+
+    /**
+     * Returns a MultivariateFunction h(x[]) defined by &lt;pre&gt; &lt;code&gt;
+     * h(x[]) = combiner(...combiner(combiner(initialValue,x[0]),x[1])...),x[x.length-1])
+     * &lt;/code&gt;&lt;/pre&gt;
+     *
+     * @param combiner Combiner function.
+     * @param initialValue Initial value.
+     * @return a collector function.
+     */
+    public static MultivariateFunction collector(final BivariateRealFunction combiner,
+                                                     final double initialValue) {
+<span class="fc" id="L258">        return collector(combiner, new Identity(), initialValue);</span>
+    }
+
+    /**
+     * Create a unary function by fixing the first argument of a binary function.
+     *
+     * @param f Binary function.
+     * @param fixed Value to which the first argument of {@code f} is set.
+     * @return the unary function h(x) = f(fixed, x)
+     */
+    public static UnivariateFunction fix1stArgument(final BivariateRealFunction f,
+                                                        final double fixed) {
+<span class="fc" id="L270">        return new UnivariateFunction() {</span>
+            /** {@inheritDoc} */
+            public double value(double x) {
+<span class="fc" id="L273">                return f.value(fixed, x);</span>
+            }
+        };
+    }
+    /**
+     * Create a unary function by fixing the second argument of a binary function.
+     *
+     * @param f Binary function.
+     * @param fixed Value to which the second argument of {@code f} is set.
+     * @return the unary function h(x) = f(x, fixed)
+     */
+    public static UnivariateFunction fix2ndArgument(final BivariateRealFunction f,
+                                                        final double fixed) {
+<span class="fc" id="L286">        return new UnivariateFunction() {</span>
+            /** {@inheritDoc} */
+            public double value(double x) {
+<span class="fc" id="L289">                return f.value(x, fixed);</span>
+            }
+        };
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

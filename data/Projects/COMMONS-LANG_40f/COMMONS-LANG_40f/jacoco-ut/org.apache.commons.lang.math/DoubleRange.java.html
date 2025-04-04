@@ -1,0 +1,436 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DoubleRange.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Commons Lang</a> &gt; <a href="index.source.html" class="el_package">org.apache.commons.lang.math</a> &gt; <span class="el_source">DoubleRange.java</span></div><h1>DoubleRange.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ * 
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.commons.lang.math;
+
+import java.io.Serializable;
+
+/**
+ * &lt;p&gt;&lt;code&gt;DoubleRange&lt;/code&gt; represents an inclusive range of &lt;code&gt;double&lt;/code&gt;s.&lt;/p&gt;
+ *
+ * @author Stephen Colebourne
+ * @since 2.0
+ * @version $Id$
+ */
+public final class DoubleRange extends Range implements Serializable {
+    
+    /**
+     * Required for serialization support.
+     * 
+     * @see java.io.Serializable
+     */
+    private static final long serialVersionUID = 71849363892740L;
+
+    /**
+     * The minimum number in this range (inclusive).
+     */
+    private final double min;
+    /**
+     * The maximum number in this range (inclusive).
+     */
+    private final double max;
+    
+    /**
+     * Cached output minObject (class is immutable).
+     */
+<span class="fc" id="L49">    private transient Double minObject = null;</span>
+    /**
+     * Cached output maxObject (class is immutable).
+     */
+<span class="fc" id="L53">    private transient Double maxObject = null;</span>
+    /**
+     * Cached output hashCode (class is immutable).
+     */
+<span class="fc" id="L57">    private transient int hashCode = 0;</span>
+    /**
+     * Cached output toString (class is immutable).
+     */
+<span class="fc" id="L61">    private transient String toString = null;</span>
+    
+    /**
+     * &lt;p&gt;Constructs a new &lt;code&gt;DoubleRange&lt;/code&gt; using the specified
+     * number as both the minimum and maximum in this range.&lt;/p&gt;
+     *
+     * @param number  the number to use for this range
+     * @throws IllegalArgumentException if the number is &lt;code&gt;NaN&lt;/code&gt;
+     */
+    public DoubleRange(double number) {
+<span class="fc" id="L71">        super();</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">        if (Double.isNaN(number)) {</span>
+<span class="fc" id="L73">            throw new IllegalArgumentException(&quot;The number must not be NaN&quot;);</span>
+        }
+<span class="fc" id="L75">        this.min = number;</span>
+<span class="fc" id="L76">        this.max = number;</span>
+<span class="fc" id="L77">    }</span>
+
+    /**
+     * &lt;p&gt;Constructs a new &lt;code&gt;DoubleRange&lt;/code&gt; using the specified
+     * number as both the minimum and maximum in this range.&lt;/p&gt;
+     *
+     * @param number  the number to use for this range, must not
+     *  be &lt;code&gt;null&lt;/code&gt;
+     * @throws IllegalArgumentException if the number is &lt;code&gt;null&lt;/code&gt;
+     * @throws IllegalArgumentException if the number is &lt;code&gt;NaN&lt;/code&gt;
+     */
+    public DoubleRange(Number number) {
+<span class="fc" id="L89">        super();</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">        if (number == null) {</span>
+<span class="fc" id="L91">            throw new IllegalArgumentException(&quot;The number must not be null&quot;);</span>
+        }
+<span class="fc" id="L93">        this.min = number.doubleValue();</span>
+<span class="fc" id="L94">        this.max = number.doubleValue();</span>
+<span class="pc bpc" id="L95" title="1 of 4 branches missed.">        if (Double.isNaN(min) || Double.isNaN(max)) {</span>
+<span class="fc" id="L96">            throw new IllegalArgumentException(&quot;The number must not be NaN&quot;);</span>
+        }
+<span class="fc bfc" id="L98" title="All 2 branches covered.">        if (number instanceof Double) {</span>
+<span class="fc" id="L99">            this.minObject = (Double) number;</span>
+<span class="fc" id="L100">            this.maxObject = (Double) number;</span>
+        }
+<span class="fc" id="L102">    }</span>
+
+    /**
+     * &lt;p&gt;Constructs a new &lt;code&gt;DoubleRange&lt;/code&gt; with the specified
+     * minimum and maximum numbers (both inclusive).&lt;/p&gt;
+     * 
+     * &lt;p&gt;The arguments may be passed in the order (min,max) or (max,min). The
+     * getMinimum and getMaximum methods will return the correct values.&lt;/p&gt;
+     * 
+     * @param number1  first number that defines the edge of the range, inclusive
+     * @param number2  second number that defines the edge of the range, inclusive
+     * @throws IllegalArgumentException if either number is &lt;code&gt;NaN&lt;/code&gt;
+     */
+    public DoubleRange(double number1, double number2) {
+<span class="fc" id="L116">        super();</span>
+<span class="pc bpc" id="L117" title="1 of 4 branches missed.">        if (Double.isNaN(number1) || Double.isNaN(number2)) {</span>
+<span class="fc" id="L118">            throw new IllegalArgumentException(&quot;The numbers must not be NaN&quot;);</span>
+        }
+<span class="fc bfc" id="L120" title="All 2 branches covered.">        if (number2 &lt; number1) {</span>
+<span class="fc" id="L121">            this.min = number2;</span>
+<span class="fc" id="L122">            this.max = number1;</span>
+        } else {
+<span class="fc" id="L124">            this.min = number1;</span>
+<span class="fc" id="L125">            this.max = number2;</span>
+        }
+<span class="fc" id="L127">    }</span>
+
+    /**
+     * &lt;p&gt;Constructs a new &lt;code&gt;DoubleRange&lt;/code&gt; with the specified
+     * minimum and maximum numbers (both inclusive).&lt;/p&gt;
+     * 
+     * &lt;p&gt;The arguments may be passed in the order (min,max) or (max,min). The
+     * getMinimum and getMaximum methods will return the correct values.&lt;/p&gt;
+     *
+     * @param number1  first number that defines the edge of the range, inclusive
+     * @param number2  second number that defines the edge of the range, inclusive
+     * @throws IllegalArgumentException if either number is &lt;code&gt;null&lt;/code&gt;
+     * @throws IllegalArgumentException if either number is &lt;code&gt;NaN&lt;/code&gt;
+     */
+    public DoubleRange(Number number1, Number number2) {
+<span class="fc" id="L142">        super();</span>
+<span class="fc bfc" id="L143" title="All 4 branches covered.">        if (number1 == null || number2 == null) {</span>
+<span class="fc" id="L144">            throw new IllegalArgumentException(&quot;The numbers must not be null&quot;);</span>
+        }
+<span class="fc" id="L146">        double number1val = number1.doubleValue();</span>
+<span class="fc" id="L147">        double number2val = number2.doubleValue();</span>
+<span class="pc bpc" id="L148" title="1 of 4 branches missed.">        if (Double.isNaN(number1val) || Double.isNaN(number2val)) {</span>
+<span class="fc" id="L149">            throw new IllegalArgumentException(&quot;The numbers must not be NaN&quot;);</span>
+        }
+<span class="fc bfc" id="L151" title="All 2 branches covered.">        if (number2val &lt; number1val) {</span>
+<span class="fc" id="L152">            this.min = number2val;</span>
+<span class="fc" id="L153">            this.max = number1val;</span>
+<span class="fc bfc" id="L154" title="All 2 branches covered.">            if (number2 instanceof Double) {</span>
+<span class="fc" id="L155">                this.minObject = (Double) number2;</span>
+            }
+<span class="fc bfc" id="L157" title="All 2 branches covered.">            if (number1 instanceof Double) {</span>
+<span class="fc" id="L158">                this.maxObject = (Double) number1;</span>
+            }
+        } else {
+<span class="fc" id="L161">            this.min = number1val;</span>
+<span class="fc" id="L162">            this.max = number2val;</span>
+<span class="fc bfc" id="L163" title="All 2 branches covered.">            if (number1 instanceof Double) {</span>
+<span class="fc" id="L164">                this.minObject = (Double) number1;</span>
+            }
+<span class="fc bfc" id="L166" title="All 2 branches covered.">            if (number2 instanceof Double) {</span>
+<span class="fc" id="L167">                this.maxObject = (Double) number2;</span>
+            }
+        }
+<span class="fc" id="L170">    }</span>
+
+    // Accessors
+    //--------------------------------------------------------------------
+
+    /**
+     * &lt;p&gt;Returns the minimum number in this range.&lt;/p&gt;
+     *
+     * @return the minimum number in this range
+     */
+    @Override
+    public Number getMinimumNumber() {
+<span class="fc bfc" id="L182" title="All 2 branches covered.">        if (minObject == null) {</span>
+<span class="fc" id="L183">            minObject = new Double(min);            </span>
+        }
+<span class="fc" id="L185">        return minObject;</span>
+    }
+
+    /**
+     * &lt;p&gt;Gets the minimum number in this range as a &lt;code&gt;long&lt;/code&gt;.&lt;/p&gt;
+     * 
+     * &lt;p&gt;This conversion can lose information for large values or decimals.&lt;/p&gt;
+     *
+     * @return the minimum number in this range
+     */
+    @Override
+    public long getMinimumLong() {
+<span class="fc" id="L197">        return (long) min;</span>
+    }
+
+    /**
+     * &lt;p&gt;Gets the minimum number in this range as a &lt;code&gt;int&lt;/code&gt;.&lt;/p&gt;
+     * 
+     * &lt;p&gt;This conversion can lose information for large values or decimals.&lt;/p&gt;
+     *
+     * @return the minimum number in this range
+     */
+    @Override
+    public int getMinimumInteger() {
+<span class="fc" id="L209">        return (int) min;</span>
+    }
+
+    /**
+     * &lt;p&gt;Gets the minimum number in this range as a &lt;code&gt;double&lt;/code&gt;.&lt;/p&gt;
+     *
+     * @return the minimum number in this range
+     */
+    @Override
+    public double getMinimumDouble() {
+<span class="fc" id="L219">        return min;</span>
+    }
+
+    /**
+     * &lt;p&gt;Gets the minimum number in this range as a &lt;code&gt;float&lt;/code&gt;.&lt;/p&gt;
+     * 
+     * &lt;p&gt;This conversion can lose information for large values.&lt;/p&gt;
+     *
+     * @return the minimum number in this range
+     */
+    @Override
+    public float getMinimumFloat() {
+<span class="fc" id="L231">        return (float) min;</span>
+    }
+
+    /**
+     * &lt;p&gt;Returns the maximum number in this range.&lt;/p&gt;
+     *
+     * @return the maximum number in this range
+     */
+    @Override
+    public Number getMaximumNumber() {
+<span class="fc bfc" id="L241" title="All 2 branches covered.">        if (maxObject == null) {</span>
+<span class="fc" id="L242">            maxObject = new Double(max);            </span>
+        }
+<span class="fc" id="L244">        return maxObject;</span>
+    }
+
+    /**
+     * &lt;p&gt;Gets the maximum number in this range as a &lt;code&gt;long&lt;/code&gt;.&lt;/p&gt;
+     * 
+     * &lt;p&gt;This conversion can lose information for large values or decimals.&lt;/p&gt;
+     *
+     * @return the maximum number in this range
+     */
+    @Override
+    public long getMaximumLong() {
+<span class="fc" id="L256">        return (long) max;</span>
+    }
+
+    /**
+     * &lt;p&gt;Gets the maximum number in this range as a &lt;code&gt;int&lt;/code&gt;.&lt;/p&gt;
+     * 
+     * &lt;p&gt;This conversion can lose information for large values or decimals.&lt;/p&gt;
+     *
+     * @return the maximum number in this range
+     */
+    @Override
+    public int getMaximumInteger() {
+<span class="fc" id="L268">        return (int) max;</span>
+    }
+
+    /**
+     * &lt;p&gt;Gets the maximum number in this range as a &lt;code&gt;double&lt;/code&gt;.&lt;/p&gt;
+     *
+     * @return the maximum number in this range
+     */
+    @Override
+    public double getMaximumDouble() {
+<span class="fc" id="L278">        return max;</span>
+    }
+
+    /**
+     * &lt;p&gt;Gets the maximum number in this range as a &lt;code&gt;float&lt;/code&gt;.&lt;/p&gt;
+     * 
+     * &lt;p&gt;This conversion can lose information for large values.&lt;/p&gt;
+     *
+     * @return the maximum number in this range
+     */
+    @Override
+    public float getMaximumFloat() {
+<span class="fc" id="L290">        return (float) max;</span>
+    }
+
+    // Tests
+    //--------------------------------------------------------------------
+    
+    /**
+     * &lt;p&gt;Tests whether the specified &lt;code&gt;number&lt;/code&gt; occurs within
+     * this range using &lt;code&gt;double&lt;/code&gt; comparison.&lt;/p&gt;
+     * 
+     * &lt;p&gt;&lt;code&gt;null&lt;/code&gt; is handled and returns &lt;code&gt;false&lt;/code&gt;.&lt;/p&gt;
+     *
+     * @param number  the number to test, may be &lt;code&gt;null&lt;/code&gt;
+     * @return &lt;code&gt;true&lt;/code&gt; if the specified number occurs within this range
+     */
+    @Override
+    public boolean containsNumber(Number number) {
+<span class="fc bfc" id="L307" title="All 2 branches covered.">        if (number == null) {</span>
+<span class="fc" id="L308">            return false;</span>
+        }
+<span class="fc" id="L310">        return containsDouble(number.doubleValue());</span>
+    }
+
+    /**
+     * &lt;p&gt;Tests whether the specified &lt;code&gt;double&lt;/code&gt; occurs within
+     * this range using &lt;code&gt;double&lt;/code&gt; comparison.&lt;/p&gt;
+     * 
+     * &lt;p&gt;This implementation overrides the superclass for performance as it is
+     * the most common case.&lt;/p&gt;
+     * 
+     * @param value  the double to test
+     * @return &lt;code&gt;true&lt;/code&gt; if the specified number occurs within this
+     *  range by &lt;code&gt;double&lt;/code&gt; comparison
+     */
+    @Override
+    public boolean containsDouble(double value) {
+<span class="fc bfc" id="L326" title="All 4 branches covered.">        return value &gt;= min &amp;&amp; value &lt;= max;</span>
+    }
+
+    // Range tests
+    //--------------------------------------------------------------------
+
+    /**
+     * &lt;p&gt;Tests whether the specified range occurs entirely within this range
+     * using &lt;code&gt;double&lt;/code&gt; comparison.&lt;/p&gt;
+     * 
+     * &lt;p&gt;&lt;code&gt;null&lt;/code&gt; is handled and returns &lt;code&gt;false&lt;/code&gt;.&lt;/p&gt;
+     *
+     * @param range  the range to test, may be &lt;code&gt;null&lt;/code&gt;
+     * @return &lt;code&gt;true&lt;/code&gt; if the specified range occurs entirely within this range
+     * @throws IllegalArgumentException if the range is not of this type
+     */
+    @Override
+    public boolean containsRange(Range range) {
+<span class="fc bfc" id="L344" title="All 2 branches covered.">        if (range == null) {</span>
+<span class="fc" id="L345">            return false;</span>
+        }
+<span class="fc bfc" id="L347" title="All 2 branches covered.">        return containsDouble(range.getMinimumDouble())</span>
+<span class="fc bfc" id="L348" title="All 2 branches covered.">            &amp;&amp; containsDouble(range.getMaximumDouble());</span>
+    }
+
+    /**
+     * &lt;p&gt;Tests whether the specified range overlaps with this range
+     * using &lt;code&gt;double&lt;/code&gt; comparison.&lt;/p&gt;
+     * 
+     * &lt;p&gt;&lt;code&gt;null&lt;/code&gt; is handled and returns &lt;code&gt;false&lt;/code&gt;.&lt;/p&gt;
+     *
+     * @param range  the range to test, may be &lt;code&gt;null&lt;/code&gt;
+     * @return &lt;code&gt;true&lt;/code&gt; if the specified range overlaps with this range
+     */
+    @Override
+    public boolean overlapsRange(Range range) {
+<span class="fc bfc" id="L362" title="All 2 branches covered.">        if (range == null) {</span>
+<span class="fc" id="L363">            return false;</span>
+        }
+<span class="fc bfc" id="L365" title="All 2 branches covered.">        return range.containsDouble(min)</span>
+<span class="fc bfc" id="L366" title="All 2 branches covered.">            || range.containsDouble(max)</span>
+<span class="fc bfc" id="L367" title="All 2 branches covered.">            || containsDouble(range.getMinimumDouble());</span>
+    }
+
+    // Basics
+    //--------------------------------------------------------------------
+
+    /**
+     * &lt;p&gt;Compares this range to another object to test if they are equal.&lt;/p&gt;.
+     * 
+     * &lt;p&gt;To be equal, the class, minimum and maximum must be equal.&lt;/p&gt;
+     *
+     * @param obj the reference object with which to compare
+     * @return &lt;code&gt;true&lt;/code&gt; if this object is equal
+     */
+    @Override
+    public boolean equals(Object obj) {
+<span class="fc bfc" id="L383" title="All 2 branches covered.">        if (obj == this) {</span>
+<span class="fc" id="L384">            return true;</span>
+        }
+<span class="fc bfc" id="L386" title="All 2 branches covered.">        if (obj instanceof DoubleRange == false) {</span>
+<span class="fc" id="L387">            return false;</span>
+        }
+<span class="fc" id="L389">        DoubleRange range = (DoubleRange) obj;</span>
+<span class="fc bfc" id="L390" title="All 2 branches covered.">        return (Double.doubleToLongBits(min) == Double.doubleToLongBits(range.min) &amp;&amp;</span>
+<span class="fc bfc" id="L391" title="All 2 branches covered.">                Double.doubleToLongBits(max) == Double.doubleToLongBits(range.max));</span>
+    }
+
+    /**
+     * &lt;p&gt;Gets a hashCode for the range.&lt;/p&gt;
+     *
+     * @return a hash code value for this object
+     */
+    @Override
+    public int hashCode() {
+<span class="fc" id="L401">        int temp = hashCode;</span>
+<span class="fc bfc" id="L402" title="All 2 branches covered.">        if (temp == 0) {</span>
+<span class="fc" id="L403">            temp = 17;</span>
+<span class="fc" id="L404">            temp = 37 * temp + getClass().hashCode();</span>
+<span class="fc" id="L405">            long lng = Double.doubleToLongBits(min);</span>
+<span class="fc" id="L406">            temp = 37 * temp + ((int) (lng ^ (lng &gt;&gt; 32)));</span>
+<span class="fc" id="L407">            lng = Double.doubleToLongBits(max);</span>
+<span class="fc" id="L408">            temp = 37 * temp + ((int) (lng ^ (lng &gt;&gt; 32)));</span>
+<span class="fc" id="L409">            hashCode = temp;</span>
+        }
+<span class="fc" id="L411">        return hashCode;</span>
+    }
+
+    /**
+     * &lt;p&gt;Gets the range as a &lt;code&gt;String&lt;/code&gt;.&lt;/p&gt;
+     *
+     * &lt;p&gt;The format of the String is 'Range[&lt;i&gt;min&lt;/i&gt;,&lt;i&gt;max&lt;/i&gt;]'.&lt;/p&gt;
+     *
+     * @return the &lt;code&gt;String&lt;/code&gt; representation of this range
+     */
+    @Override
+    public String toString() {
+<span class="fc bfc" id="L423" title="All 2 branches covered.">        if (toString == null) {</span>
+<span class="fc" id="L424">            StringBuilder buf = new StringBuilder(32);</span>
+<span class="fc" id="L425">            buf.append(&quot;Range[&quot;);</span>
+<span class="fc" id="L426">            buf.append(min);</span>
+<span class="fc" id="L427">            buf.append(',');</span>
+<span class="fc" id="L428">            buf.append(max);</span>
+<span class="fc" id="L429">            buf.append(']');</span>
+<span class="fc" id="L430">            toString = buf.toString();</span>
+        }
+<span class="fc" id="L432">        return toString;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

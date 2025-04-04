@@ -1,0 +1,256 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GJLocaleSymbols.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Joda time</a> &gt; <a href="index.source.html" class="el_package">org.joda.time.chrono</a> &gt; <span class="el_source">GJLocaleSymbols.java</span></div><h1>GJLocaleSymbols.java</h1><pre class="source lang-java linenums">/*
+ *  Copyright 2001-2009 Stephen Colebourne
+ *
+ *  Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+package org.joda.time.chrono;
+
+import java.lang.ref.WeakReference;
+import java.text.DateFormatSymbols;
+import java.util.Locale;
+import java.util.TreeMap;
+import java.util.WeakHashMap;
+
+import org.joda.time.DateTimeFieldType;
+import org.joda.time.DateTimeUtils;
+import org.joda.time.IllegalFieldValueException;
+
+/**
+ * Utility class used by a few of the GJDateTimeFields.
+ *
+ * @author Brian S O'Neill
+ * @since 1.0
+ */
+class GJLocaleSymbols {
+    private static final int FAST_CACHE_SIZE = 64;
+
+<span class="fc" id="L37">    private static final GJLocaleSymbols[] cFastCache = new GJLocaleSymbols[FAST_CACHE_SIZE];</span>
+
+<span class="fc" id="L39">    private static WeakHashMap&lt;Locale, GJLocaleSymbols&gt; cCache = new WeakHashMap&lt;Locale, GJLocaleSymbols&gt;();</span>
+
+    public static GJLocaleSymbols forLocale(Locale locale) {
+<span class="fc bfc" id="L42" title="All 2 branches covered.">        if (locale == null) {</span>
+<span class="fc" id="L43">            locale = Locale.getDefault();</span>
+        }
+<span class="fc" id="L45">        int index = System.identityHashCode(locale) &amp; (FAST_CACHE_SIZE - 1);</span>
+<span class="fc" id="L46">        GJLocaleSymbols symbols = cFastCache[index];</span>
+<span class="pc bpc" id="L47" title="1 of 4 branches missed.">        if (symbols != null &amp;&amp; symbols.iLocale.get() == locale) {</span>
+<span class="fc" id="L48">            return symbols;</span>
+        }
+<span class="fc" id="L50">        synchronized (cCache) {</span>
+<span class="fc" id="L51">            symbols = cCache.get(locale);</span>
+<span class="pc bpc" id="L52" title="1 of 2 branches missed.">            if (symbols == null) {</span>
+<span class="fc" id="L53">                symbols = new GJLocaleSymbols(locale);</span>
+<span class="fc" id="L54">                cCache.put(locale, symbols);</span>
+            }
+<span class="fc" id="L56">        }</span>
+<span class="fc" id="L57">        cFastCache[index] = symbols;</span>
+<span class="fc" id="L58">        return symbols;</span>
+    }
+
+    private static String[] realignMonths(String[] months) {
+<span class="fc" id="L62">        String[] a = new String[13];</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">        for (int i=1; i&lt;13; i++) {</span>
+<span class="fc" id="L64">            a[i] = months[i - 1];</span>
+        }
+<span class="fc" id="L66">        return a;</span>
+    }
+
+    private static String[] realignDaysOfWeek(String[] daysOfWeek) {
+<span class="fc" id="L70">        String[] a = new String[8];</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">        for (int i=1; i&lt;8; i++) {</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">            a[i] = daysOfWeek[(i &lt; 7) ? i + 1 : 1];</span>
+        }
+<span class="fc" id="L74">        return a;</span>
+    }
+
+    private static void addSymbols(TreeMap&lt;String, Integer&gt; map, String[] symbols, Integer[] integers) {
+<span class="fc bfc" id="L78" title="All 2 branches covered.">        for (int i=symbols.length; --i&gt;=0; ) {</span>
+<span class="fc" id="L79">            String symbol = symbols[i];</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">            if (symbol != null) {</span>
+<span class="fc" id="L81">                map.put(symbol, integers[i]);</span>
+            }
+<span class="fc" id="L83">        }</span>
+<span class="fc" id="L84">    }</span>
+
+    private static void addNumerals(TreeMap&lt;String, Integer&gt; map, int start, int end, Integer[] integers) {
+<span class="fc bfc" id="L87" title="All 2 branches covered.">        for (int i=start; i&lt;=end; i++) {</span>
+<span class="fc" id="L88">            map.put(String.valueOf(i).intern(), integers[i]);</span>
+        }
+<span class="fc" id="L90">    }</span>
+
+    private static int maxLength(String[] a) {
+<span class="fc" id="L93">        int max = 0;</span>
+<span class="fc bfc" id="L94" title="All 2 branches covered.">        for (int i=a.length; --i&gt;=0; ) {</span>
+<span class="fc" id="L95">            String s = a[i];</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">            if (s != null) {</span>
+<span class="fc" id="L97">                int len = s.length();</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">                if (len &gt; max) {</span>
+<span class="fc" id="L99">                    max = len;</span>
+                }
+            }
+<span class="fc" id="L102">        }</span>
+<span class="fc" id="L103">        return max;</span>
+    }
+
+    private final WeakReference&lt;Locale&gt; iLocale;
+
+    private final String[] iEras;
+    private final String[] iDaysOfWeek;
+    private final String[] iShortDaysOfWeek;
+    private final String[] iMonths;
+    private final String[] iShortMonths;
+    private final String[] iHalfday;
+
+    private final TreeMap&lt;String, Integer&gt; iParseEras;
+    private final TreeMap&lt;String, Integer&gt; iParseDaysOfWeek;
+    private final TreeMap&lt;String, Integer&gt; iParseMonths;
+
+    private final int iMaxEraLength;
+    private final int iMaxDayOfWeekLength;
+    private final int iMaxShortDayOfWeekLength;
+    private final int iMaxMonthLength;
+    private final int iMaxShortMonthLength;
+    private final int iMaxHalfdayLength;
+
+    /**
+     * @param locale must not be null
+     */
+<span class="fc" id="L129">    private GJLocaleSymbols(Locale locale) {</span>
+<span class="fc" id="L130">        iLocale = new WeakReference&lt;Locale&gt;(locale);</span>
+        
+<span class="fc" id="L132">        DateFormatSymbols dfs = DateTimeUtils.getDateFormatSymbols(locale);</span>
+        
+<span class="fc" id="L134">        iEras = dfs.getEras();</span>
+<span class="fc" id="L135">        iDaysOfWeek = realignDaysOfWeek(dfs.getWeekdays());</span>
+<span class="fc" id="L136">        iShortDaysOfWeek = realignDaysOfWeek(dfs.getShortWeekdays());</span>
+<span class="fc" id="L137">        iMonths = realignMonths(dfs.getMonths());</span>
+<span class="fc" id="L138">        iShortMonths = realignMonths(dfs.getShortMonths());</span>
+<span class="fc" id="L139">        iHalfday = dfs.getAmPmStrings();</span>
+
+<span class="fc" id="L141">        Integer[] integers = new Integer[13];</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">        for (int i=0; i&lt;13; i++) {</span>
+<span class="fc" id="L143">            integers[i] = Integer.valueOf(i);</span>
+        }
+
+<span class="fc" id="L146">        iParseEras = new TreeMap&lt;String, Integer&gt;(String.CASE_INSENSITIVE_ORDER);</span>
+<span class="fc" id="L147">        addSymbols(iParseEras, iEras, integers);</span>
+<span class="fc bfc" id="L148" title="All 2 branches covered.">        if (&quot;en&quot;.equals(locale.getLanguage())) {</span>
+            // Include support for parsing &quot;BCE&quot; and &quot;CE&quot; if the language is
+            // English. At some point Joda-Time will need an independent set of
+            // localized symbols and not depend on java.text.DateFormatSymbols.
+<span class="fc" id="L152">            iParseEras.put(&quot;BCE&quot;, integers[0]);</span>
+<span class="fc" id="L153">            iParseEras.put(&quot;CE&quot;, integers[1]);</span>
+        }
+
+<span class="fc" id="L156">        iParseDaysOfWeek = new TreeMap&lt;String, Integer&gt;(String.CASE_INSENSITIVE_ORDER);</span>
+<span class="fc" id="L157">        addSymbols(iParseDaysOfWeek, iDaysOfWeek, integers);</span>
+<span class="fc" id="L158">        addSymbols(iParseDaysOfWeek, iShortDaysOfWeek, integers);</span>
+<span class="fc" id="L159">        addNumerals(iParseDaysOfWeek, 1, 7, integers);</span>
+
+<span class="fc" id="L161">        iParseMonths = new TreeMap&lt;String, Integer&gt;(String.CASE_INSENSITIVE_ORDER);</span>
+<span class="fc" id="L162">        addSymbols(iParseMonths, iMonths, integers);</span>
+<span class="fc" id="L163">        addSymbols(iParseMonths, iShortMonths, integers);</span>
+<span class="fc" id="L164">        addNumerals(iParseMonths, 1, 12, integers);</span>
+
+<span class="fc" id="L166">        iMaxEraLength = maxLength(iEras);</span>
+<span class="fc" id="L167">        iMaxDayOfWeekLength = maxLength(iDaysOfWeek);</span>
+<span class="fc" id="L168">        iMaxShortDayOfWeekLength = maxLength(iShortDaysOfWeek);</span>
+<span class="fc" id="L169">        iMaxMonthLength = maxLength(iMonths);</span>
+<span class="fc" id="L170">        iMaxShortMonthLength = maxLength(iShortMonths);</span>
+<span class="fc" id="L171">        iMaxHalfdayLength = maxLength(iHalfday);</span>
+<span class="fc" id="L172">    }</span>
+
+    public String eraValueToText(int value) {
+<span class="fc" id="L175">        return iEras[value];</span>
+    }
+
+    public int eraTextToValue(String text) {
+<span class="fc" id="L179">        Integer era = iParseEras.get(text);</span>
+<span class="fc bfc" id="L180" title="All 2 branches covered.">        if (era != null) {</span>
+<span class="fc" id="L181">            return era.intValue();</span>
+        }
+<span class="fc" id="L183">        throw new IllegalFieldValueException(DateTimeFieldType.era(), text);</span>
+    }
+
+    public int getEraMaxTextLength() {
+<span class="fc" id="L187">        return iMaxEraLength;</span>
+    }
+
+    public String monthOfYearValueToText(int value) {
+<span class="fc" id="L191">        return iMonths[value];</span>
+    }
+
+    public String monthOfYearValueToShortText(int value) {
+<span class="fc" id="L195">        return iShortMonths[value];</span>
+    }
+
+    public int monthOfYearTextToValue(String text) {
+<span class="fc" id="L199">        Integer month = iParseMonths.get(text);</span>
+<span class="fc bfc" id="L200" title="All 2 branches covered.">        if (month != null) {</span>
+<span class="fc" id="L201">            return month.intValue();</span>
+        }
+<span class="fc" id="L203">        throw new IllegalFieldValueException(DateTimeFieldType.monthOfYear(), text);</span>
+    }
+
+    public int getMonthMaxTextLength() {
+<span class="fc" id="L207">        return iMaxMonthLength;</span>
+    }
+
+    public int getMonthMaxShortTextLength() {
+<span class="fc" id="L211">        return iMaxShortMonthLength;</span>
+    }
+
+    public String dayOfWeekValueToText(int value) {
+<span class="fc" id="L215">        return iDaysOfWeek[value];</span>
+    }
+
+    public String dayOfWeekValueToShortText(int value) {
+<span class="fc" id="L219">        return iShortDaysOfWeek[value];</span>
+    }
+
+    public int dayOfWeekTextToValue(String text) {
+<span class="fc" id="L223">        Integer day = iParseDaysOfWeek.get(text);</span>
+<span class="fc bfc" id="L224" title="All 2 branches covered.">        if (day != null) {</span>
+<span class="fc" id="L225">            return day.intValue();</span>
+        }
+<span class="fc" id="L227">        throw new IllegalFieldValueException(DateTimeFieldType.dayOfWeek(), text);</span>
+    }
+
+    public int getDayOfWeekMaxTextLength() {
+<span class="fc" id="L231">        return iMaxDayOfWeekLength;</span>
+    }
+
+    public int getDayOfWeekMaxShortTextLength() {
+<span class="fc" id="L235">        return iMaxShortDayOfWeekLength;</span>
+    }
+
+    public String halfdayValueToText(int value) {
+<span class="fc" id="L239">        return iHalfday[value];</span>
+    }
+
+    public int halfdayTextToValue(String text) {
+<span class="fc" id="L243">        String[] halfday = iHalfday;</span>
+<span class="fc bfc" id="L244" title="All 2 branches covered.">        for (int i = halfday.length; --i&gt;=0; ) {</span>
+<span class="fc bfc" id="L245" title="All 2 branches covered.">            if (halfday[i].equalsIgnoreCase(text)) {</span>
+<span class="fc" id="L246">                return i;</span>
+            }
+        }
+<span class="fc" id="L249">        throw new IllegalFieldValueException(DateTimeFieldType.halfdayOfDay(), text);</span>
+    }
+
+    public int getHalfdayMaxTextLength() {
+<span class="fc" id="L253">        return iMaxHalfdayLength;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

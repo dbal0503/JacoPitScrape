@@ -1,0 +1,538 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DefaultXmlPrettyPrinter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Jackson-dataformat-XML</a> &gt; <a href="index.source.html" class="el_package">com.fasterxml.jackson.dataformat.xml.util</a> &gt; <span class="el_source">DefaultXmlPrettyPrinter.java</span></div><h1>DefaultXmlPrettyPrinter.java</h1><pre class="source lang-java linenums">package com.fasterxml.jackson.dataformat.xml.util;
+
+import java.io.IOException;
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.util.Arrays;
+
+import javax.xml.stream.XMLStreamException;
+
+import org.codehaus.stax2.XMLStreamWriter2;
+
+import com.fasterxml.jackson.core.*;
+import com.fasterxml.jackson.core.util.Instantiatable;
+
+import com.fasterxml.jackson.dataformat.xml.XmlPrettyPrinter;
+import com.fasterxml.jackson.dataformat.xml.ser.ToXmlGenerator;
+
+/**
+ * Indentation to use with XML is different from JSON, because JSON
+ * requires use of separator characters and XML just basic whitespace.
+ *&lt;p&gt;
+ * Note that only a subset of methods of {@link PrettyPrinter} actually
+ * get called by {@link ToXmlGenerator}; because of this, implementation
+ * is bit briefer (and uglier...).
+ */
+public class DefaultXmlPrettyPrinter
+    implements XmlPrettyPrinter, Instantiatable&lt;DefaultXmlPrettyPrinter&gt;,
+        java.io.Serializable
+{
+    private static final long serialVersionUID = 1L; // since 2.6
+
+    /**
+     * Interface that defines objects that can produce indentation used
+     * to separate object entries and array values. Indentation in this
+     * context just means insertion of white space, independent of whether
+     * linefeeds are output.
+     */
+    public interface Indenter
+    {
+        public void writeIndentation(JsonGenerator g, int level) throws IOException;
+
+        public void writeIndentation(XMLStreamWriter2 sw, int level) throws XMLStreamException;
+
+        /**
+         * @return True if indenter is considered inline (does not add linefeeds),
+         *   false otherwise
+         */
+        public boolean isInline();
+    }
+
+    /*
+    /**********************************************************
+    /* Configuration
+    /**********************************************************
+     */
+
+    /**
+     * By default, let's use only spaces to separate array values.
+     */
+<span class="fc" id="L60">    protected Indenter _arrayIndenter = new FixedSpaceIndenter();</span>
+
+    /**
+     * By default, let's use linefeed-adding indenter for separate
+     * object entries. We'll further configure indenter to use
+     * system-specific linefeeds, and 2 spaces per level (as opposed to,
+     * say, single tabs)
+     */
+<span class="fc" id="L68">    protected Indenter _objectIndenter = new Lf2SpacesIndenter();</span>
+
+    // // // Config, other white space configuration
+
+    /**
+     * By default we will add spaces around colons used to
+     * separate object fields and values.
+     * If disabled, will not use spaces around colon.
+     */
+<span class="fc" id="L77">    protected boolean _spacesInObjectEntries = true;</span>
+
+    /*
+    /**********************************************************
+    /* State
+    /**********************************************************
+    */
+    
+    /**
+     * Number of open levels of nesting. Used to determine amount of
+     * indentation to use.
+     */
+<span class="fc" id="L89">    protected transient int _nesting = 0;</span>
+
+    /**
+     * Marker flag set on start element, and cleared if an end element
+     * is encountered. Used for suppressing indentation to allow empty
+     * elements.
+     * 
+     * @since 2.3
+     */
+    protected transient boolean _justHadStartElement;
+    
+    /*
+    /**********************************************************
+    /* Life-cycle (construct, configure)
+    /**********************************************************
+    */
+
+<span class="fc" id="L106">    public DefaultXmlPrettyPrinter() { }</span>
+
+    protected DefaultXmlPrettyPrinter(DefaultXmlPrettyPrinter base)
+<span class="fc" id="L109">    {</span>
+<span class="fc" id="L110">        _arrayIndenter = base._arrayIndenter;</span>
+<span class="fc" id="L111">        _objectIndenter = base._objectIndenter;</span>
+<span class="fc" id="L112">        _spacesInObjectEntries = base._spacesInObjectEntries;</span>
+<span class="fc" id="L113">        _nesting = base._nesting;</span>
+<span class="fc" id="L114">    }</span>
+
+    public void indentArraysWith(Indenter i)
+    {
+<span class="nc bnc" id="L118" title="All 2 branches missed.">        _arrayIndenter = (i == null) ? new NopIndenter() : i;</span>
+<span class="nc" id="L119">    }</span>
+
+    public void indentObjectsWith(Indenter i)
+    {
+<span class="nc bnc" id="L123" title="All 2 branches missed.">        _objectIndenter = (i == null) ? new NopIndenter() : i;</span>
+<span class="nc" id="L124">    }</span>
+
+<span class="nc" id="L126">    public void spacesInObjectEntries(boolean b) { _spacesInObjectEntries = b; }</span>
+
+    /*
+    /**********************************************************
+    /* Instantiatable impl
+    /**********************************************************
+     */
+    
+    @Override
+    public DefaultXmlPrettyPrinter createInstance() {
+<span class="fc" id="L136">        return new DefaultXmlPrettyPrinter(this);</span>
+    }
+
+    /*
+    /**********************************************************
+    /* PrettyPrinter impl
+    /**********************************************************
+     */
+
+    @Override
+    public void writeRootValueSeparator(JsonGenerator gen) throws IOException {
+        // Not sure if this should ever be applicable; but if multiple roots were allowed, we'd use linefeed
+<span class="nc" id="L148">        gen.writeRaw('\n');</span>
+<span class="nc" id="L149">    }</span>
+    
+    /*
+    /**********************************************************
+    /* Array values
+    /**********************************************************
+     */
+    
+    @Override
+    public void beforeArrayValues(JsonGenerator gen) throws IOException {
+        // never called for ToXmlGenerator
+<span class="nc" id="L160">    }</span>
+
+    @Override
+    public void writeStartArray(JsonGenerator gen) throws IOException {
+        // anything to do here?
+<span class="fc" id="L165">    }</span>
+
+    @Override
+    public void writeArrayValueSeparator(JsonGenerator gen)  throws IOException {
+        // never called for ToXmlGenerator
+<span class="nc" id="L170">    }</span>
+
+    @Override
+    public void writeEndArray(JsonGenerator gen, int nrOfValues) throws IOException {
+        // anything to do here?
+<span class="fc" id="L175">    }</span>
+    
+    /*
+    /**********************************************************
+    /* Object values
+    /**********************************************************
+     */
+
+    @Override
+    public void beforeObjectEntries(JsonGenerator gen)
+        throws IOException, JsonGenerationException
+    {
+        // never called for ToXmlGenerator
+<span class="nc" id="L188">    }</span>
+
+    @Override
+    public void writeStartObject(JsonGenerator gen) throws IOException
+    {
+<span class="pc bpc" id="L193" title="1 of 2 branches missed.">        if (!_objectIndenter.isInline()) {</span>
+<span class="fc bfc" id="L194" title="All 2 branches covered.">            if (_nesting &gt; 0) {</span>
+<span class="fc" id="L195">                _objectIndenter.writeIndentation(gen, _nesting);</span>
+            }
+<span class="fc" id="L197">            ++_nesting;</span>
+        }
+<span class="fc" id="L199">        _justHadStartElement = true;</span>
+<span class="fc" id="L200">        ((ToXmlGenerator) gen)._handleStartObject();</span>
+<span class="fc" id="L201">    }</span>
+
+    @Override
+    public void writeObjectEntrySeparator(JsonGenerator gen) throws IOException {
+        // never called for ToXmlGenerator
+<span class="nc" id="L206">    }</span>
+
+    @Override
+    public void writeObjectFieldValueSeparator(JsonGenerator gen) throws IOException {
+        // never called for ToXmlGenerator
+<span class="nc" id="L211">    }</span>
+    
+    @Override
+    public void writeEndObject(JsonGenerator gen, int nrOfEntries) throws IOException
+    {
+<span class="pc bpc" id="L216" title="1 of 2 branches missed.">        if (!_objectIndenter.isInline()) {</span>
+<span class="fc" id="L217">            --_nesting;</span>
+        }
+        // for empty elements, no need for linefeeds etc:
+<span class="fc bfc" id="L220" title="All 2 branches covered.">        if (_justHadStartElement) {</span>
+<span class="fc" id="L221">            _justHadStartElement = false;</span>
+        } else {
+<span class="fc" id="L223">            _objectIndenter.writeIndentation(gen, _nesting);</span>
+        }
+<span class="fc" id="L225">        ((ToXmlGenerator) gen)._handleEndObject();</span>
+<span class="fc" id="L226">    }</span>
+    
+    /*
+    /**********************************************************
+    /* XML-specific additions
+    /**********************************************************
+     */
+
+    @Override
+    public void writeStartElement(XMLStreamWriter2 sw,
+            String nsURI, String localName) throws XMLStreamException
+    {
+<span class="pc bpc" id="L238" title="1 of 2 branches missed.">        if (!_objectIndenter.isInline()) {</span>
+<span class="fc bfc" id="L239" title="All 2 branches covered.">            if (_justHadStartElement) {</span>
+<span class="fc" id="L240">                _justHadStartElement = false;</span>
+            }
+<span class="fc" id="L242">            _objectIndenter.writeIndentation(sw, _nesting);</span>
+<span class="fc" id="L243">            ++_nesting;</span>
+        }
+<span class="fc" id="L245">        sw.writeStartElement(nsURI, localName);</span>
+<span class="fc" id="L246">        _justHadStartElement = true;        </span>
+<span class="fc" id="L247">    }</span>
+
+    @Override
+    public void writeEndElement(XMLStreamWriter2 sw, int nrOfEntries) throws XMLStreamException
+    {
+<span class="pc bpc" id="L252" title="1 of 2 branches missed.">        if (!_objectIndenter.isInline()) {</span>
+<span class="fc" id="L253">            --_nesting;</span>
+        }
+        // for empty elements, no need for linefeeds etc:
+<span class="pc bpc" id="L256" title="1 of 2 branches missed.">        if (_justHadStartElement) {</span>
+<span class="nc" id="L257">            _justHadStartElement = false;</span>
+        } else {
+<span class="fc" id="L259">            _objectIndenter.writeIndentation(sw, _nesting);</span>
+        }
+<span class="fc" id="L261">        sw.writeEndElement();</span>
+<span class="fc" id="L262">    }</span>
+    
+    @Override
+    public void writeLeafElement(XMLStreamWriter2 sw,
+    		String nsURI, String localName, String text, boolean isCData)
+  		throws XMLStreamException
+    {
+<span class="pc bpc" id="L269" title="1 of 2 branches missed.">        if (!_objectIndenter.isInline()) {</span>
+<span class="fc" id="L270">            _objectIndenter.writeIndentation(sw, _nesting);</span>
+        }
+<span class="fc" id="L272">        sw.writeStartElement(nsURI, localName);</span>
+<span class="pc bpc" id="L273" title="1 of 2 branches missed.">        if(isCData) {</span>
+<span class="nc" id="L274">            sw.writeCData(text);</span>
+        } else {
+<span class="fc" id="L276">            sw.writeCharacters(text);</span>
+        }
+<span class="fc" id="L278">        sw.writeEndElement();</span>
+<span class="fc" id="L279">        _justHadStartElement = false;</span>
+<span class="fc" id="L280">    }</span>
+
+    @Override
+    public void writeLeafElement(XMLStreamWriter2 sw,
+    		String nsURI, String localName,
+    		char[] buffer, int offset, int len, boolean isCData)
+        throws XMLStreamException
+    {
+<span class="nc bnc" id="L288" title="All 2 branches missed.">        if (!_objectIndenter.isInline()) {</span>
+<span class="nc" id="L289">            _objectIndenter.writeIndentation(sw, _nesting);</span>
+        }
+<span class="nc" id="L291">        sw.writeStartElement(nsURI, localName);</span>
+<span class="nc bnc" id="L292" title="All 2 branches missed.">        if(isCData) {</span>
+<span class="nc" id="L293">            sw.writeCData(buffer, offset, len);</span>
+        } else {
+<span class="nc" id="L295">            sw.writeCharacters(buffer, offset, len);</span>
+        }
+<span class="nc" id="L297">        sw.writeEndElement();</span>
+<span class="nc" id="L298">        _justHadStartElement = false;</span>
+<span class="nc" id="L299">    }</span>
+	
+    @Override
+    public void writeLeafElement(XMLStreamWriter2 sw,
+    		String nsURI, String localName, boolean value)
+  		throws XMLStreamException
+    {
+<span class="nc bnc" id="L306" title="All 2 branches missed.">        if (!_objectIndenter.isInline()) {</span>
+<span class="nc" id="L307">            _objectIndenter.writeIndentation(sw, _nesting);</span>
+        }
+<span class="nc" id="L309">        sw.writeStartElement(nsURI, localName);</span>
+<span class="nc" id="L310">        sw.writeBoolean(value);</span>
+<span class="nc" id="L311">        sw.writeEndElement();</span>
+<span class="nc" id="L312">        _justHadStartElement = false;</span>
+<span class="nc" id="L313">    }</span>
+    
+    @Override
+    public void writeLeafElement(XMLStreamWriter2 sw,
+            String nsURI, String localName, int value)
+        throws XMLStreamException
+    {
+<span class="pc bpc" id="L320" title="1 of 2 branches missed.">        if (!_objectIndenter.isInline()) {</span>
+<span class="fc" id="L321">            _objectIndenter.writeIndentation(sw, _nesting);</span>
+        }
+<span class="fc" id="L323">        sw.writeStartElement(nsURI, localName);</span>
+<span class="fc" id="L324">        sw.writeInt(value);</span>
+<span class="fc" id="L325">        sw.writeEndElement();</span>
+<span class="fc" id="L326">        _justHadStartElement = false;</span>
+<span class="fc" id="L327">    }</span>
+
+    @Override
+    public void writeLeafElement(XMLStreamWriter2 sw,
+            String nsURI, String localName, long value)
+        throws XMLStreamException
+    {
+<span class="pc bpc" id="L334" title="1 of 2 branches missed.">        if (!_objectIndenter.isInline()) {</span>
+<span class="fc" id="L335">            _objectIndenter.writeIndentation(sw, _nesting);</span>
+        }
+<span class="fc" id="L337">        sw.writeStartElement(nsURI, localName);</span>
+<span class="fc" id="L338">        sw.writeLong(value);</span>
+<span class="fc" id="L339">        sw.writeEndElement();</span>
+<span class="fc" id="L340">        _justHadStartElement = false;</span>
+<span class="fc" id="L341">    }</span>
+
+    @Override
+    public void writeLeafElement(XMLStreamWriter2 sw,
+            String nsURI, String localName, double value)
+  		throws XMLStreamException
+    {
+<span class="nc bnc" id="L348" title="All 2 branches missed.">        if (!_objectIndenter.isInline()) {</span>
+<span class="nc" id="L349">            _objectIndenter.writeIndentation(sw, _nesting);</span>
+        }
+<span class="nc" id="L351">        sw.writeStartElement(nsURI, localName);</span>
+<span class="nc" id="L352">        sw.writeDouble(value);</span>
+<span class="nc" id="L353">        sw.writeEndElement();</span>
+<span class="nc" id="L354">        _justHadStartElement = false;</span>
+<span class="nc" id="L355">    }</span>
+
+    @Override
+    public void writeLeafElement(XMLStreamWriter2 sw,
+    		String nsURI, String localName, float value)
+  		throws XMLStreamException
+    {
+<span class="nc bnc" id="L362" title="All 2 branches missed.">        if (!_objectIndenter.isInline()) {</span>
+<span class="nc" id="L363">            _objectIndenter.writeIndentation(sw, _nesting);</span>
+        }
+<span class="nc" id="L365">        sw.writeStartElement(nsURI, localName);</span>
+<span class="nc" id="L366">        sw.writeFloat(value);</span>
+<span class="nc" id="L367">        sw.writeEndElement();</span>
+<span class="nc" id="L368">        _justHadStartElement = false;</span>
+<span class="nc" id="L369">    }</span>
+	
+    @Override
+    public void writeLeafElement(XMLStreamWriter2 sw,
+            String nsURI, String localName, BigInteger value)
+        throws XMLStreamException
+    {
+<span class="nc bnc" id="L376" title="All 2 branches missed.">        if (!_objectIndenter.isInline()) {</span>
+<span class="nc" id="L377">            _objectIndenter.writeIndentation(sw, _nesting);</span>
+        }
+<span class="nc" id="L379">        sw.writeStartElement(nsURI, localName);</span>
+<span class="nc" id="L380">        sw.writeInteger(value);</span>
+<span class="nc" id="L381">        sw.writeEndElement();</span>
+<span class="nc" id="L382">        _justHadStartElement = false;</span>
+<span class="nc" id="L383">    }</span>
+
+    @Override
+    public void writeLeafElement(XMLStreamWriter2 sw,
+    		String nsURI, String localName, BigDecimal value)
+  		throws XMLStreamException
+    {
+<span class="nc bnc" id="L390" title="All 2 branches missed.">        if (!_objectIndenter.isInline()) {</span>
+<span class="nc" id="L391">            _objectIndenter.writeIndentation(sw, _nesting);</span>
+        }
+<span class="nc" id="L393">        sw.writeStartElement(nsURI, localName);</span>
+<span class="nc" id="L394">        sw.writeDecimal(value);</span>
+<span class="nc" id="L395">        sw.writeEndElement();</span>
+<span class="nc" id="L396">        _justHadStartElement = false;</span>
+<span class="nc" id="L397">    }</span>
+
+    @Override
+    public void writeLeafElement(XMLStreamWriter2 sw,
+    		String nsURI, String localName,
+    		byte[] data, int offset, int len)
+        throws XMLStreamException
+    {
+<span class="nc bnc" id="L405" title="All 2 branches missed.">        if (!_objectIndenter.isInline()) {</span>
+<span class="nc" id="L406">            _objectIndenter.writeIndentation(sw, _nesting);</span>
+        }
+<span class="nc" id="L408">        sw.writeStartElement(nsURI, localName);</span>
+<span class="nc" id="L409">        sw.writeBinary(data, offset, len);</span>
+<span class="nc" id="L410">        sw.writeEndElement();</span>
+<span class="nc" id="L411">        _justHadStartElement = false;</span>
+<span class="nc" id="L412">    }</span>
+
+    @Override
+    public void writeLeafNullElement(XMLStreamWriter2 sw,
+    		String nsURI, String localName)
+        throws XMLStreamException
+    {
+<span class="pc bpc" id="L419" title="1 of 2 branches missed.">        if (!_objectIndenter.isInline()) {</span>
+<span class="fc" id="L420">            _objectIndenter.writeIndentation(sw, _nesting);</span>
+        }
+<span class="fc" id="L422">        sw.writeEmptyElement(nsURI, localName);</span>
+<span class="fc" id="L423">        _justHadStartElement = false;</span>
+<span class="fc" id="L424">    }</span>
+
+    @Override // since 2.7
+    public void writePrologLinefeed(XMLStreamWriter2 sw) throws XMLStreamException
+    {
+        // 06-Dec-2015, tatu: Alternatively could try calling `writeSpace()`...
+<span class="fc" id="L430">        sw.writeRaw(Lf2SpacesIndenter.SYSTEM_LINE_SEPARATOR);</span>
+<span class="fc" id="L431">    }</span>
+
+    /*
+    /**********************************************************
+    /* Helper classes
+    /* (note: copied from jackson-core to avoid dependency;
+    /* allow local changes)
+    /**********************************************************
+     */
+
+    /**
+     * Dummy implementation that adds no indentation whatsoever
+     */
+    protected static class NopIndenter
+        implements Indenter, java.io.Serializable
+    {
+        private static final long serialVersionUID = 1L;
+
+<span class="nc" id="L449">        public NopIndenter() { }</span>
+<span class="nc" id="L450">        @Override public void writeIndentation(JsonGenerator jg, int level) { }</span>
+<span class="nc" id="L451">        @Override public boolean isInline() { return true; }</span>
+<span class="nc" id="L452">        @Override public void writeIndentation(XMLStreamWriter2 sw, int level) { }</span>
+    }
+
+    /**
+     * This is a very simple indenter that only every adds a
+     * single space for indentation. It is used as the default
+     * indenter for array values.
+     */
+    protected static class FixedSpaceIndenter
+        implements Indenter, java.io.Serializable
+    {
+        private static final long serialVersionUID = 1L;
+
+<span class="fc" id="L465">        public FixedSpaceIndenter() { }</span>
+
+        @Override
+        public void writeIndentation(XMLStreamWriter2 sw, int level)
+            throws XMLStreamException
+        {
+<span class="nc" id="L471">            sw.writeRaw(&quot; &quot;);</span>
+<span class="nc" id="L472">        }</span>
+        
+        @Override
+        public void writeIndentation(JsonGenerator g, int level) throws IOException
+        {
+<span class="nc" id="L477">            g.writeRaw(' ');</span>
+<span class="nc" id="L478">        }</span>
+
+        @Override
+<span class="nc" id="L481">        public boolean isInline() { return true; }</span>
+    }
+
+    /**
+     * Default linefeed-based indenter uses system-specific linefeeds and
+     * 2 spaces for indentation per level.
+     */
+    protected static class Lf2SpacesIndenter
+        implements Indenter, java.io.Serializable
+    {
+        private static final long serialVersionUID = 1L;
+
+        final static String SYSTEM_LINE_SEPARATOR;
+        static {
+<span class="fc" id="L495">            String lf = null;</span>
+            try {
+<span class="fc" id="L497">                lf = System.getProperty(&quot;line.separator&quot;);</span>
+<span class="pc" id="L498">            } catch (Throwable t) { } // access exception?</span>
+<span class="pc bpc" id="L499" title="1 of 2 branches missed.">            SYSTEM_LINE_SEPARATOR = (lf == null) ? &quot;\n&quot; : lf;</span>
+        }
+
+        final static int SPACE_COUNT = 64;
+<span class="fc" id="L503">        final static char[] SPACES = new char[SPACE_COUNT];</span>
+        static {
+<span class="fc" id="L505">            Arrays.fill(SPACES, ' ');</span>
+<span class="fc" id="L506">        }</span>
+
+<span class="fc" id="L508">        public Lf2SpacesIndenter() { }</span>
+
+        @Override
+<span class="fc" id="L511">        public boolean isInline() { return false; }</span>
+
+        @Override
+        public void writeIndentation(XMLStreamWriter2 sw, int level) throws XMLStreamException
+        {
+<span class="fc" id="L516">            sw.writeRaw(SYSTEM_LINE_SEPARATOR);</span>
+<span class="fc" id="L517">            level += level; // 2 spaces per level</span>
+<span class="pc bpc" id="L518" title="1 of 2 branches missed.">            while (level &gt; SPACE_COUNT) { // should never happen but...</span>
+<span class="nc" id="L519">            	sw.writeRaw(SPACES, 0, SPACE_COUNT); </span>
+<span class="nc" id="L520">                level -= SPACES.length;</span>
+            }
+<span class="fc" id="L522">            sw.writeRaw(SPACES, 0, level);</span>
+<span class="fc" id="L523">        }</span>
+        
+        @Override
+        public void writeIndentation(JsonGenerator jg, int level) throws IOException
+        {
+<span class="fc" id="L528">            jg.writeRaw(SYSTEM_LINE_SEPARATOR);</span>
+<span class="fc" id="L529">            level += level; // 2 spaces per level</span>
+<span class="pc bpc" id="L530" title="1 of 2 branches missed.">            while (level &gt; SPACE_COUNT) { // should never happen but...</span>
+<span class="nc" id="L531">                jg.writeRaw(SPACES, 0, SPACE_COUNT); </span>
+<span class="nc" id="L532">                level -= SPACES.length;</span>
+            }
+<span class="fc" id="L534">            jg.writeRaw(SPACES, 0, level);</span>
+<span class="fc" id="L535">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

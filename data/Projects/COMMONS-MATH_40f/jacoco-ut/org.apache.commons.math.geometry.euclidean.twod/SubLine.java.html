@@ -1,0 +1,210 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SubLine.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Commons Math</a> &gt; <a href="index.source.html" class="el_package">org.apache.commons.math.geometry.euclidean.twod</a> &gt; <span class="el_source">SubLine.java</span></div><h1>SubLine.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.commons.math.geometry.euclidean.twod;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import org.apache.commons.math.geometry.euclidean.oned.Euclidean1D;
+import org.apache.commons.math.geometry.euclidean.oned.Interval;
+import org.apache.commons.math.geometry.euclidean.oned.IntervalsSet;
+import org.apache.commons.math.geometry.euclidean.oned.OrientedPoint;
+import org.apache.commons.math.geometry.euclidean.oned.Vector1D;
+import org.apache.commons.math.geometry.partitioning.AbstractSubHyperplane;
+import org.apache.commons.math.geometry.partitioning.BSPTree;
+import org.apache.commons.math.geometry.partitioning.Hyperplane;
+import org.apache.commons.math.geometry.partitioning.Region;
+import org.apache.commons.math.geometry.partitioning.Region.Location;
+import org.apache.commons.math.geometry.partitioning.Side;
+import org.apache.commons.math.geometry.partitioning.SubHyperplane;
+import org.apache.commons.math.util.FastMath;
+
+/** This class represents a sub-hyperplane for {@link Line}.
+ * @version $Id$
+ * @since 3.0
+ */
+public class SubLine extends AbstractSubHyperplane&lt;Euclidean2D, Euclidean1D&gt; {
+
+    /** Simple constructor.
+     * @param hyperplane underlying hyperplane
+     * @param remainingRegion remaining region of the hyperplane
+     */
+    public SubLine(final Hyperplane&lt;Euclidean2D&gt; hyperplane,
+                   final Region&lt;Euclidean1D&gt; remainingRegion) {
+<span class="fc" id="L48">        super(hyperplane, remainingRegion);</span>
+<span class="fc" id="L49">    }</span>
+
+    /** Create a sub-line from two endpoints.
+     * @param start start point
+     * @param end end point
+     */
+    public SubLine(final Vector2D start, final Vector2D end) {
+<span class="fc" id="L56">        super(new Line(start, end), buildIntervalSet(start, end));</span>
+<span class="fc" id="L57">    }</span>
+
+    /** Create a sub-line from a segment.
+     * @param segment single segment forming the sub-line
+     */
+    public SubLine(final Segment segment) {
+<span class="fc" id="L63">        super(segment.getLine(), buildIntervalSet(segment.getStart(), segment.getEnd()));</span>
+<span class="fc" id="L64">    }</span>
+
+    /** Get the endpoints of the sub-line.
+     * &lt;p&gt;
+     * A subline may be any arbitrary number of disjoints segments, so the endpoints
+     * are provided as a list of endpoint pairs. Each element of the list represents
+     * one segment, and each segment contains a start point at index 0 and an end point
+     * at index 1. If the sub-line is unbounded in the negative infinity direction,
+     * the start point of the first segment will have infinite coordinates. If the
+     * sub-line is unbounded in the positive infinity direction, the end point of the
+     * last segment will have infinite coordinates. So a sub-line covering the whole
+     * line will contain just one row and both elements of this row will have infinite
+     * coordinates. If the sub-line is empty, the returned list will contain 0 segments.
+     * &lt;/p&gt;
+     * @return list of segments endpoints
+     */
+    public List&lt;Segment&gt; getSegments() {
+
+<span class="fc" id="L82">        final Line line = (Line) getHyperplane();</span>
+<span class="fc" id="L83">        final List&lt;Interval&gt; list = ((IntervalsSet) getRemainingRegion()).asList();</span>
+<span class="fc" id="L84">        final List&lt;Segment&gt; segments = new ArrayList&lt;Segment&gt;();</span>
+
+<span class="fc bfc" id="L86" title="All 2 branches covered.">        for (final Interval interval : list) {</span>
+<span class="fc" id="L87">            final Vector2D start = line.toSpace(new Vector1D(interval.getLower()));</span>
+<span class="fc" id="L88">            final Vector2D end   = line.toSpace(new Vector1D(interval.getUpper()));</span>
+<span class="fc" id="L89">            segments.add(new Segment(start, end, line));</span>
+<span class="fc" id="L90">        }</span>
+
+<span class="fc" id="L92">        return segments;</span>
+
+    }
+
+    /** Get the intersection of the instance and another sub-line.
+     * &lt;p&gt;
+     * This method is related to the {@link Line#intersection(Line)
+     * intersection} method in the {@link Line Line} class, but in addition
+     * to compute the point along infinite lines, it also checks the point
+     * lies on both sub-line ranges.
+     * &lt;/p&gt;
+     * @param subLine other sub-line which may intersect instance
+     * @param includeEndPoints if true, endpoints are considered to belong to
+     * instance (i.e. they are closed sets) and may be returned, otherwise endpoints
+     * are considered to not belong to instance (i.e. they are open sets) and intersection
+     * occurring on endpoints lead to null being returned
+     * @return the intersection point if there is one, null if the sub-lines don't intersect
+     */
+    public Vector2D intersection(final SubLine subLine, final boolean includeEndPoints) {
+
+        // retrieve the underlying lines
+<span class="fc" id="L113">        Line line1 = (Line) getHyperplane();</span>
+<span class="fc" id="L114">        Line line2 = (Line) subLine.getHyperplane();</span>
+
+        // compute the intersection on infinite line
+<span class="fc" id="L117">        Vector2D v2D = line1.intersection(line2);</span>
+
+        // check location of point with respect to first sub-line
+<span class="fc" id="L120">        Location loc1 = getRemainingRegion().checkPoint(line1.toSubSpace(v2D));</span>
+
+        // check location of point with respect to second sub-line
+<span class="fc" id="L123">        Location loc2 = subLine.getRemainingRegion().checkPoint(line2.toSubSpace(v2D));</span>
+
+<span class="fc bfc" id="L125" title="All 2 branches covered.">        if (includeEndPoints) {</span>
+<span class="fc bfc" id="L126" title="All 4 branches covered.">            return ((loc1 != Location.OUTSIDE) &amp;&amp; (loc2 != Location.OUTSIDE)) ? v2D : null;</span>
+        } else {
+<span class="fc bfc" id="L128" title="All 4 branches covered.">            return ((loc1 == Location.INSIDE) &amp;&amp; (loc2 == Location.INSIDE)) ? v2D : null;</span>
+        }
+
+    }
+
+    /** Build an interval set from two points.
+     * @param start start point
+     * @param end end point
+     * @return an interval set
+     */
+    private static IntervalsSet buildIntervalSet(final Vector2D start, final Vector2D end) {
+<span class="fc" id="L139">        final Line line = new Line(start, end);</span>
+<span class="fc" id="L140">        return new IntervalsSet(line.toSubSpace(start).getX(),</span>
+<span class="fc" id="L141">                                line.toSubSpace(end).getX());</span>
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    protected AbstractSubHyperplane&lt;Euclidean2D, Euclidean1D&gt; buildNew(final Hyperplane&lt;Euclidean2D&gt; hyperplane,
+                                                                       final Region&lt;Euclidean1D&gt; remainingRegion) {
+<span class="fc" id="L148">        return new SubLine(hyperplane, remainingRegion);</span>
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public Side side(final Hyperplane&lt;Euclidean2D&gt; hyperplane) {
+
+<span class="fc" id="L155">        final Line    thisLine  = (Line) getHyperplane();</span>
+<span class="fc" id="L156">        final Line    otherLine = (Line) hyperplane;</span>
+<span class="fc" id="L157">        final Vector2D crossing  = thisLine.intersection(otherLine);</span>
+
+<span class="fc bfc" id="L159" title="All 2 branches covered.">        if (crossing == null) {</span>
+            // the lines are parallel,
+<span class="fc" id="L161">            final double global = otherLine.getOffset(thisLine);</span>
+<span class="fc bfc" id="L162" title="All 4 branches covered.">            return (global &lt; -1.0e-10) ? Side.MINUS : ((global &gt; 1.0e-10) ? Side.PLUS : Side.HYPER);</span>
+        }
+
+        // the lines do intersect
+<span class="fc bfc" id="L166" title="All 2 branches covered.">        final boolean direct = FastMath.sin(thisLine.getAngle() - otherLine.getAngle()) &lt; 0;</span>
+<span class="fc" id="L167">        final Vector1D x = thisLine.toSubSpace(crossing);</span>
+<span class="fc" id="L168">        return getRemainingRegion().side(new OrientedPoint(x, direct));</span>
+
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public SplitSubHyperplane&lt;Euclidean2D&gt; split(final Hyperplane&lt;Euclidean2D&gt; hyperplane) {
+
+<span class="fc" id="L176">        final Line    thisLine  = (Line) getHyperplane();</span>
+<span class="fc" id="L177">        final Line    otherLine = (Line) hyperplane;</span>
+<span class="fc" id="L178">        final Vector2D crossing  = thisLine.intersection(otherLine);</span>
+
+<span class="fc bfc" id="L180" title="All 2 branches covered.">        if (crossing == null) {</span>
+            // the lines are parallel
+<span class="fc" id="L182">            final double global = otherLine.getOffset(thisLine);</span>
+<span class="fc bfc" id="L183" title="All 2 branches covered.">            return (global &lt; -1.0e-10) ?</span>
+<span class="fc" id="L184">                   new SplitSubHyperplane&lt;Euclidean2D&gt;(null, this) :</span>
+<span class="fc" id="L185">                   new SplitSubHyperplane&lt;Euclidean2D&gt;(this, null);</span>
+        }
+
+        // the lines do intersect
+<span class="fc bfc" id="L189" title="All 2 branches covered.">        final boolean direct = FastMath.sin(thisLine.getAngle() - otherLine.getAngle()) &lt; 0;</span>
+<span class="fc" id="L190">        final Vector1D x      = thisLine.toSubSpace(crossing);</span>
+<span class="fc bfc" id="L191" title="All 2 branches covered.">        final SubHyperplane&lt;Euclidean1D&gt; subPlus  = new OrientedPoint(x, !direct).wholeHyperplane();</span>
+<span class="fc" id="L192">        final SubHyperplane&lt;Euclidean1D&gt; subMinus = new OrientedPoint(x,  direct).wholeHyperplane();</span>
+
+<span class="fc" id="L194">        final BSPTree&lt;Euclidean1D&gt; splitTree = getRemainingRegion().getTree(false).split(subMinus);</span>
+<span class="fc bfc" id="L195" title="All 2 branches covered.">        final BSPTree&lt;Euclidean1D&gt; plusTree  = getRemainingRegion().isEmpty(splitTree.getPlus()) ?</span>
+<span class="fc" id="L196">                                               new BSPTree&lt;Euclidean1D&gt;(Boolean.FALSE) :</span>
+<span class="fc" id="L197">                                               new BSPTree&lt;Euclidean1D&gt;(subPlus, new BSPTree&lt;Euclidean1D&gt;(Boolean.FALSE),</span>
+<span class="fc" id="L198">                                                                        splitTree.getPlus(), null);</span>
+<span class="fc bfc" id="L199" title="All 2 branches covered.">        final BSPTree&lt;Euclidean1D&gt; minusTree = getRemainingRegion().isEmpty(splitTree.getMinus()) ?</span>
+<span class="fc" id="L200">                                               new BSPTree&lt;Euclidean1D&gt;(Boolean.FALSE) :</span>
+<span class="fc" id="L201">                                               new BSPTree&lt;Euclidean1D&gt;(subMinus, new BSPTree&lt;Euclidean1D&gt;(Boolean.FALSE),</span>
+<span class="fc" id="L202">                                                                        splitTree.getMinus(), null);</span>
+
+<span class="fc" id="L204">        return new SplitSubHyperplane&lt;Euclidean2D&gt;(new SubLine(thisLine.copySelf(), new IntervalsSet(plusTree)),</span>
+<span class="fc" id="L205">                                                   new SubLine(thisLine.copySelf(), new IntervalsSet(minusTree)));</span>
+
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

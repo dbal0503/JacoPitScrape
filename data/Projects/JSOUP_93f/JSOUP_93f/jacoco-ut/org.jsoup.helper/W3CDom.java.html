@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>W3CDom.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">jsoup Java HTML Parser</a> &gt; <a href="index.source.html" class="el_package">org.jsoup.helper</a> &gt; <span class="el_source">W3CDom.java</span></div><h1>W3CDom.java</h1><pre class="source lang-java linenums">package org.jsoup.helper;
+
+import org.jsoup.internal.StringUtil;
+import org.jsoup.nodes.Attribute;
+import org.jsoup.nodes.Attributes;
+import org.jsoup.select.NodeTraversor;
+import org.jsoup.select.NodeVisitor;
+import org.w3c.dom.Comment;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.Text;
+
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.transform.Transformer;
+import javax.xml.transform.TransformerException;
+import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.dom.DOMSource;
+import javax.xml.transform.stream.StreamResult;
+import java.io.StringWriter;
+import java.util.HashMap;
+import java.util.Stack;
+
+/**
+ * Helper class to transform a {@link org.jsoup.nodes.Document} to a {@link org.w3c.dom.Document org.w3c.dom.Document},
+ * for integration with toolsets that use the W3C DOM.
+ */
+<span class="fc" id="L29">public class W3CDom {</span>
+<span class="fc" id="L30">    protected DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();</span>
+
+    /**
+     * Convert a jsoup Document to a W3C Document.
+     * @param in jsoup doc
+     * @return w3c doc
+     */
+    public Document fromJsoup(org.jsoup.nodes.Document in) {
+<span class="fc" id="L38">        Validate.notNull(in);</span>
+        DocumentBuilder builder;
+        try {
+        	//set the factory to be namespace-aware
+<span class="fc" id="L42">        	factory.setNamespaceAware(true);</span>
+<span class="fc" id="L43">            builder = factory.newDocumentBuilder();</span>
+<span class="fc" id="L44">            Document out = builder.newDocument();</span>
+<span class="fc" id="L45">            convert(in, out);</span>
+<span class="fc" id="L46">            return out;</span>
+<span class="nc" id="L47">        } catch (ParserConfigurationException e) {</span>
+<span class="nc" id="L48">            throw new IllegalStateException(e);</span>
+        }
+    }
+
+    /**
+     * Converts a jsoup document into the provided W3C Document. If required, you can set options on the output document
+     * before converting.
+     * @param in jsoup doc
+     * @param out w3c doc
+     * @see org.jsoup.helper.W3CDom#fromJsoup(org.jsoup.nodes.Document)
+     */
+    public void convert(org.jsoup.nodes.Document in, Document out) {
+<span class="fc bfc" id="L60" title="All 2 branches covered.">        if (!StringUtil.isBlank(in.location()))</span>
+<span class="fc" id="L61">            out.setDocumentURI(in.location());</span>
+
+<span class="fc" id="L63">        org.jsoup.nodes.Element rootEl = in.child(0); // skip the #root node</span>
+<span class="fc" id="L64">        NodeTraversor.traverse(new W3CBuilder(out), rootEl);</span>
+<span class="fc" id="L65">    }</span>
+
+    /**
+     * Implements the conversion by walking the input.
+     */
+    protected static class W3CBuilder implements NodeVisitor {
+        private static final String xmlnsKey = &quot;xmlns&quot;;
+        private static final String xmlnsPrefix = &quot;xmlns:&quot;;
+
+        private final Document doc;
+<span class="fc" id="L75">        private final Stack&lt;HashMap&lt;String, String&gt;&gt; namespacesStack = new Stack&lt;&gt;(); // stack of namespaces, prefix =&gt; urn</span>
+        private Element dest;
+
+<span class="fc" id="L78">        public W3CBuilder(Document doc) {</span>
+<span class="fc" id="L79">            this.doc = doc;</span>
+<span class="fc" id="L80">            this.namespacesStack.push(new HashMap&lt;String, String&gt;());</span>
+<span class="fc" id="L81">        }</span>
+
+        public void head(org.jsoup.nodes.Node source, int depth) {
+<span class="fc" id="L84">            namespacesStack.push(new HashMap&lt;&gt;(namespacesStack.peek())); // inherit from above on the stack</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">            if (source instanceof org.jsoup.nodes.Element) {</span>
+<span class="fc" id="L86">                org.jsoup.nodes.Element sourceEl = (org.jsoup.nodes.Element) source;</span>
+
+<span class="fc" id="L88">                String prefix = updateNamespaces(sourceEl);</span>
+<span class="fc" id="L89">                String namespace = namespacesStack.peek().get(prefix);</span>
+<span class="fc" id="L90">                String tagName = sourceEl.tagName();</span>
+
+<span class="fc bfc" id="L92" title="All 4 branches covered.">                Element el = namespace == null &amp;&amp; tagName.contains(&quot;:&quot;) ?</span>
+<span class="fc" id="L93">                    doc.createElementNS(&quot;&quot;, tagName) : // doesn't have a real namespace defined</span>
+<span class="fc" id="L94">                    doc.createElementNS(namespace, tagName);</span>
+<span class="fc" id="L95">                copyAttributes(sourceEl, el);</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">                if (dest == null) { // sets up the root</span>
+<span class="fc" id="L97">                    doc.appendChild(el);</span>
+                } else {
+<span class="fc" id="L99">                    dest.appendChild(el);</span>
+                }
+<span class="fc" id="L101">                dest = el; // descend</span>
+<span class="fc bfc" id="L102" title="All 2 branches covered.">            } else if (source instanceof org.jsoup.nodes.TextNode) {</span>
+<span class="fc" id="L103">                org.jsoup.nodes.TextNode sourceText = (org.jsoup.nodes.TextNode) source;</span>
+<span class="fc" id="L104">                Text text = doc.createTextNode(sourceText.getWholeText());</span>
+<span class="fc" id="L105">                dest.appendChild(text);</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">            } else if (source instanceof org.jsoup.nodes.Comment) {</span>
+<span class="fc" id="L107">                org.jsoup.nodes.Comment sourceComment = (org.jsoup.nodes.Comment) source;</span>
+<span class="fc" id="L108">                Comment comment = doc.createComment(sourceComment.getData());</span>
+<span class="fc" id="L109">                dest.appendChild(comment);</span>
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">            } else if (source instanceof org.jsoup.nodes.DataNode) {</span>
+<span class="fc" id="L111">                org.jsoup.nodes.DataNode sourceData = (org.jsoup.nodes.DataNode) source;</span>
+<span class="fc" id="L112">                Text node = doc.createTextNode(sourceData.getWholeData());</span>
+<span class="fc" id="L113">                dest.appendChild(node);</span>
+            } else {
+                // unhandled
+            }
+<span class="fc" id="L117">        }</span>
+
+        public void tail(org.jsoup.nodes.Node source, int depth) {
+<span class="fc bfc" id="L120" title="All 4 branches covered.">            if (source instanceof org.jsoup.nodes.Element &amp;&amp; dest.getParentNode() instanceof Element) {</span>
+<span class="fc" id="L121">                dest = (Element) dest.getParentNode(); // undescend. cromulent.</span>
+            }
+<span class="fc" id="L123">            namespacesStack.pop();</span>
+<span class="fc" id="L124">        }</span>
+
+        private void copyAttributes(org.jsoup.nodes.Node source, Element el) {
+<span class="fc bfc" id="L127" title="All 2 branches covered.">            for (Attribute attribute : source.attributes()) {</span>
+                // valid xml attribute names are: ^[a-zA-Z_:][-a-zA-Z0-9_:.]
+<span class="fc" id="L129">                String key = attribute.getKey().replaceAll(&quot;[^-a-zA-Z0-9_:.]&quot;, &quot;&quot;);</span>
+<span class="fc bfc" id="L130" title="All 2 branches covered.">                if (key.matches(&quot;[a-zA-Z_:][-a-zA-Z0-9_:.]*&quot;))</span>
+<span class="fc" id="L131">                    el.setAttribute(key, attribute.getValue());</span>
+<span class="fc" id="L132">            }</span>
+<span class="fc" id="L133">        }</span>
+
+        /**
+         * Finds any namespaces defined in this element. Returns any tag prefix.
+         */
+        private String updateNamespaces(org.jsoup.nodes.Element el) {
+            // scan the element for namespace declarations
+            // like: xmlns=&quot;blah&quot; or xmlns:prefix=&quot;blah&quot;
+<span class="fc" id="L141">            Attributes attributes = el.attributes();</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">            for (Attribute attr : attributes) {</span>
+<span class="fc" id="L143">                String key = attr.getKey();</span>
+                String prefix;
+<span class="fc bfc" id="L145" title="All 2 branches covered.">                if (key.equals(xmlnsKey)) {</span>
+<span class="fc" id="L146">                    prefix = &quot;&quot;;</span>
+<span class="fc bfc" id="L147" title="All 2 branches covered.">                } else if (key.startsWith(xmlnsPrefix)) {</span>
+<span class="fc" id="L148">                    prefix = key.substring(xmlnsPrefix.length());</span>
+                } else {
+                    continue;
+                }
+<span class="fc" id="L152">                namespacesStack.peek().put(prefix, attr.getValue());</span>
+<span class="fc" id="L153">            }</span>
+
+            // get the element prefix if any
+<span class="fc" id="L156">            int pos = el.tagName().indexOf(&quot;:&quot;);</span>
+<span class="fc bfc" id="L157" title="All 2 branches covered.">            return pos &gt; 0 ? el.tagName().substring(0, pos) : &quot;&quot;;</span>
+        }
+
+    }
+
+    /**
+     * Serialize a W3C document to a String.
+     * @param doc Document
+     * @return Document as string
+     */
+    public String asString(Document doc) {
+        try {
+<span class="fc" id="L169">            DOMSource domSource = new DOMSource(doc);</span>
+<span class="fc" id="L170">            StringWriter writer = new StringWriter();</span>
+<span class="fc" id="L171">            StreamResult result = new StreamResult(writer);</span>
+<span class="fc" id="L172">            TransformerFactory tf = TransformerFactory.newInstance();</span>
+<span class="fc" id="L173">            Transformer transformer = tf.newTransformer();</span>
+<span class="fc" id="L174">            transformer.transform(domSource, result);</span>
+<span class="fc" id="L175">            return writer.toString();</span>
+<span class="nc" id="L176">        } catch (TransformerException e) {</span>
+<span class="nc" id="L177">            throw new IllegalStateException(e);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

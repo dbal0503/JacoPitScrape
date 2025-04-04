@@ -1,0 +1,3812 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FastMath.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Commons Math</a> &gt; <a href="index.source.html" class="el_package">org.apache.commons.math.util</a> &gt; <span class="el_source">FastMath.java</span></div><h1>FastMath.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.commons.math.util;
+
+import java.io.PrintStream;
+
+/**
+ * Faster, more accurate, portable alternative to {@link Math} and
+ * {@link StrictMath} for large scale computation.
+ * &lt;p&gt;
+ * FastMath is a drop-in replacement for both Math and StrictMath. This
+ * means that for any method in Math (say {@code Math.sin(x)} or
+ * {@code Math.cbrt(y)}), user can directly change the class and use the
+ * methods as is (using {@code FastMath.sin(x)} or {@code FastMath.cbrt(y)}
+ * in the previous example).
+ * &lt;/p&gt;
+ * &lt;p&gt;
+ * FastMath speed is achieved by relying heavily on optimizing compilers
+ * to native code present in many JVMs today and use of large tables.
+ * The larger tables are lazily initialised on first use, so that the setup
+ * time does not penalise methods that don't need them.
+ * &lt;/p&gt;
+ * &lt;p&gt;
+ * Note that FastMath is
+ * extensively used inside Apache Commons Math, so by calling some algorithms,
+ * the overhead when the the tables need to be intialised will occur
+ * regardless of the end-user calling FastMath methods directly or not.
+ * Performance figures for a specific JVM and hardware can be evaluated by
+ * running the FastMathTestPerformance tests in the test directory of the source
+ * distribution.
+ * &lt;/p&gt;
+ * &lt;p&gt;
+ * FastMath accuracy should be mostly independent of the JVM as it relies only
+ * on IEEE-754 basic operations and on embedded tables. Almost all operations
+ * are accurate to about 0.5 ulp throughout the domain range. This statement,
+ * of course is only a rough global observed behavior, it is &lt;em&gt;not&lt;/em&gt; a
+ * guarantee for &lt;em&gt;every&lt;/em&gt; double numbers input (see William Kahan's &lt;a
+ * href=&quot;http://en.wikipedia.org/wiki/Rounding#The_table-maker.27s_dilemma&quot;&gt;Table
+ * Maker's Dilemma&lt;/a&gt;).
+ * &lt;/p&gt;
+ * &lt;p&gt;
+ * FastMath additionally implements the following methods not found in Math/StrictMath:
+ * &lt;ul&gt;
+ * &lt;li&gt;{@link #asinh(double)}&lt;/li&gt;
+ * &lt;li&gt;{@link #acosh(double)}&lt;/li&gt;
+ * &lt;li&gt;{@link #atanh(double)}&lt;/li&gt;
+ * &lt;/ul&gt;
+ * The following methods are found in Math/StrictMath since 1.6 only, they are provided
+ * by FastMath even in 1.5 Java virtual machines
+ * &lt;ul&gt;
+ * &lt;li&gt;{@link #copySign(double, double)}&lt;/li&gt;
+ * &lt;li&gt;{@link #getExponent(double)}&lt;/li&gt;
+ * &lt;li&gt;{@link #nextAfter(double,double)}&lt;/li&gt;
+ * &lt;li&gt;{@link #nextUp(double)}&lt;/li&gt;
+ * &lt;li&gt;{@link #scalb(double, int)}&lt;/li&gt;
+ * &lt;li&gt;{@link #copySign(float, float)}&lt;/li&gt;
+ * &lt;li&gt;{@link #getExponent(float)}&lt;/li&gt;
+ * &lt;li&gt;{@link #nextAfter(float,double)}&lt;/li&gt;
+ * &lt;li&gt;{@link #nextUp(float)}&lt;/li&gt;
+ * &lt;li&gt;{@link #scalb(float, int)}&lt;/li&gt;
+ * &lt;/ul&gt;
+ * &lt;/p&gt;
+ * @version $Id$
+ * @since 2.2
+ */
+public class FastMath {
+
+    /** Archimede's constant PI, ratio of circle circumference to diameter. */
+    public static final double PI = 105414357.0 / 33554432.0 + 1.984187159361080883e-9;
+
+    /** Napier's constant e, base of the natural logarithm. */
+    public static final double E = 2850325.0 / 1048576.0 + 8.254840070411028747e-8;
+
+    /** Index of exp(0) in the array of integer exponentials. */
+    static final int EXP_INT_TABLE_MAX_INDEX = 750;
+    /** Length of the array of integer exponentials. */
+    static final int EXP_INT_TABLE_LEN = EXP_INT_TABLE_MAX_INDEX * 2;
+    /** Logarithm table length. */
+    static final int LN_MANT_LEN = 1024;
+    /** Exponential fractions table length. */
+    static final int EXP_FRAC_TABLE_LEN = 1025; // 0, 1/1024, ... 1024/1024
+
+    /** Indicator for tables initialization.
+     * &lt;p&gt;
+     * This compile-time constant should be set to true only if one explicitly
+     * wants to compute the tables at class loading time instead of using the
+     * already computed ones provided as literal arrays below.
+     * &lt;/p&gt;
+     */
+<span class="fc" id="L104">    private static /* final */ boolean RECOMPUTE_TABLES_AT_RUNTIME = false;</span>
+    /** Indicator for loading big tables from &quot;resource&quot; files. */
+<span class="fc" id="L106">    private static /* final */ boolean LOAD_RESOURCES = false;</span>
+
+    /** log(2) (high bits). */
+    private static final double LN_2_A = 0.693147063255310059;
+
+    /** log(2) (low bits). */
+    private static final double LN_2_B = 1.17304635250823482e-7;
+
+    /** Coefficients for log, when input 0.99 &lt; x &lt; 1.01. */
+<span class="fc" id="L115">    private static final double LN_QUICK_COEF[][] = {</span>
+        {1.0, 5.669184079525E-24},
+        {-0.25, -0.25},
+        {0.3333333134651184, 1.986821492305628E-8},
+        {-0.25, -6.663542893624021E-14},
+        {0.19999998807907104, 1.1921056801463227E-8},
+        {-0.1666666567325592, -7.800414592973399E-9},
+        {0.1428571343421936, 5.650007086920087E-9},
+        {-0.12502530217170715, -7.44321345601866E-11},
+        {0.11113807559013367, 9.219544613762692E-9},
+    };
+
+    /** Coefficients for log in the range of 1.0 &lt; x &lt; 1.0 + 2^-10. */
+<span class="fc" id="L128">    private static final double LN_HI_PREC_COEF[][] = {</span>
+        {1.0, -6.032174644509064E-23},
+        {-0.25, -0.25},
+        {0.3333333134651184, 1.9868161777724352E-8},
+        {-0.2499999701976776, -2.957007209750105E-8},
+        {0.19999954104423523, 1.5830993332061267E-10},
+        {-0.16624879837036133, -2.6033824355191673E-8}
+    };
+
+    /** Sine, Cosine, Tangent tables are for 0, 1/8, 2/8, ... 13/8 = PI/2 approx. */
+    private static final int SINE_TABLE_LEN = 14;
+
+    /** Sine table (high bits). */
+<span class="fc" id="L141">    private static final double SINE_TABLE_A[] =</span>
+        {
+        +0.0d,
+        +0.1246747374534607d,
+        +0.24740394949913025d,
+        +0.366272509098053d,
+        +0.4794255495071411d,
+        +0.5850973129272461d,
+        +0.6816387176513672d,
+        +0.7675435543060303d,
+        +0.8414709568023682d,
+        +0.902267575263977d,
+        +0.9489846229553223d,
+        +0.9808930158615112d,
+        +0.9974949359893799d,
+        +0.9985313415527344d,
+    };
+
+    /** Sine table (low bits). */
+<span class="fc" id="L160">    private static final double SINE_TABLE_B[] =</span>
+        {
+        +0.0d,
+        -4.068233003401932E-9d,
+        +9.755392680573412E-9d,
+        +1.9987994582857286E-8d,
+        -1.0902938113007961E-8d,
+        -3.9986783938944604E-8d,
+        +4.23719669792332E-8d,
+        -5.207000323380292E-8d,
+        +2.800552834259E-8d,
+        +1.883511811213715E-8d,
+        -3.5997360512765566E-9d,
+        +4.116164446561962E-8d,
+        +5.0614674548127384E-8d,
+        -1.0129027912496858E-9d,
+    };
+
+    /** Cosine table (high bits). */
+<span class="fc" id="L179">    private static final double COSINE_TABLE_A[] =</span>
+        {
+        +1.0d,
+        +0.9921976327896118d,
+        +0.9689123630523682d,
+        +0.9305076599121094d,
+        +0.8775825500488281d,
+        +0.8109631538391113d,
+        +0.7316888570785522d,
+        +0.6409968137741089d,
+        +0.5403022766113281d,
+        +0.4311765432357788d,
+        +0.3153223395347595d,
+        +0.19454771280288696d,
+        +0.07073719799518585d,
+        -0.05417713522911072d,
+    };
+
+    /** Cosine table (low bits). */
+<span class="fc" id="L198">    private static final double COSINE_TABLE_B[] =</span>
+        {
+        +0.0d,
+        +3.4439717236742845E-8d,
+        +5.865827662008209E-8d,
+        -3.7999795083850525E-8d,
+        +1.184154459111628E-8d,
+        -3.43338934259355E-8d,
+        +1.1795268640216787E-8d,
+        +4.438921624363781E-8d,
+        +2.925681159240093E-8d,
+        -2.6437112632041807E-8d,
+        +2.2860509143963117E-8d,
+        -4.813899778443457E-9d,
+        +3.6725170580355583E-9d,
+        +2.0217439756338078E-10d,
+    };
+
+
+    /** Tangent table, used by atan() (high bits). */
+<span class="fc" id="L218">    private static final double TANGENT_TABLE_A[] =</span>
+        {
+        +0.0d,
+        +0.1256551444530487d,
+        +0.25534194707870483d,
+        +0.3936265707015991d,
+        +0.5463024377822876d,
+        +0.7214844226837158d,
+        +0.9315965175628662d,
+        +1.1974215507507324d,
+        +1.5574076175689697d,
+        +2.092571258544922d,
+        +3.0095696449279785d,
+        +5.041914939880371d,
+        +14.101419448852539d,
+        -18.430862426757812d,
+    };
+
+    /** Tangent table, used by atan() (low bits). */
+<span class="fc" id="L237">    private static final double TANGENT_TABLE_B[] =</span>
+        {
+        +0.0d,
+        -7.877917738262007E-9d,
+        -2.5857668567479893E-8d,
+        +5.2240336371356666E-9d,
+        +5.206150291559893E-8d,
+        +1.8307188599677033E-8d,
+        -5.7618793749770706E-8d,
+        +7.848361555046424E-8d,
+        +1.0708593250394448E-7d,
+        +1.7827257129423813E-8d,
+        +2.893485277253286E-8d,
+        +3.1660099222737955E-7d,
+        +4.983191803254889E-7d,
+        -3.356118100840571E-7d,
+    };
+
+    /** Bits of 1/(2*pi), need for reducePayneHanek(). */
+<span class="fc" id="L256">    private static final long RECIP_2PI[] = new long[] {</span>
+        (0x28be60dbL &lt;&lt; 32) | 0x9391054aL,
+        (0x7f09d5f4L &lt;&lt; 32) | 0x7d4d3770L,
+        (0x36d8a566L &lt;&lt; 32) | 0x4f10e410L,
+        (0x7f9458eaL &lt;&lt; 32) | 0xf7aef158L,
+        (0x6dc91b8eL &lt;&lt; 32) | 0x909374b8L,
+        (0x01924bbaL &lt;&lt; 32) | 0x82746487L,
+        (0x3f877ac7L &lt;&lt; 32) | 0x2c4a69cfL,
+        (0xba208d7dL &lt;&lt; 32) | 0x4baed121L,
+        (0x3a671c09L &lt;&lt; 32) | 0xad17df90L,
+        (0x4e64758eL &lt;&lt; 32) | 0x60d4ce7dL,
+        (0x272117e2L &lt;&lt; 32) | 0xef7e4a0eL,
+        (0xc7fe25ffL &lt;&lt; 32) | 0xf7816603L,
+        (0xfbcbc462L &lt;&lt; 32) | 0xd6829b47L,
+        (0xdb4d9fb3L &lt;&lt; 32) | 0xc9f2c26dL,
+        (0xd3d18fd9L &lt;&lt; 32) | 0xa797fa8bL,
+        (0x5d49eeb1L &lt;&lt; 32) | 0xfaf97c5eL,
+        (0xcf41ce7dL &lt;&lt; 32) | 0xe294a4baL,
+         0x9afed7ecL &lt;&lt; 32  };
+
+    /** Bits of pi/4, need for reducePayneHanek(). */
+<span class="fc" id="L277">    private static final long PI_O_4_BITS[] = new long[] {</span>
+        (0xc90fdaa2L &lt;&lt; 32) | 0x2168c234L,
+        (0xc4c6628bL &lt;&lt; 32) | 0x80dc1cd1L };
+
+    /** Eighths.
+     * This is used by sinQ, because its faster to do a table lookup than
+     * a multiply in this time-critical routine
+     */
+<span class="fc" id="L285">    private static final double EIGHTHS[] = {0, 0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875, 1.0, 1.125, 1.25, 1.375, 1.5, 1.625};</span>
+
+    /** Table of 2^((n+2)/3) */
+<span class="fc" id="L288">    private static final double CBRTTWO[] = { 0.6299605249474366,</span>
+                                            0.7937005259840998,
+                                            1.0,
+                                            1.2599210498948732,
+                                            1.5874010519681994 };
+
+    /*
+     *  There are 52 bits in the mantissa of a double.
+     *  For additional precision, the code splits double numbers into two parts,
+     *  by clearing the low order 30 bits if possible, and then performs the arithmetic
+     *  on each half separately.
+     */
+
+    /**
+     * 0x40000000 - used to split a double into two parts, both with the low order bits cleared.
+     * Equivalent to 2^30.
+     */
+    private static final long HEX_40000000 = 0x40000000L; // 1073741824L
+
+    /** Mask used to clear low order 30 bits */
+    private static final long MASK_30BITS = -1L - (HEX_40000000 -1); // 0xFFFFFFFFC0000000L;
+
+    /** 2^52 - double numbers this large must be integral (no fraction) or NaN or Infinite */
+    private static final double TWO_POWER_52 = 4503599627370496.0;
+
+    /** Constant: {@value}. */
+    private static final double F_1_3 = 1d / 3d;
+    /** Constant: {@value}. */
+    private static final double F_1_5 = 1d / 5d;
+    /** Constant: {@value}. */
+    private static final double F_1_7 = 1d / 7d;
+    /** Constant: {@value}. */
+    private static final double F_1_9 = 1d / 9d;
+    /** Constant: {@value}. */
+    private static final double F_1_11 = 1d / 11d;
+    /** Constant: {@value}. */
+    private static final double F_1_13 = 1d / 13d;
+    /** Constant: {@value}. */
+    private static final double F_1_15 = 1d / 15d;
+    /** Constant: {@value}. */
+    private static final double F_1_17 = 1d / 17d;
+    /** Constant: {@value}. */
+    private static final double F_3_4 = 3d / 4d;
+    /** Constant: {@value}. */
+    private static final double F_15_16 = 15d / 16d;
+    /** Constant: {@value}. */
+    private static final double F_13_14 = 13d / 14d;
+    /** Constant: {@value}. */
+    private static final double F_11_12 = 11d / 12d;
+    /** Constant: {@value}. */
+    private static final double F_9_10 = 9d / 10d;
+    /** Constant: {@value}. */
+    private static final double F_7_8 = 7d / 8d;
+    /** Constant: {@value}. */
+    private static final double F_5_6 = 5d / 6d;
+    /** Constant: {@value}. */
+    private static final double F_1_2 = 1d / 2d;
+
+    /**
+     * Private Constructor
+     */
+    private FastMath() {}
+
+    // Generic helper methods
+
+    /**
+     * Get the high order bits from the mantissa.
+     * Equivalent to adding and subtracting HEX_40000 but also works for very large numbers
+     *
+     * @param d the value to split
+     * @return the high order part of the mantissa
+     */
+    private static double doubleHighPart(double d) {
+<span class="fc bfc" id="L361" title="All 4 branches covered.">        if (d &gt; -Precision.SAFE_MIN &amp;&amp; d &lt; Precision.SAFE_MIN){</span>
+<span class="fc" id="L362">            return d; // These are un-normalised - don't try to convert</span>
+        }
+<span class="fc" id="L364">        long xl = Double.doubleToLongBits(d);</span>
+<span class="fc" id="L365">        xl = xl &amp; MASK_30BITS; // Drop low order bits</span>
+<span class="fc" id="L366">        return Double.longBitsToDouble(xl);</span>
+    }
+
+    /** Compute the square root of a number.
+     * &lt;p&gt;&lt;b&gt;Note:&lt;/b&gt; this implementation currently delegates to {@link Math#sqrt}
+     * @param a number on which evaluation is done
+     * @return square root of a
+     */
+    public static double sqrt(final double a) {
+<span class="fc" id="L375">        return Math.sqrt(a);</span>
+    }
+
+    /** Compute the hyperbolic cosine of a number.
+     * @param x number on which evaluation is done
+     * @return hyperbolic cosine of x
+     */
+    public static double cosh(double x) {
+<span class="fc bfc" id="L383" title="All 2 branches covered.">      if (x != x) {</span>
+<span class="fc" id="L384">          return x;</span>
+      }
+
+      // cosh[z] = (exp(z) + exp(-z))/2
+
+      // for numbers with magnitude 20 or so,
+      // exp(-z) can be ignored in comparison with exp(z)
+
+<span class="fc bfc" id="L392" title="All 2 branches covered.">      if (x &gt; 20.0) {</span>
+<span class="fc" id="L393">          return exp(x)/2.0;</span>
+      }
+
+<span class="fc bfc" id="L396" title="All 2 branches covered.">      if (x &lt; -20) {</span>
+<span class="fc" id="L397">          return exp(-x)/2.0;</span>
+      }
+
+<span class="fc" id="L400">      double hiPrec[] = new double[2];</span>
+<span class="fc bfc" id="L401" title="All 2 branches covered.">      if (x &lt; 0.0) {</span>
+<span class="fc" id="L402">          x = -x;</span>
+      }
+<span class="fc" id="L404">      exp(x, 0.0, hiPrec);</span>
+
+<span class="fc" id="L406">      double ya = hiPrec[0] + hiPrec[1];</span>
+<span class="fc" id="L407">      double yb = -(ya - hiPrec[0] - hiPrec[1]);</span>
+
+<span class="fc" id="L409">      double temp = ya * HEX_40000000;</span>
+<span class="fc" id="L410">      double yaa = ya + temp - temp;</span>
+<span class="fc" id="L411">      double yab = ya - yaa;</span>
+
+      // recip = 1/y
+<span class="fc" id="L414">      double recip = 1.0/ya;</span>
+<span class="fc" id="L415">      temp = recip * HEX_40000000;</span>
+<span class="fc" id="L416">      double recipa = recip + temp - temp;</span>
+<span class="fc" id="L417">      double recipb = recip - recipa;</span>
+
+      // Correct for rounding in division
+<span class="fc" id="L420">      recipb += (1.0 - yaa*recipa - yaa*recipb - yab*recipa - yab*recipb) * recip;</span>
+      // Account for yb
+<span class="fc" id="L422">      recipb += -yb * recip * recip;</span>
+
+      // y = y + 1/y
+<span class="fc" id="L425">      temp = ya + recipa;</span>
+<span class="fc" id="L426">      yb += -(temp - ya - recipa);</span>
+<span class="fc" id="L427">      ya = temp;</span>
+<span class="fc" id="L428">      temp = ya + recipb;</span>
+<span class="fc" id="L429">      yb += -(temp - ya - recipb);</span>
+<span class="fc" id="L430">      ya = temp;</span>
+
+<span class="fc" id="L432">      double result = ya + yb;</span>
+<span class="fc" id="L433">      result *= 0.5;</span>
+<span class="fc" id="L434">      return result;</span>
+    }
+
+    /** Compute the hyperbolic sine of a number.
+     * @param x number on which evaluation is done
+     * @return hyperbolic sine of x
+     */
+    public static double sinh(double x) {
+<span class="fc" id="L442">      boolean negate = false;</span>
+<span class="fc bfc" id="L443" title="All 2 branches covered.">      if (x != x) {</span>
+<span class="fc" id="L444">          return x;</span>
+      }
+
+      // sinh[z] = (exp(z) - exp(-z) / 2
+
+      // for values of z larger than about 20,
+      // exp(-z) can be ignored in comparison with exp(z)
+
+<span class="fc bfc" id="L452" title="All 2 branches covered.">      if (x &gt; 20.0) {</span>
+<span class="fc" id="L453">          return exp(x)/2.0;</span>
+      }
+
+<span class="fc bfc" id="L456" title="All 2 branches covered.">      if (x &lt; -20) {</span>
+<span class="fc" id="L457">          return -exp(-x)/2.0;</span>
+      }
+
+<span class="fc bfc" id="L460" title="All 2 branches covered.">      if (x == 0) {</span>
+<span class="fc" id="L461">          return x;</span>
+      }
+
+<span class="fc bfc" id="L464" title="All 2 branches covered.">      if (x &lt; 0.0) {</span>
+<span class="fc" id="L465">          x = -x;</span>
+<span class="fc" id="L466">          negate = true;</span>
+      }
+
+      double result;
+
+<span class="fc bfc" id="L471" title="All 2 branches covered.">      if (x &gt; 0.25) {</span>
+<span class="fc" id="L472">          double hiPrec[] = new double[2];</span>
+<span class="fc" id="L473">          exp(x, 0.0, hiPrec);</span>
+
+<span class="fc" id="L475">          double ya = hiPrec[0] + hiPrec[1];</span>
+<span class="fc" id="L476">          double yb = -(ya - hiPrec[0] - hiPrec[1]);</span>
+
+<span class="fc" id="L478">          double temp = ya * HEX_40000000;</span>
+<span class="fc" id="L479">          double yaa = ya + temp - temp;</span>
+<span class="fc" id="L480">          double yab = ya - yaa;</span>
+
+          // recip = 1/y
+<span class="fc" id="L483">          double recip = 1.0/ya;</span>
+<span class="fc" id="L484">          temp = recip * HEX_40000000;</span>
+<span class="fc" id="L485">          double recipa = recip + temp - temp;</span>
+<span class="fc" id="L486">          double recipb = recip - recipa;</span>
+
+          // Correct for rounding in division
+<span class="fc" id="L489">          recipb += (1.0 - yaa*recipa - yaa*recipb - yab*recipa - yab*recipb) * recip;</span>
+          // Account for yb
+<span class="fc" id="L491">          recipb += -yb * recip * recip;</span>
+
+<span class="fc" id="L493">          recipa = -recipa;</span>
+<span class="fc" id="L494">          recipb = -recipb;</span>
+
+          // y = y + 1/y
+<span class="fc" id="L497">          temp = ya + recipa;</span>
+<span class="fc" id="L498">          yb += -(temp - ya - recipa);</span>
+<span class="fc" id="L499">          ya = temp;</span>
+<span class="fc" id="L500">          temp = ya + recipb;</span>
+<span class="fc" id="L501">          yb += -(temp - ya - recipb);</span>
+<span class="fc" id="L502">          ya = temp;</span>
+
+<span class="fc" id="L504">          result = ya + yb;</span>
+<span class="fc" id="L505">          result *= 0.5;</span>
+<span class="fc" id="L506">      }</span>
+      else {
+<span class="fc" id="L508">          double hiPrec[] = new double[2];</span>
+<span class="fc" id="L509">          expm1(x, hiPrec);</span>
+
+<span class="fc" id="L511">          double ya = hiPrec[0] + hiPrec[1];</span>
+<span class="fc" id="L512">          double yb = -(ya - hiPrec[0] - hiPrec[1]);</span>
+
+          /* Compute expm1(-x) = -expm1(x) / (expm1(x) + 1) */
+<span class="fc" id="L515">          double denom = 1.0 + ya;</span>
+<span class="fc" id="L516">          double denomr = 1.0 / denom;</span>
+<span class="fc" id="L517">          double denomb = -(denom - 1.0 - ya) + yb;</span>
+<span class="fc" id="L518">          double ratio = ya * denomr;</span>
+<span class="fc" id="L519">          double temp = ratio * HEX_40000000;</span>
+<span class="fc" id="L520">          double ra = ratio + temp - temp;</span>
+<span class="fc" id="L521">          double rb = ratio - ra;</span>
+
+<span class="fc" id="L523">          temp = denom * HEX_40000000;</span>
+<span class="fc" id="L524">          double za = denom + temp - temp;</span>
+<span class="fc" id="L525">          double zb = denom - za;</span>
+
+<span class="fc" id="L527">          rb += (ya - za*ra - za*rb - zb*ra - zb*rb) * denomr;</span>
+
+          // Adjust for yb
+<span class="fc" id="L530">          rb += yb*denomr;                        // numerator</span>
+<span class="fc" id="L531">          rb += -ya * denomb * denomr * denomr;   // denominator</span>
+
+          // y = y - 1/y
+<span class="fc" id="L534">          temp = ya + ra;</span>
+<span class="fc" id="L535">          yb += -(temp - ya - ra);</span>
+<span class="fc" id="L536">          ya = temp;</span>
+<span class="fc" id="L537">          temp = ya + rb;</span>
+<span class="fc" id="L538">          yb += -(temp - ya - rb);</span>
+<span class="fc" id="L539">          ya = temp;</span>
+
+<span class="fc" id="L541">          result = ya + yb;</span>
+<span class="fc" id="L542">          result *= 0.5;</span>
+      }
+
+<span class="fc bfc" id="L545" title="All 2 branches covered.">      if (negate) {</span>
+<span class="fc" id="L546">          result = -result;</span>
+      }
+
+<span class="fc" id="L549">      return result;</span>
+    }
+
+    /** Compute the hyperbolic tangent of a number.
+     * @param x number on which evaluation is done
+     * @return hyperbolic tangent of x
+     */
+    public static double tanh(double x) {
+<span class="fc" id="L557">      boolean negate = false;</span>
+
+<span class="fc bfc" id="L559" title="All 2 branches covered.">      if (x != x) {</span>
+<span class="fc" id="L560">          return x;</span>
+      }
+
+      // tanh[z] = sinh[z] / cosh[z]
+      // = (exp(z) - exp(-z)) / (exp(z) + exp(-z))
+      // = (exp(2x) - 1) / (exp(2x) + 1)
+
+      // for magnitude &gt; 20, sinh[z] == cosh[z] in double precision
+
+<span class="fc bfc" id="L569" title="All 2 branches covered.">      if (x &gt; 20.0) {</span>
+<span class="fc" id="L570">          return 1.0;</span>
+      }
+
+<span class="fc bfc" id="L573" title="All 2 branches covered.">      if (x &lt; -20) {</span>
+<span class="fc" id="L574">          return -1.0;</span>
+      }
+
+<span class="fc bfc" id="L577" title="All 2 branches covered.">      if (x == 0) {</span>
+<span class="fc" id="L578">          return x;</span>
+      }
+
+<span class="fc bfc" id="L581" title="All 2 branches covered.">      if (x &lt; 0.0) {</span>
+<span class="fc" id="L582">          x = -x;</span>
+<span class="fc" id="L583">          negate = true;</span>
+      }
+
+      double result;
+<span class="fc bfc" id="L587" title="All 2 branches covered.">      if (x &gt;= 0.5) {</span>
+<span class="fc" id="L588">          double hiPrec[] = new double[2];</span>
+          // tanh(x) = (exp(2x) - 1) / (exp(2x) + 1)
+<span class="fc" id="L590">          exp(x*2.0, 0.0, hiPrec);</span>
+
+<span class="fc" id="L592">          double ya = hiPrec[0] + hiPrec[1];</span>
+<span class="fc" id="L593">          double yb = -(ya - hiPrec[0] - hiPrec[1]);</span>
+
+          /* Numerator */
+<span class="fc" id="L596">          double na = -1.0 + ya;</span>
+<span class="fc" id="L597">          double nb = -(na + 1.0 - ya);</span>
+<span class="fc" id="L598">          double temp = na + yb;</span>
+<span class="fc" id="L599">          nb += -(temp - na - yb);</span>
+<span class="fc" id="L600">          na = temp;</span>
+
+          /* Denominator */
+<span class="fc" id="L603">          double da = 1.0 + ya;</span>
+<span class="fc" id="L604">          double db = -(da - 1.0 - ya);</span>
+<span class="fc" id="L605">          temp = da + yb;</span>
+<span class="fc" id="L606">          db += -(temp - da - yb);</span>
+<span class="fc" id="L607">          da = temp;</span>
+
+<span class="fc" id="L609">          temp = da * HEX_40000000;</span>
+<span class="fc" id="L610">          double daa = da + temp - temp;</span>
+<span class="fc" id="L611">          double dab = da - daa;</span>
+
+          // ratio = na/da
+<span class="fc" id="L614">          double ratio = na/da;</span>
+<span class="fc" id="L615">          temp = ratio * HEX_40000000;</span>
+<span class="fc" id="L616">          double ratioa = ratio + temp - temp;</span>
+<span class="fc" id="L617">          double ratiob = ratio - ratioa;</span>
+
+          // Correct for rounding in division
+<span class="fc" id="L620">          ratiob += (na - daa*ratioa - daa*ratiob - dab*ratioa - dab*ratiob) / da;</span>
+
+          // Account for nb
+<span class="fc" id="L623">          ratiob += nb / da;</span>
+          // Account for db
+<span class="fc" id="L625">          ratiob += -db * na / da / da;</span>
+
+<span class="fc" id="L627">          result = ratioa + ratiob;</span>
+<span class="fc" id="L628">      }</span>
+      else {
+<span class="fc" id="L630">          double hiPrec[] = new double[2];</span>
+          // tanh(x) = expm1(2x) / (expm1(2x) + 2)
+<span class="fc" id="L632">          expm1(x*2.0, hiPrec);</span>
+
+<span class="fc" id="L634">          double ya = hiPrec[0] + hiPrec[1];</span>
+<span class="fc" id="L635">          double yb = -(ya - hiPrec[0] - hiPrec[1]);</span>
+
+          /* Numerator */
+<span class="fc" id="L638">          double na = ya;</span>
+<span class="fc" id="L639">          double nb = yb;</span>
+
+          /* Denominator */
+<span class="fc" id="L642">          double da = 2.0 + ya;</span>
+<span class="fc" id="L643">          double db = -(da - 2.0 - ya);</span>
+<span class="fc" id="L644">          double temp = da + yb;</span>
+<span class="fc" id="L645">          db += -(temp - da - yb);</span>
+<span class="fc" id="L646">          da = temp;</span>
+
+<span class="fc" id="L648">          temp = da * HEX_40000000;</span>
+<span class="fc" id="L649">          double daa = da + temp - temp;</span>
+<span class="fc" id="L650">          double dab = da - daa;</span>
+
+          // ratio = na/da
+<span class="fc" id="L653">          double ratio = na/da;</span>
+<span class="fc" id="L654">          temp = ratio * HEX_40000000;</span>
+<span class="fc" id="L655">          double ratioa = ratio + temp - temp;</span>
+<span class="fc" id="L656">          double ratiob = ratio - ratioa;</span>
+
+          // Correct for rounding in division
+<span class="fc" id="L659">          ratiob += (na - daa*ratioa - daa*ratiob - dab*ratioa - dab*ratiob) / da;</span>
+
+          // Account for nb
+<span class="fc" id="L662">          ratiob += nb / da;</span>
+          // Account for db
+<span class="fc" id="L664">          ratiob += -db * na / da / da;</span>
+
+<span class="fc" id="L666">          result = ratioa + ratiob;</span>
+      }
+
+<span class="fc bfc" id="L669" title="All 2 branches covered.">      if (negate) {</span>
+<span class="fc" id="L670">          result = -result;</span>
+      }
+
+<span class="fc" id="L673">      return result;</span>
+    }
+
+    /** Compute the inverse hyperbolic cosine of a number.
+     * @param a number on which evaluation is done
+     * @return inverse hyperbolic cosine of a
+     */
+    public static double acosh(final double a) {
+<span class="fc" id="L681">        return FastMath.log(a + FastMath.sqrt(a * a - 1));</span>
+    }
+
+    /** Compute the inverse hyperbolic sine of a number.
+     * @param a number on which evaluation is done
+     * @return inverse hyperbolic sine of a
+     */
+    public static double asinh(double a) {
+<span class="fc" id="L689">        boolean negative = false;</span>
+<span class="fc bfc" id="L690" title="All 2 branches covered.">        if (a &lt; 0) {</span>
+<span class="fc" id="L691">            negative = true;</span>
+<span class="fc" id="L692">            a = -a;</span>
+        }
+
+        double absAsinh;
+<span class="fc bfc" id="L696" title="All 2 branches covered.">        if (a &gt; 0.167) {</span>
+<span class="fc" id="L697">            absAsinh = FastMath.log(FastMath.sqrt(a * a + 1) + a);</span>
+        } else {
+<span class="fc" id="L699">            final double a2 = a * a;</span>
+<span class="fc bfc" id="L700" title="All 2 branches covered.">            if (a &gt; 0.097) {</span>
+<span class="fc" id="L701">                absAsinh = a * (1 - a2 * (F_1_3 - a2 * (F_1_5 - a2 * (F_1_7 - a2 * (F_1_9 - a2 * (F_1_11 - a2 * (F_1_13 - a2 * (F_1_15 - a2 * F_1_17 * F_15_16) * F_13_14) * F_11_12) * F_9_10) * F_7_8) * F_5_6) * F_3_4) * F_1_2);</span>
+<span class="fc bfc" id="L702" title="All 2 branches covered.">            } else if (a &gt; 0.036) {</span>
+<span class="fc" id="L703">                absAsinh = a * (1 - a2 * (F_1_3 - a2 * (F_1_5 - a2 * (F_1_7 - a2 * (F_1_9 - a2 * (F_1_11 - a2 * F_1_13 * F_11_12) * F_9_10) * F_7_8) * F_5_6) * F_3_4) * F_1_2);</span>
+<span class="fc bfc" id="L704" title="All 2 branches covered.">            } else if (a &gt; 0.0036) {</span>
+<span class="fc" id="L705">                absAsinh = a * (1 - a2 * (F_1_3 - a2 * (F_1_5 - a2 * (F_1_7 - a2 * F_1_9 * F_7_8) * F_5_6) * F_3_4) * F_1_2);</span>
+            } else {
+<span class="fc" id="L707">                absAsinh = a * (1 - a2 * (F_1_3 - a2 * F_1_5 * F_3_4) * F_1_2);</span>
+            }
+        }
+
+<span class="fc bfc" id="L711" title="All 2 branches covered.">        return negative ? -absAsinh : absAsinh;</span>
+    }
+
+    /** Compute the inverse hyperbolic tangent of a number.
+     * @param a number on which evaluation is done
+     * @return inverse hyperbolic tangent of a
+     */
+    public static double atanh(double a) {
+<span class="fc" id="L719">        boolean negative = false;</span>
+<span class="fc bfc" id="L720" title="All 2 branches covered.">        if (a &lt; 0) {</span>
+<span class="fc" id="L721">            negative = true;</span>
+<span class="fc" id="L722">            a = -a;</span>
+        }
+
+        double absAtanh;
+<span class="fc bfc" id="L726" title="All 2 branches covered.">        if (a &gt; 0.15) {</span>
+<span class="fc" id="L727">            absAtanh = 0.5 * FastMath.log((1 + a) / (1 - a));</span>
+        } else {
+<span class="fc" id="L729">            final double a2 = a * a;</span>
+<span class="fc bfc" id="L730" title="All 2 branches covered.">            if (a &gt; 0.087) {</span>
+<span class="fc" id="L731">                absAtanh = a * (1 + a2 * (F_1_3 + a2 * (F_1_5 + a2 * (F_1_7 + a2 * (F_1_9 + a2 * (F_1_11 + a2 * (F_1_13 + a2 * (F_1_15 + a2 * F_1_17))))))));</span>
+<span class="fc bfc" id="L732" title="All 2 branches covered.">            } else if (a &gt; 0.031) {</span>
+<span class="fc" id="L733">                absAtanh = a * (1 + a2 * (F_1_3 + a2 * (F_1_5 + a2 * (F_1_7 + a2 * (F_1_9 + a2 * (F_1_11 + a2 * F_1_13))))));</span>
+<span class="fc bfc" id="L734" title="All 2 branches covered.">            } else if (a &gt; 0.003) {</span>
+<span class="fc" id="L735">                absAtanh = a * (1 + a2 * (F_1_3 + a2 * (F_1_5 + a2 * (F_1_7 + a2 * F_1_9))));</span>
+            } else {
+<span class="fc" id="L737">                absAtanh = a * (1 + a2 * (F_1_3 + a2 * F_1_5));</span>
+            }
+        }
+
+<span class="fc bfc" id="L741" title="All 2 branches covered.">        return negative ? -absAtanh : absAtanh;</span>
+    }
+
+    /** Compute the signum of a number.
+     * The signum is -1 for negative numbers, +1 for positive numbers and 0 otherwise
+     * @param a number on which evaluation is done
+     * @return -1.0, -0.0, +0.0, +1.0 or NaN depending on sign of a
+     */
+    public static double signum(final double a) {
+<span class="fc bfc" id="L750" title="All 4 branches covered.">        return (a &lt; 0.0) ? -1.0 : ((a &gt; 0.0) ? 1.0 : a); // return +0.0/-0.0/NaN depending on a</span>
+    }
+
+    /** Compute the signum of a number.
+     * The signum is -1 for negative numbers, +1 for positive numbers and 0 otherwise
+     * @param a number on which evaluation is done
+     * @return -1.0, -0.0, +0.0, +1.0 or NaN depending on sign of a
+     */
+    public static float signum(final float a) {
+<span class="fc bfc" id="L759" title="All 4 branches covered.">        return (a &lt; 0.0f) ? -1.0f : ((a &gt; 0.0f) ? 1.0f : a); // return +0.0/-0.0/NaN depending on a</span>
+    }
+
+    /** Compute next number towards positive infinity.
+     * @param a number to which neighbor should be computed
+     * @return neighbor of a towards positive infinity
+     */
+    public static double nextUp(final double a) {
+<span class="fc" id="L767">        return nextAfter(a, Double.POSITIVE_INFINITY);</span>
+    }
+
+    /** Compute next number towards positive infinity.
+     * @param a number to which neighbor should be computed
+     * @return neighbor of a towards positive infinity
+     */
+    public static float nextUp(final float a) {
+<span class="fc" id="L775">        return nextAfter(a, Float.POSITIVE_INFINITY);</span>
+    }
+
+    /** Returns a pseudo-random number between 0.0 and 1.0.
+     * &lt;p&gt;&lt;b&gt;Note:&lt;/b&gt; this implementation currently delegates to {@link Math#random}
+     * @return a random number between 0.0 and 1.0
+     */
+    public static double random() {
+<span class="fc" id="L783">        return Math.random();</span>
+    }
+
+    /**
+     * Exponential function.
+     *
+     * Computes exp(x), function result is nearly rounded.   It will be correctly
+     * rounded to the theoretical value for 99.9% of input values, otherwise it will
+     * have a 1 UPL error.
+     *
+     * Method:
+     *    Lookup intVal = exp(int(x))
+     *    Lookup fracVal = exp(int(x-int(x) / 1024.0) * 1024.0 );
+     *    Compute z as the exponential of the remaining bits by a polynomial minus one
+     *    exp(x) = intVal * fracVal * (1 + z)
+     *
+     * Accuracy:
+     *    Calculation is done with 63 bits of precision, so result should be correctly
+     *    rounded for 99.9% of input values, with less than 1 ULP error otherwise.
+     *
+     * @param x   a double
+     * @return double e&lt;sup&gt;x&lt;/sup&gt;
+     */
+    public static double exp(double x) {
+<span class="fc" id="L807">        return exp(x, 0.0, null);</span>
+    }
+
+    /**
+     * Internal helper method for exponential function.
+     * @param x original argument of the exponential function
+     * @param extra extra bits of precision on input (To Be Confirmed)
+     * @param hiPrec extra bits of precision on output (To Be Confirmed)
+     * @return exp(x)
+     */
+    private static double exp(double x, double extra, double[] hiPrec) {
+        double intPartA;
+        double intPartB;
+        int intVal;
+
+        /* Lookup exp(floor(x)).
+         * intPartA will have the upper 22 bits, intPartB will have the lower
+         * 52 bits.
+         */
+<span class="fc bfc" id="L826" title="All 2 branches covered.">        if (x &lt; 0.0) {</span>
+<span class="fc" id="L827">            intVal = (int) -x;</span>
+
+<span class="fc bfc" id="L829" title="All 2 branches covered.">            if (intVal &gt; 746) {</span>
+<span class="fc bfc" id="L830" title="All 2 branches covered.">                if (hiPrec != null) {</span>
+<span class="fc" id="L831">                    hiPrec[0] = 0.0;</span>
+<span class="fc" id="L832">                    hiPrec[1] = 0.0;</span>
+                }
+<span class="fc" id="L834">                return 0.0;</span>
+            }
+
+<span class="fc bfc" id="L837" title="All 2 branches covered.">            if (intVal &gt; 709) {</span>
+                /* This will produce a subnormal output */
+<span class="fc" id="L839">                final double result = exp(x+40.19140625, extra, hiPrec) / 285040095144011776.0;</span>
+<span class="pc bpc" id="L840" title="1 of 2 branches missed.">                if (hiPrec != null) {</span>
+<span class="nc" id="L841">                    hiPrec[0] /= 285040095144011776.0;</span>
+<span class="nc" id="L842">                    hiPrec[1] /= 285040095144011776.0;</span>
+                }
+<span class="fc" id="L844">                return result;</span>
+            }
+
+<span class="fc bfc" id="L847" title="All 2 branches covered.">            if (intVal == 709) {</span>
+                /* exp(1.494140625) is nearly a machine number... */
+<span class="fc" id="L849">                final double result = exp(x+1.494140625, extra, hiPrec) / 4.455505956692756620;</span>
+<span class="pc bpc" id="L850" title="1 of 2 branches missed.">                if (hiPrec != null) {</span>
+<span class="nc" id="L851">                    hiPrec[0] /= 4.455505956692756620;</span>
+<span class="nc" id="L852">                    hiPrec[1] /= 4.455505956692756620;</span>
+                }
+<span class="fc" id="L854">                return result;</span>
+            }
+
+<span class="fc" id="L857">            intVal++;</span>
+
+<span class="fc" id="L859">            intPartA = ExpIntTable.EXP_INT_TABLE_A[EXP_INT_TABLE_MAX_INDEX-intVal];</span>
+<span class="fc" id="L860">            intPartB = ExpIntTable.EXP_INT_TABLE_B[EXP_INT_TABLE_MAX_INDEX-intVal];</span>
+
+<span class="fc" id="L862">            intVal = -intVal;</span>
+        } else {
+<span class="fc" id="L864">            intVal = (int) x;</span>
+
+<span class="fc bfc" id="L866" title="All 2 branches covered.">            if (intVal &gt; 709) {</span>
+<span class="fc bfc" id="L867" title="All 2 branches covered.">                if (hiPrec != null) {</span>
+<span class="fc" id="L868">                    hiPrec[0] = Double.POSITIVE_INFINITY;</span>
+<span class="fc" id="L869">                    hiPrec[1] = 0.0;</span>
+                }
+<span class="fc" id="L871">                return Double.POSITIVE_INFINITY;</span>
+            }
+
+<span class="fc" id="L874">            intPartA = ExpIntTable.EXP_INT_TABLE_A[EXP_INT_TABLE_MAX_INDEX+intVal];</span>
+<span class="fc" id="L875">            intPartB = ExpIntTable.EXP_INT_TABLE_B[EXP_INT_TABLE_MAX_INDEX+intVal];</span>
+        }
+
+        /* Get the fractional part of x, find the greatest multiple of 2^-10 less than
+         * x and look up the exp function of it.
+         * fracPartA will have the upper 22 bits, fracPartB the lower 52 bits.
+         */
+<span class="fc" id="L882">        final int intFrac = (int) ((x - intVal) * 1024.0);</span>
+<span class="fc" id="L883">        final double fracPartA = ExpFracTable.EXP_FRAC_TABLE_A[intFrac];</span>
+<span class="fc" id="L884">        final double fracPartB = ExpFracTable.EXP_FRAC_TABLE_B[intFrac];</span>
+
+        /* epsilon is the difference in x from the nearest multiple of 2^-10.  It
+         * has a value in the range 0 &lt;= epsilon &lt; 2^-10.
+         * Do the subtraction from x as the last step to avoid possible loss of percison.
+         */
+<span class="fc" id="L890">        final double epsilon = x - (intVal + intFrac / 1024.0);</span>
+
+        /* Compute z = exp(epsilon) - 1.0 via a minimax polynomial.  z has
+       full double precision (52 bits).  Since z &lt; 2^-10, we will have
+       62 bits of precision when combined with the contant 1.  This will be
+       used in the last addition below to get proper rounding. */
+
+        /* Remez generated polynomial.  Converges on the interval [0, 2^-10], error
+       is less than 0.5 ULP */
+<span class="fc" id="L899">        double z = 0.04168701738764507;</span>
+<span class="fc" id="L900">        z = z * epsilon + 0.1666666505023083;</span>
+<span class="fc" id="L901">        z = z * epsilon + 0.5000000000042687;</span>
+<span class="fc" id="L902">        z = z * epsilon + 1.0;</span>
+<span class="fc" id="L903">        z = z * epsilon + -3.940510424527919E-20;</span>
+
+        /* Compute (intPartA+intPartB) * (fracPartA+fracPartB) by binomial
+       expansion.
+       tempA is exact since intPartA and intPartB only have 22 bits each.
+       tempB will have 52 bits of precision.
+         */
+<span class="fc" id="L910">        double tempA = intPartA * fracPartA;</span>
+<span class="fc" id="L911">        double tempB = intPartA * fracPartB + intPartB * fracPartA + intPartB * fracPartB;</span>
+
+        /* Compute the result.  (1+z)(tempA+tempB).  Order of operations is
+       important.  For accuracy add by increasing size.  tempA is exact and
+       much larger than the others.  If there are extra bits specified from the
+       pow() function, use them. */
+<span class="fc" id="L917">        final double tempC = tempB + tempA;</span>
+        final double result;
+<span class="fc bfc" id="L919" title="All 2 branches covered.">        if (extra != 0.0) {</span>
+<span class="fc" id="L920">            result = tempC*extra*z + tempC*extra + tempC*z + tempB + tempA;</span>
+        } else {
+<span class="fc" id="L922">            result = tempC*z + tempB + tempA;</span>
+        }
+
+<span class="fc bfc" id="L925" title="All 2 branches covered.">        if (hiPrec != null) {</span>
+            // If requesting high precision
+<span class="fc" id="L927">            hiPrec[0] = tempA;</span>
+<span class="fc" id="L928">            hiPrec[1] = tempC*extra*z + tempC*extra + tempC*z + tempB;</span>
+        }
+
+<span class="fc" id="L931">        return result;</span>
+    }
+
+    /** Compute exp(x) - 1
+     * @param x number to compute shifted exponential
+     * @return exp(x) - 1
+     */
+    public static double expm1(double x) {
+<span class="fc" id="L939">      return expm1(x, null);</span>
+    }
+
+    /** Internal helper method for expm1
+     * @param x number to compute shifted exponential
+     * @param hiPrecOut receive high precision result for -1.0 &lt; x &lt; 1.0
+     * @return exp(x) - 1
+     */
+    private static double expm1(double x, double hiPrecOut[]) {
+<span class="fc bfc" id="L948" title="All 4 branches covered.">        if (x != x || x == 0.0) { // NaN or zero</span>
+<span class="fc" id="L949">            return x;</span>
+        }
+
+<span class="fc bfc" id="L952" title="All 4 branches covered.">        if (x &lt;= -1.0 || x &gt;= 1.0) {</span>
+            // If not between +/- 1.0
+            //return exp(x) - 1.0;
+<span class="fc" id="L955">            double hiPrec[] = new double[2];</span>
+<span class="fc" id="L956">            exp(x, 0.0, hiPrec);</span>
+<span class="fc bfc" id="L957" title="All 2 branches covered.">            if (x &gt; 0.0) {</span>
+<span class="fc" id="L958">                return -1.0 + hiPrec[0] + hiPrec[1];</span>
+            } else {
+<span class="fc" id="L960">                final double ra = -1.0 + hiPrec[0];</span>
+<span class="fc" id="L961">                double rb = -(ra + 1.0 - hiPrec[0]);</span>
+<span class="fc" id="L962">                rb += hiPrec[1];</span>
+<span class="fc" id="L963">                return ra + rb;</span>
+            }
+        }
+
+        double baseA;
+        double baseB;
+        double epsilon;
+<span class="fc" id="L970">        boolean negative = false;</span>
+
+<span class="fc bfc" id="L972" title="All 2 branches covered.">        if (x &lt; 0.0) {</span>
+<span class="fc" id="L973">            x = -x;</span>
+<span class="fc" id="L974">            negative = true;</span>
+        }
+
+        {
+<span class="fc" id="L978">            int intFrac = (int) (x * 1024.0);</span>
+<span class="fc" id="L979">            double tempA = ExpFracTable.EXP_FRAC_TABLE_A[intFrac] - 1.0;</span>
+<span class="fc" id="L980">            double tempB = ExpFracTable.EXP_FRAC_TABLE_B[intFrac];</span>
+
+<span class="fc" id="L982">            double temp = tempA + tempB;</span>
+<span class="fc" id="L983">            tempB = -(temp - tempA - tempB);</span>
+<span class="fc" id="L984">            tempA = temp;</span>
+
+<span class="fc" id="L986">            temp = tempA * HEX_40000000;</span>
+<span class="fc" id="L987">            baseA = tempA + temp - temp;</span>
+<span class="fc" id="L988">            baseB = tempB + (tempA - baseA);</span>
+
+<span class="fc" id="L990">            epsilon = x - intFrac/1024.0;</span>
+        }
+
+
+        /* Compute expm1(epsilon) */
+<span class="fc" id="L995">        double zb = 0.008336750013465571;</span>
+<span class="fc" id="L996">        zb = zb * epsilon + 0.041666663879186654;</span>
+<span class="fc" id="L997">        zb = zb * epsilon + 0.16666666666745392;</span>
+<span class="fc" id="L998">        zb = zb * epsilon + 0.49999999999999994;</span>
+<span class="fc" id="L999">        zb = zb * epsilon;</span>
+<span class="fc" id="L1000">        zb = zb * epsilon;</span>
+
+<span class="fc" id="L1002">        double za = epsilon;</span>
+<span class="fc" id="L1003">        double temp = za + zb;</span>
+<span class="fc" id="L1004">        zb = -(temp - za - zb);</span>
+<span class="fc" id="L1005">        za = temp;</span>
+
+<span class="fc" id="L1007">        temp = za * HEX_40000000;</span>
+<span class="fc" id="L1008">        temp = za + temp - temp;</span>
+<span class="fc" id="L1009">        zb += za - temp;</span>
+<span class="fc" id="L1010">        za = temp;</span>
+
+        /* Combine the parts.   expm1(a+b) = expm1(a) + expm1(b) + expm1(a)*expm1(b) */
+<span class="fc" id="L1013">        double ya = za * baseA;</span>
+        //double yb = za*baseB + zb*baseA + zb*baseB;
+<span class="fc" id="L1015">        temp = ya + za * baseB;</span>
+<span class="fc" id="L1016">        double yb = -(temp - ya - za * baseB);</span>
+<span class="fc" id="L1017">        ya = temp;</span>
+
+<span class="fc" id="L1019">        temp = ya + zb * baseA;</span>
+<span class="fc" id="L1020">        yb += -(temp - ya - zb * baseA);</span>
+<span class="fc" id="L1021">        ya = temp;</span>
+
+<span class="fc" id="L1023">        temp = ya + zb * baseB;</span>
+<span class="fc" id="L1024">        yb += -(temp - ya - zb*baseB);</span>
+<span class="fc" id="L1025">        ya = temp;</span>
+
+        //ya = ya + za + baseA;
+        //yb = yb + zb + baseB;
+<span class="fc" id="L1029">        temp = ya + baseA;</span>
+<span class="fc" id="L1030">        yb += -(temp - baseA - ya);</span>
+<span class="fc" id="L1031">        ya = temp;</span>
+
+<span class="fc" id="L1033">        temp = ya + za;</span>
+        //yb += (ya &gt; za) ? -(temp - ya - za) : -(temp - za - ya);
+<span class="fc" id="L1035">        yb += -(temp - ya - za);</span>
+<span class="fc" id="L1036">        ya = temp;</span>
+
+<span class="fc" id="L1038">        temp = ya + baseB;</span>
+        //yb += (ya &gt; baseB) ? -(temp - ya - baseB) : -(temp - baseB - ya);
+<span class="fc" id="L1040">        yb += -(temp - ya - baseB);</span>
+<span class="fc" id="L1041">        ya = temp;</span>
+
+<span class="fc" id="L1043">        temp = ya + zb;</span>
+        //yb += (ya &gt; zb) ? -(temp - ya - zb) : -(temp - zb - ya);
+<span class="fc" id="L1045">        yb += -(temp - ya - zb);</span>
+<span class="fc" id="L1046">        ya = temp;</span>
+
+<span class="fc bfc" id="L1048" title="All 2 branches covered.">        if (negative) {</span>
+            /* Compute expm1(-x) = -expm1(x) / (expm1(x) + 1) */
+<span class="fc" id="L1050">            double denom = 1.0 + ya;</span>
+<span class="fc" id="L1051">            double denomr = 1.0 / denom;</span>
+<span class="fc" id="L1052">            double denomb = -(denom - 1.0 - ya) + yb;</span>
+<span class="fc" id="L1053">            double ratio = ya * denomr;</span>
+<span class="fc" id="L1054">            temp = ratio * HEX_40000000;</span>
+<span class="fc" id="L1055">            final double ra = ratio + temp - temp;</span>
+<span class="fc" id="L1056">            double rb = ratio - ra;</span>
+
+<span class="fc" id="L1058">            temp = denom * HEX_40000000;</span>
+<span class="fc" id="L1059">            za = denom + temp - temp;</span>
+<span class="fc" id="L1060">            zb = denom - za;</span>
+
+<span class="fc" id="L1062">            rb += (ya - za * ra - za * rb - zb * ra - zb * rb) * denomr;</span>
+
+            // f(x) = x/1+x
+            // Compute f'(x)
+            // Product rule:  d(uv) = du*v + u*dv
+            // Chain rule:  d(f(g(x)) = f'(g(x))*f(g'(x))
+            // d(1/x) = -1/(x*x)
+            // d(1/1+x) = -1/( (1+x)^2) *  1 =  -1/((1+x)*(1+x))
+            // d(x/1+x) = -x/((1+x)(1+x)) + 1/1+x = 1 / ((1+x)(1+x))
+
+            // Adjust for yb
+<span class="fc" id="L1073">            rb += yb * denomr;                      // numerator</span>
+<span class="fc" id="L1074">            rb += -ya * denomb * denomr * denomr;   // denominator</span>
+
+            // negate
+<span class="fc" id="L1077">            ya = -ra;</span>
+<span class="fc" id="L1078">            yb = -rb;</span>
+        }
+
+<span class="fc bfc" id="L1081" title="All 2 branches covered.">        if (hiPrecOut != null) {</span>
+<span class="fc" id="L1082">            hiPrecOut[0] = ya;</span>
+<span class="fc" id="L1083">            hiPrecOut[1] = yb;</span>
+        }
+
+<span class="fc" id="L1086">        return ya + yb;</span>
+    }
+
+    /**
+     * Natural logarithm.
+     *
+     * @param x   a double
+     * @return log(x)
+     */
+    public static double log(final double x) {
+<span class="fc" id="L1096">        return log(x, null);</span>
+    }
+
+    /**
+     * Internal helper method for natural logarithm function.
+     * @param x original argument of the natural logarithm function
+     * @param hiPrec extra bits of precision on output (To Be Confirmed)
+     * @return log(x)
+     */
+    private static double log(final double x, final double[] hiPrec) {
+<span class="fc bfc" id="L1106" title="All 2 branches covered.">        if (x==0) { // Handle special case of +0/-0</span>
+<span class="fc" id="L1107">            return Double.NEGATIVE_INFINITY;</span>
+        }
+<span class="fc" id="L1109">        long bits = Double.doubleToLongBits(x);</span>
+
+        /* Handle special cases of negative input, and NaN */
+<span class="fc bfc" id="L1112" title="All 4 branches covered.">        if ((bits &amp; 0x8000000000000000L) != 0 || x != x) {</span>
+<span class="pc bpc" id="L1113" title="1 of 2 branches missed.">            if (x != 0.0) {</span>
+<span class="fc bfc" id="L1114" title="All 2 branches covered.">                if (hiPrec != null) {</span>
+<span class="fc" id="L1115">                    hiPrec[0] = Double.NaN;</span>
+                }
+
+<span class="fc" id="L1118">                return Double.NaN;</span>
+            }
+        }
+
+        /* Handle special cases of Positive infinity. */
+<span class="fc bfc" id="L1123" title="All 2 branches covered.">        if (x == Double.POSITIVE_INFINITY) {</span>
+<span class="fc bfc" id="L1124" title="All 2 branches covered.">            if (hiPrec != null) {</span>
+<span class="fc" id="L1125">                hiPrec[0] = Double.POSITIVE_INFINITY;</span>
+            }
+
+<span class="fc" id="L1128">            return Double.POSITIVE_INFINITY;</span>
+        }
+
+        /* Extract the exponent */
+<span class="fc" id="L1132">        int exp = (int)(bits &gt;&gt; 52)-1023;</span>
+
+<span class="fc bfc" id="L1134" title="All 2 branches covered.">        if ((bits &amp; 0x7ff0000000000000L) == 0) {</span>
+            // Subnormal!
+<span class="pc bpc" id="L1136" title="1 of 2 branches missed.">            if (x == 0) {</span>
+                // Zero
+<span class="nc bnc" id="L1138" title="All 2 branches missed.">                if (hiPrec != null) {</span>
+<span class="nc" id="L1139">                    hiPrec[0] = Double.NEGATIVE_INFINITY;</span>
+                }
+
+<span class="nc" id="L1142">                return Double.NEGATIVE_INFINITY;</span>
+            }
+
+            /* Normalize the subnormal number. */
+<span class="fc" id="L1146">            bits &lt;&lt;= 1;</span>
+<span class="fc bfc" id="L1147" title="All 2 branches covered.">            while ( (bits &amp; 0x0010000000000000L) == 0) {</span>
+<span class="fc" id="L1148">                exp--;</span>
+<span class="fc" id="L1149">                bits &lt;&lt;= 1;</span>
+            }
+        }
+
+
+<span class="fc bfc" id="L1154" title="All 4 branches covered.">        if (exp == -1 || exp == 0) {</span>
+<span class="fc bfc" id="L1155" title="All 6 branches covered.">            if (x &lt; 1.01 &amp;&amp; x &gt; 0.99 &amp;&amp; hiPrec == null) {</span>
+                /* The normal method doesn't work well in the range [0.99, 1.01], so call do a straight
+           polynomial expansion in higer precision. */
+
+               /* Compute x - 1.0 and split it */
+<span class="fc" id="L1160">                double xa = x - 1.0;</span>
+<span class="fc" id="L1161">                double xb = xa - x + 1.0;</span>
+<span class="fc" id="L1162">                double tmp = xa * HEX_40000000;</span>
+<span class="fc" id="L1163">                double aa = xa + tmp - tmp;</span>
+<span class="fc" id="L1164">                double ab = xa - aa;</span>
+<span class="fc" id="L1165">                xa = aa;</span>
+<span class="fc" id="L1166">                xb = ab;</span>
+
+<span class="fc" id="L1168">                double ya = LN_QUICK_COEF[LN_QUICK_COEF.length-1][0];</span>
+<span class="fc" id="L1169">                double yb = LN_QUICK_COEF[LN_QUICK_COEF.length-1][1];</span>
+
+<span class="fc bfc" id="L1171" title="All 2 branches covered.">                for (int i = LN_QUICK_COEF.length - 2; i &gt;= 0; i--) {</span>
+                    /* Multiply a = y * x */
+<span class="fc" id="L1173">                    aa = ya * xa;</span>
+<span class="fc" id="L1174">                    ab = ya * xb + yb * xa + yb * xb;</span>
+                    /* split, so now y = a */
+<span class="fc" id="L1176">                    tmp = aa * HEX_40000000;</span>
+<span class="fc" id="L1177">                    ya = aa + tmp - tmp;</span>
+<span class="fc" id="L1178">                    yb = aa - ya + ab;</span>
+
+                    /* Add  a = y + lnQuickCoef */
+<span class="fc" id="L1181">                    aa = ya + LN_QUICK_COEF[i][0];</span>
+<span class="fc" id="L1182">                    ab = yb + LN_QUICK_COEF[i][1];</span>
+                    /* Split y = a */
+<span class="fc" id="L1184">                    tmp = aa * HEX_40000000;</span>
+<span class="fc" id="L1185">                    ya = aa + tmp - tmp;</span>
+<span class="fc" id="L1186">                    yb = aa - ya + ab;</span>
+                }
+
+                /* Multiply a = y * x */
+<span class="fc" id="L1190">                aa = ya * xa;</span>
+<span class="fc" id="L1191">                ab = ya * xb + yb * xa + yb * xb;</span>
+                /* split, so now y = a */
+<span class="fc" id="L1193">                tmp = aa * HEX_40000000;</span>
+<span class="fc" id="L1194">                ya = aa + tmp - tmp;</span>
+<span class="fc" id="L1195">                yb = aa - ya + ab;</span>
+
+<span class="fc" id="L1197">                return ya + yb;</span>
+            }
+        }
+
+        // lnm is a log of a number in the range of 1.0 - 2.0, so 0 &lt;= lnm &lt; ln(2)
+<span class="fc" id="L1202">        double lnm[] = lnMant.LN_MANT[(int)((bits &amp; 0x000ffc0000000000L) &gt;&gt; 42)];</span>
+
+        /*
+    double epsilon = x / Double.longBitsToDouble(bits &amp; 0xfffffc0000000000L);
+
+    epsilon -= 1.0;
+         */
+
+        // y is the most significant 10 bits of the mantissa
+        //double y = Double.longBitsToDouble(bits &amp; 0xfffffc0000000000L);
+        //double epsilon = (x - y) / y;
+<span class="fc" id="L1213">        double epsilon = (bits &amp; 0x3ffffffffffL) / (TWO_POWER_52 + (bits &amp; 0x000ffc0000000000L));</span>
+
+<span class="fc" id="L1215">        double lnza = 0.0;</span>
+<span class="fc" id="L1216">        double lnzb = 0.0;</span>
+
+<span class="fc bfc" id="L1218" title="All 2 branches covered.">        if (hiPrec != null) {</span>
+            /* split epsilon -&gt; x */
+<span class="fc" id="L1220">            double tmp = epsilon * HEX_40000000;</span>
+<span class="fc" id="L1221">            double aa = epsilon + tmp - tmp;</span>
+<span class="fc" id="L1222">            double ab = epsilon - aa;</span>
+<span class="fc" id="L1223">            double xa = aa;</span>
+<span class="fc" id="L1224">            double xb = ab;</span>
+
+            /* Need a more accurate epsilon, so adjust the division. */
+<span class="fc" id="L1227">            double numer = bits &amp; 0x3ffffffffffL;</span>
+<span class="fc" id="L1228">            double denom = TWO_POWER_52 + (bits &amp; 0x000ffc0000000000L);</span>
+<span class="fc" id="L1229">            aa = numer - xa*denom - xb * denom;</span>
+<span class="fc" id="L1230">            xb += aa / denom;</span>
+
+            /* Remez polynomial evaluation */
+<span class="fc" id="L1233">            double ya = LN_HI_PREC_COEF[LN_HI_PREC_COEF.length-1][0];</span>
+<span class="fc" id="L1234">            double yb = LN_HI_PREC_COEF[LN_HI_PREC_COEF.length-1][1];</span>
+
+<span class="fc bfc" id="L1236" title="All 2 branches covered.">            for (int i = LN_HI_PREC_COEF.length - 2; i &gt;= 0; i--) {</span>
+                /* Multiply a = y * x */
+<span class="fc" id="L1238">                aa = ya * xa;</span>
+<span class="fc" id="L1239">                ab = ya * xb + yb * xa + yb * xb;</span>
+                /* split, so now y = a */
+<span class="fc" id="L1241">                tmp = aa * HEX_40000000;</span>
+<span class="fc" id="L1242">                ya = aa + tmp - tmp;</span>
+<span class="fc" id="L1243">                yb = aa - ya + ab;</span>
+
+                /* Add  a = y + lnHiPrecCoef */
+<span class="fc" id="L1246">                aa = ya + LN_HI_PREC_COEF[i][0];</span>
+<span class="fc" id="L1247">                ab = yb + LN_HI_PREC_COEF[i][1];</span>
+                /* Split y = a */
+<span class="fc" id="L1249">                tmp = aa * HEX_40000000;</span>
+<span class="fc" id="L1250">                ya = aa + tmp - tmp;</span>
+<span class="fc" id="L1251">                yb = aa - ya + ab;</span>
+            }
+
+            /* Multiply a = y * x */
+<span class="fc" id="L1255">            aa = ya * xa;</span>
+<span class="fc" id="L1256">            ab = ya * xb + yb * xa + yb * xb;</span>
+
+            /* split, so now lnz = a */
+            /*
+      tmp = aa * 1073741824.0;
+      lnza = aa + tmp - tmp;
+      lnzb = aa - lnza + ab;
+             */
+<span class="fc" id="L1264">            lnza = aa + ab;</span>
+<span class="fc" id="L1265">            lnzb = -(lnza - aa - ab);</span>
+<span class="fc" id="L1266">        } else {</span>
+            /* High precision not required.  Eval Remez polynomial
+         using standard double precision */
+<span class="fc" id="L1269">            lnza = -0.16624882440418567;</span>
+<span class="fc" id="L1270">            lnza = lnza * epsilon + 0.19999954120254515;</span>
+<span class="fc" id="L1271">            lnza = lnza * epsilon + -0.2499999997677497;</span>
+<span class="fc" id="L1272">            lnza = lnza * epsilon + 0.3333333333332802;</span>
+<span class="fc" id="L1273">            lnza = lnza * epsilon + -0.5;</span>
+<span class="fc" id="L1274">            lnza = lnza * epsilon + 1.0;</span>
+<span class="fc" id="L1275">            lnza = lnza * epsilon;</span>
+        }
+
+        /* Relative sizes:
+         * lnzb     [0, 2.33E-10]
+         * lnm[1]   [0, 1.17E-7]
+         * ln2B*exp [0, 1.12E-4]
+         * lnza      [0, 9.7E-4]
+         * lnm[0]   [0, 0.692]
+         * ln2A*exp [0, 709]
+         */
+
+        /* Compute the following sum:
+         * lnzb + lnm[1] + ln2B*exp + lnza + lnm[0] + ln2A*exp;
+         */
+
+        //return lnzb + lnm[1] + ln2B*exp + lnza + lnm[0] + ln2A*exp;
+<span class="fc" id="L1292">        double a = LN_2_A*exp;</span>
+<span class="fc" id="L1293">        double b = 0.0;</span>
+<span class="fc" id="L1294">        double c = a+lnm[0];</span>
+<span class="fc" id="L1295">        double d = -(c-a-lnm[0]);</span>
+<span class="fc" id="L1296">        a = c;</span>
+<span class="fc" id="L1297">        b = b + d;</span>
+
+<span class="fc" id="L1299">        c = a + lnza;</span>
+<span class="fc" id="L1300">        d = -(c - a - lnza);</span>
+<span class="fc" id="L1301">        a = c;</span>
+<span class="fc" id="L1302">        b = b + d;</span>
+
+<span class="fc" id="L1304">        c = a + LN_2_B*exp;</span>
+<span class="fc" id="L1305">        d = -(c - a - LN_2_B*exp);</span>
+<span class="fc" id="L1306">        a = c;</span>
+<span class="fc" id="L1307">        b = b + d;</span>
+
+<span class="fc" id="L1309">        c = a + lnm[1];</span>
+<span class="fc" id="L1310">        d = -(c - a - lnm[1]);</span>
+<span class="fc" id="L1311">        a = c;</span>
+<span class="fc" id="L1312">        b = b + d;</span>
+
+<span class="fc" id="L1314">        c = a + lnzb;</span>
+<span class="fc" id="L1315">        d = -(c - a - lnzb);</span>
+<span class="fc" id="L1316">        a = c;</span>
+<span class="fc" id="L1317">        b = b + d;</span>
+
+<span class="fc bfc" id="L1319" title="All 2 branches covered.">        if (hiPrec != null) {</span>
+<span class="fc" id="L1320">            hiPrec[0] = a;</span>
+<span class="fc" id="L1321">            hiPrec[1] = b;</span>
+        }
+
+<span class="fc" id="L1324">        return a + b;</span>
+    }
+
+    /** Compute log(1 + x).
+     * @param x a number
+     * @return log(1 + x)
+     */
+    public static double log1p(final double x) {
+
+<span class="fc bfc" id="L1333" title="All 2 branches covered.">        if (x == -1) {</span>
+<span class="fc" id="L1334">            return x/0.0;   // -Infinity</span>
+        }
+
+<span class="fc bfc" id="L1337" title="All 4 branches covered.">        if (x &gt; 0 &amp;&amp; 1/x == 0) { // x = Infinity</span>
+<span class="fc" id="L1338">            return x;</span>
+        }
+
+<span class="fc bfc" id="L1341" title="All 4 branches covered.">        if (x&gt;1e-6 || x&lt;-1e-6) {</span>
+<span class="fc" id="L1342">            double xpa = 1.0 + x;</span>
+<span class="fc" id="L1343">            double xpb = -(xpa - 1.0 - x);</span>
+
+<span class="fc" id="L1345">            double hiPrec[] = new double[2];</span>
+
+<span class="fc" id="L1347">            final double lores = log(xpa, hiPrec);</span>
+<span class="pc bpc" id="L1348" title="1 of 2 branches missed.">            if (Double.isInfinite(lores)){ // don't allow this to be converted to NaN</span>
+<span class="nc" id="L1349">                return lores;</span>
+            }
+
+            /* Do a taylor series expansion around xpa */
+            /* f(x+y) = f(x) + f'(x)*y + f''(x)/2 y^2 */
+<span class="fc" id="L1354">            double fx1 = xpb/xpa;</span>
+
+<span class="fc" id="L1356">            double epsilon = 0.5 * fx1 + 1.0;</span>
+<span class="fc" id="L1357">            epsilon = epsilon * fx1;</span>
+
+<span class="fc" id="L1359">            return epsilon + hiPrec[1] + hiPrec[0];</span>
+        }
+
+        /* Value is small |x| &lt; 1e6, do a Taylor series centered on 1.0 */
+<span class="fc" id="L1363">        double y = x * F_1_3 - F_1_2;</span>
+<span class="fc" id="L1364">        y = y * x + 1.0;</span>
+<span class="fc" id="L1365">        y = y * x;</span>
+
+<span class="fc" id="L1367">        return y;</span>
+    }
+
+    /** Compute the base 10 logarithm.
+     * @param x a number
+     * @return log10(x)
+     */
+    public static double log10(final double x) {
+<span class="fc" id="L1375">        final double hiPrec[] = new double[2];</span>
+
+<span class="fc" id="L1377">        final double lores = log(x, hiPrec);</span>
+<span class="fc bfc" id="L1378" title="All 2 branches covered.">        if (Double.isInfinite(lores)){ // don't allow this to be converted to NaN</span>
+<span class="fc" id="L1379">            return lores;</span>
+        }
+
+<span class="fc" id="L1382">        final double tmp = hiPrec[0] * HEX_40000000;</span>
+<span class="fc" id="L1383">        final double lna = hiPrec[0] + tmp - tmp;</span>
+<span class="fc" id="L1384">        final double lnb = hiPrec[0] - lna + hiPrec[1];</span>
+
+<span class="fc" id="L1386">        final double rln10a = 0.4342944622039795;</span>
+<span class="fc" id="L1387">        final double rln10b = 1.9699272335463627E-8;</span>
+
+<span class="fc" id="L1389">        return rln10b * lnb + rln10b * lna + rln10a * lnb + rln10a * lna;</span>
+    }
+
+    /**
+     * Computes the &lt;a href=&quot;http://mathworld.wolfram.com/Logarithm.html&quot;&gt;
+     * logarithm&lt;/a&gt; in a given base.
+     *
+     * Returns {@code NaN} if either argument is negative.
+     * If {@code base} is 0 and {@code x} is positive, 0 is returned.
+     * If {@code base} is positive and {@code x} is 0,
+     * {@code Double.NEGATIVE_INFINITY} is returned.
+     * If both arguments are 0, the result is {@code NaN}.
+     *
+     * @param base Base of the logarithm, must be greater than 0.
+     * @param x Argument, must be greater than 0.
+     * @return the value of the logarithm, i.e. the number {@code y} such that
+     * &lt;code&gt;base&lt;sup&gt;y&lt;/sup&gt; = x&lt;/code&gt;.
+     * @since 1.2 (previously in {@code MathUtils}, moved as of version 3.0)
+     */
+    public static double log(double base, double x) {
+<span class="fc" id="L1409">        return log(x) / log(base);</span>
+    }
+
+    /**
+     * Power function.  Compute x^y.
+     *
+     * @param x   a double
+     * @param y   a double
+     * @return double
+     */
+    public static double pow(double x, double y) {
+<span class="fc" id="L1420">        final double lns[] = new double[2];</span>
+
+<span class="fc bfc" id="L1422" title="All 2 branches covered.">        if (y == 0.0) {</span>
+<span class="fc" id="L1423">            return 1.0;</span>
+        }
+
+<span class="fc bfc" id="L1426" title="All 2 branches covered.">        if (x != x) { // X is NaN</span>
+<span class="fc" id="L1427">            return x;</span>
+        }
+
+
+<span class="fc bfc" id="L1431" title="All 2 branches covered.">        if (x == 0) {</span>
+<span class="fc" id="L1432">            long bits = Double.doubleToLongBits(x);</span>
+<span class="fc bfc" id="L1433" title="All 2 branches covered.">            if ((bits &amp; 0x8000000000000000L) != 0) {</span>
+                // -zero
+<span class="fc" id="L1435">                long yi = (long) y;</span>
+
+<span class="pc bpc" id="L1437" title="1 of 6 branches missed.">                if (y &lt; 0 &amp;&amp; y == yi &amp;&amp; (yi &amp; 1) == 1) {</span>
+<span class="fc" id="L1438">                    return Double.NEGATIVE_INFINITY;</span>
+                }
+
+<span class="fc bfc" id="L1441" title="All 6 branches covered.">                if (y &gt; 0 &amp;&amp; y == yi &amp;&amp; (yi &amp; 1) == 1) {</span>
+<span class="fc" id="L1442">                    return -0.0;</span>
+                }
+            }
+
+<span class="fc bfc" id="L1446" title="All 2 branches covered.">            if (y &lt; 0) {</span>
+<span class="fc" id="L1447">                return Double.POSITIVE_INFINITY;</span>
+            }
+<span class="fc bfc" id="L1449" title="All 2 branches covered.">            if (y &gt; 0) {</span>
+<span class="fc" id="L1450">                return 0.0;</span>
+            }
+
+<span class="fc" id="L1453">            return Double.NaN;</span>
+        }
+
+<span class="fc bfc" id="L1456" title="All 2 branches covered.">        if (x == Double.POSITIVE_INFINITY) {</span>
+<span class="fc bfc" id="L1457" title="All 2 branches covered.">            if (y != y) { // y is NaN</span>
+<span class="fc" id="L1458">                return y;</span>
+            }
+<span class="fc bfc" id="L1460" title="All 2 branches covered.">            if (y &lt; 0.0) {</span>
+<span class="fc" id="L1461">                return 0.0;</span>
+            } else {
+<span class="fc" id="L1463">                return Double.POSITIVE_INFINITY;</span>
+            }
+        }
+
+<span class="fc bfc" id="L1467" title="All 2 branches covered.">        if (y == Double.POSITIVE_INFINITY) {</span>
+<span class="fc bfc" id="L1468" title="All 2 branches covered.">            if (x * x == 1.0) {</span>
+<span class="fc" id="L1469">                return Double.NaN;</span>
+            }
+
+<span class="fc bfc" id="L1472" title="All 2 branches covered.">            if (x * x &gt; 1.0) {</span>
+<span class="fc" id="L1473">                return Double.POSITIVE_INFINITY;</span>
+            } else {
+<span class="fc" id="L1475">                return 0.0;</span>
+            }
+        }
+
+<span class="fc bfc" id="L1479" title="All 2 branches covered.">        if (x == Double.NEGATIVE_INFINITY) {</span>
+<span class="fc bfc" id="L1480" title="All 2 branches covered.">            if (y != y) { // y is NaN</span>
+<span class="fc" id="L1481">                return y;</span>
+            }
+
+<span class="fc bfc" id="L1484" title="All 2 branches covered.">            if (y &lt; 0) {</span>
+<span class="fc" id="L1485">                long yi = (long) y;</span>
+<span class="fc bfc" id="L1486" title="All 4 branches covered.">                if (y == yi &amp;&amp; (yi &amp; 1) == 1) {</span>
+<span class="fc" id="L1487">                    return -0.0;</span>
+                }
+
+<span class="fc" id="L1490">                return 0.0;</span>
+            }
+
+<span class="pc bpc" id="L1493" title="1 of 2 branches missed.">            if (y &gt; 0)  {</span>
+<span class="fc" id="L1494">                long yi = (long) y;</span>
+<span class="fc bfc" id="L1495" title="All 4 branches covered.">                if (y == yi &amp;&amp; (yi &amp; 1) == 1) {</span>
+<span class="fc" id="L1496">                    return Double.NEGATIVE_INFINITY;</span>
+                }
+
+<span class="fc" id="L1499">                return Double.POSITIVE_INFINITY;</span>
+            }
+        }
+
+<span class="fc bfc" id="L1503" title="All 2 branches covered.">        if (y == Double.NEGATIVE_INFINITY) {</span>
+
+<span class="fc bfc" id="L1505" title="All 2 branches covered.">            if (x * x == 1.0) {</span>
+<span class="fc" id="L1506">                return Double.NaN;</span>
+            }
+
+<span class="fc bfc" id="L1509" title="All 2 branches covered.">            if (x * x &lt; 1.0) {</span>
+<span class="fc" id="L1510">                return Double.POSITIVE_INFINITY;</span>
+            } else {
+<span class="fc" id="L1512">                return 0.0;</span>
+            }
+        }
+
+        /* Handle special case x&lt;0 */
+<span class="fc bfc" id="L1517" title="All 2 branches covered.">        if (x &lt; 0) {</span>
+            // y is an even integer in this case
+<span class="fc bfc" id="L1519" title="All 4 branches covered.">            if (y &gt;= TWO_POWER_52 || y &lt;= -TWO_POWER_52) {</span>
+<span class="fc" id="L1520">                return pow(-x, y);</span>
+            }
+
+<span class="fc bfc" id="L1523" title="All 2 branches covered.">            if (y == (long) y) {</span>
+                // If y is an integer
+<span class="fc bfc" id="L1525" title="All 2 branches covered.">                return ((long)y &amp; 1) == 0 ? pow(-x, y) : -pow(-x, y);</span>
+            } else {
+<span class="fc" id="L1527">                return Double.NaN;</span>
+            }
+        }
+
+        /* Split y into ya and yb such that y = ya+yb */
+        double ya;
+        double yb;
+<span class="fc bfc" id="L1534" title="All 4 branches covered.">        if (y &lt; 8e298 &amp;&amp; y &gt; -8e298) {</span>
+<span class="fc" id="L1535">            double tmp1 = y * HEX_40000000;</span>
+<span class="fc" id="L1536">            ya = y + tmp1 - tmp1;</span>
+<span class="fc" id="L1537">            yb = y - ya;</span>
+<span class="fc" id="L1538">        } else {</span>
+<span class="fc" id="L1539">            double tmp1 = y * 9.31322574615478515625E-10;</span>
+<span class="fc" id="L1540">            double tmp2 = tmp1 * 9.31322574615478515625E-10;</span>
+<span class="fc" id="L1541">            ya = (tmp1 + tmp2 - tmp1) * HEX_40000000 * HEX_40000000;</span>
+<span class="fc" id="L1542">            yb = y - ya;</span>
+        }
+
+        /* Compute ln(x) */
+<span class="fc" id="L1546">        final double lores = log(x, lns);</span>
+<span class="pc bpc" id="L1547" title="1 of 2 branches missed.">        if (Double.isInfinite(lores)){ // don't allow this to be converted to NaN</span>
+<span class="nc" id="L1548">            return lores;</span>
+        }
+
+<span class="fc" id="L1551">        double lna = lns[0];</span>
+<span class="fc" id="L1552">        double lnb = lns[1];</span>
+
+        /* resplit lns */
+<span class="fc" id="L1555">        double tmp1 = lna * HEX_40000000;</span>
+<span class="fc" id="L1556">        double tmp2 = lna + tmp1 - tmp1;</span>
+<span class="fc" id="L1557">        lnb += lna - tmp2;</span>
+<span class="fc" id="L1558">        lna = tmp2;</span>
+
+        // y*ln(x) = (aa+ab)
+<span class="fc" id="L1561">        final double aa = lna * ya;</span>
+<span class="fc" id="L1562">        final double ab = lna * yb + lnb * ya + lnb * yb;</span>
+
+<span class="fc" id="L1564">        lna = aa+ab;</span>
+<span class="fc" id="L1565">        lnb = -(lna - aa - ab);</span>
+
+<span class="fc" id="L1567">        double z = 1.0 / 120.0;</span>
+<span class="fc" id="L1568">        z = z * lnb + (1.0 / 24.0);</span>
+<span class="fc" id="L1569">        z = z * lnb + (1.0 / 6.0);</span>
+<span class="fc" id="L1570">        z = z * lnb + 0.5;</span>
+<span class="fc" id="L1571">        z = z * lnb + 1.0;</span>
+<span class="fc" id="L1572">        z = z * lnb;</span>
+
+<span class="fc" id="L1574">        final double result = exp(lna, z, null);</span>
+        //result = result + result * z;
+<span class="fc" id="L1576">        return result;</span>
+    }
+
+
+    /**
+     *  Computes sin(x) - x, where |x| &lt; 1/16.
+     *  Use a Remez polynomial approximation.
+     *  @param x a number smaller than 1/16
+     *  @return sin(x) - x
+     */
+    private static double polySine(final double x)
+    {
+<span class="fc" id="L1588">        double x2 = x*x;</span>
+
+<span class="fc" id="L1590">        double p = 2.7553817452272217E-6;</span>
+<span class="fc" id="L1591">        p = p * x2 + -1.9841269659586505E-4;</span>
+<span class="fc" id="L1592">        p = p * x2 + 0.008333333333329196;</span>
+<span class="fc" id="L1593">        p = p * x2 + -0.16666666666666666;</span>
+        //p *= x2;
+        //p *= x;
+<span class="fc" id="L1596">        p = p * x2 * x;</span>
+
+<span class="fc" id="L1598">        return p;</span>
+    }
+
+    /**
+     *  Computes cos(x) - 1, where |x| &lt; 1/16.
+     *  Use a Remez polynomial approximation.
+     *  @param x a number smaller than 1/16
+     *  @return cos(x) - 1
+     */
+    private static double polyCosine(double x) {
+<span class="fc" id="L1608">        double x2 = x*x;</span>
+
+<span class="fc" id="L1610">        double p = 2.479773539153719E-5;</span>
+<span class="fc" id="L1611">        p = p * x2 + -0.0013888888689039883;</span>
+<span class="fc" id="L1612">        p = p * x2 + 0.041666666666621166;</span>
+<span class="fc" id="L1613">        p = p * x2 + -0.49999999999999994;</span>
+<span class="fc" id="L1614">        p *= x2;</span>
+
+<span class="fc" id="L1616">        return p;</span>
+    }
+
+    /**
+     *  Compute sine over the first quadrant (0 &lt; x &lt; pi/2).
+     *  Use combination of table lookup and rational polynomial expansion.
+     *  @param xa number from which sine is requested
+     *  @param xb extra bits for x (may be 0.0)
+     *  @return sin(xa + xb)
+     */
+    private static double sinQ(double xa, double xb) {
+<span class="fc" id="L1627">        int idx = (int) ((xa * 8.0) + 0.5);</span>
+<span class="fc" id="L1628">        final double epsilon = xa - EIGHTHS[idx]; //idx*0.125;</span>
+
+        // Table lookups
+<span class="fc" id="L1631">        final double sintA = SINE_TABLE_A[idx];</span>
+<span class="fc" id="L1632">        final double sintB = SINE_TABLE_B[idx];</span>
+<span class="fc" id="L1633">        final double costA = COSINE_TABLE_A[idx];</span>
+<span class="fc" id="L1634">        final double costB = COSINE_TABLE_B[idx];</span>
+
+        // Polynomial eval of sin(epsilon), cos(epsilon)
+<span class="fc" id="L1637">        double sinEpsA = epsilon;</span>
+<span class="fc" id="L1638">        double sinEpsB = polySine(epsilon);</span>
+<span class="fc" id="L1639">        final double cosEpsA = 1.0;</span>
+<span class="fc" id="L1640">        final double cosEpsB = polyCosine(epsilon);</span>
+
+        // Split epsilon   xa + xb = x
+<span class="fc" id="L1643">        final double temp = sinEpsA * HEX_40000000;</span>
+<span class="fc" id="L1644">        double temp2 = (sinEpsA + temp) - temp;</span>
+<span class="fc" id="L1645">        sinEpsB +=  sinEpsA - temp2;</span>
+<span class="fc" id="L1646">        sinEpsA = temp2;</span>
+
+        /* Compute sin(x) by angle addition formula */
+        double result;
+
+        /* Compute the following sum:
+         *
+         * result = sintA + costA*sinEpsA + sintA*cosEpsB + costA*sinEpsB +
+         *          sintB + costB*sinEpsA + sintB*cosEpsB + costB*sinEpsB;
+         *
+         * Ranges of elements
+         *
+         * xxxtA   0            PI/2
+         * xxxtB   -1.5e-9      1.5e-9
+         * sinEpsA -0.0625      0.0625
+         * sinEpsB -6e-11       6e-11
+         * cosEpsA  1.0
+         * cosEpsB  0           -0.0625
+         *
+         */
+
+        //result = sintA + costA*sinEpsA + sintA*cosEpsB + costA*sinEpsB +
+        //          sintB + costB*sinEpsA + sintB*cosEpsB + costB*sinEpsB;
+
+        //result = sintA + sintA*cosEpsB + sintB + sintB * cosEpsB;
+        //result += costA*sinEpsA + costA*sinEpsB + costB*sinEpsA + costB * sinEpsB;
+<span class="fc" id="L1672">        double a = 0;</span>
+<span class="fc" id="L1673">        double b = 0;</span>
+
+<span class="fc" id="L1675">        double t = sintA;</span>
+<span class="fc" id="L1676">        double c = a + t;</span>
+<span class="fc" id="L1677">        double d = -(c - a - t);</span>
+<span class="fc" id="L1678">        a = c;</span>
+<span class="fc" id="L1679">        b = b + d;</span>
+
+<span class="fc" id="L1681">        t = costA * sinEpsA;</span>
+<span class="fc" id="L1682">        c = a + t;</span>
+<span class="fc" id="L1683">        d = -(c - a - t);</span>
+<span class="fc" id="L1684">        a = c;</span>
+<span class="fc" id="L1685">        b = b + d;</span>
+
+<span class="fc" id="L1687">        b = b + sintA * cosEpsB + costA * sinEpsB;</span>
+        /*
+    t = sintA*cosEpsB;
+    c = a + t;
+    d = -(c - a - t);
+    a = c;
+    b = b + d;
+
+    t = costA*sinEpsB;
+    c = a + t;
+    d = -(c - a - t);
+    a = c;
+    b = b + d;
+         */
+
+<span class="fc" id="L1702">        b = b + sintB + costB * sinEpsA + sintB * cosEpsB + costB * sinEpsB;</span>
+        /*
+    t = sintB;
+    c = a + t;
+    d = -(c - a - t);
+    a = c;
+    b = b + d;
+
+    t = costB*sinEpsA;
+    c = a + t;
+    d = -(c - a - t);
+    a = c;
+    b = b + d;
+
+    t = sintB*cosEpsB;
+    c = a + t;
+    d = -(c - a - t);
+    a = c;
+    b = b + d;
+
+    t = costB*sinEpsB;
+    c = a + t;
+    d = -(c - a - t);
+    a = c;
+    b = b + d;
+         */
+
+<span class="fc bfc" id="L1729" title="All 2 branches covered.">        if (xb != 0.0) {</span>
+<span class="fc" id="L1730">            t = ((costA + costB) * (cosEpsA + cosEpsB) -</span>
+                 (sintA + sintB) * (sinEpsA + sinEpsB)) * xb;  // approximate cosine*xb
+<span class="fc" id="L1732">            c = a + t;</span>
+<span class="fc" id="L1733">            d = -(c - a - t);</span>
+<span class="fc" id="L1734">            a = c;</span>
+<span class="fc" id="L1735">            b = b + d;</span>
+        }
+
+<span class="fc" id="L1738">        result = a + b;</span>
+
+<span class="fc" id="L1740">        return result;</span>
+    }
+
+    /**
+     * Compute cosine in the first quadrant by subtracting input from PI/2 and
+     * then calling sinQ.  This is more accurate as the input approaches PI/2.
+     *  @param xa number from which cosine is requested
+     *  @param xb extra bits for x (may be 0.0)
+     *  @return cos(xa + xb)
+     */
+    private static double cosQ(double xa, double xb) {
+<span class="fc" id="L1751">        final double pi2a = 1.5707963267948966;</span>
+<span class="fc" id="L1752">        final double pi2b = 6.123233995736766E-17;</span>
+
+<span class="fc" id="L1754">        final double a = pi2a - xa;</span>
+<span class="fc" id="L1755">        double b = -(a - pi2a + xa);</span>
+<span class="fc" id="L1756">        b += pi2b - xb;</span>
+
+<span class="fc" id="L1758">        return sinQ(a, b);</span>
+    }
+
+    /**
+     *  Compute tangent (or cotangent) over the first quadrant.   0 &lt; x &lt; pi/2
+     *  Use combination of table lookup and rational polynomial expansion.
+     *  @param xa number from which sine is requested
+     *  @param xb extra bits for x (may be 0.0)
+     *  @param cotanFlag if true, compute the cotangent instead of the tangent
+     *  @return tan(xa+xb) (or cotangent, depending on cotanFlag)
+     */
+    private static double tanQ(double xa, double xb, boolean cotanFlag) {
+
+<span class="fc" id="L1771">        int idx = (int) ((xa * 8.0) + 0.5);</span>
+<span class="fc" id="L1772">        final double epsilon = xa - EIGHTHS[idx]; //idx*0.125;</span>
+
+        // Table lookups
+<span class="fc" id="L1775">        final double sintA = SINE_TABLE_A[idx];</span>
+<span class="fc" id="L1776">        final double sintB = SINE_TABLE_B[idx];</span>
+<span class="fc" id="L1777">        final double costA = COSINE_TABLE_A[idx];</span>
+<span class="fc" id="L1778">        final double costB = COSINE_TABLE_B[idx];</span>
+
+        // Polynomial eval of sin(epsilon), cos(epsilon)
+<span class="fc" id="L1781">        double sinEpsA = epsilon;</span>
+<span class="fc" id="L1782">        double sinEpsB = polySine(epsilon);</span>
+<span class="fc" id="L1783">        final double cosEpsA = 1.0;</span>
+<span class="fc" id="L1784">        final double cosEpsB = polyCosine(epsilon);</span>
+
+        // Split epsilon   xa + xb = x
+<span class="fc" id="L1787">        double temp = sinEpsA * HEX_40000000;</span>
+<span class="fc" id="L1788">        double temp2 = (sinEpsA + temp) - temp;</span>
+<span class="fc" id="L1789">        sinEpsB +=  sinEpsA - temp2;</span>
+<span class="fc" id="L1790">        sinEpsA = temp2;</span>
+
+        /* Compute sin(x) by angle addition formula */
+
+        /* Compute the following sum:
+         *
+         * result = sintA + costA*sinEpsA + sintA*cosEpsB + costA*sinEpsB +
+         *          sintB + costB*sinEpsA + sintB*cosEpsB + costB*sinEpsB;
+         *
+         * Ranges of elements
+         *
+         * xxxtA   0            PI/2
+         * xxxtB   -1.5e-9      1.5e-9
+         * sinEpsA -0.0625      0.0625
+         * sinEpsB -6e-11       6e-11
+         * cosEpsA  1.0
+         * cosEpsB  0           -0.0625
+         *
+         */
+
+        //result = sintA + costA*sinEpsA + sintA*cosEpsB + costA*sinEpsB +
+        //          sintB + costB*sinEpsA + sintB*cosEpsB + costB*sinEpsB;
+
+        //result = sintA + sintA*cosEpsB + sintB + sintB * cosEpsB;
+        //result += costA*sinEpsA + costA*sinEpsB + costB*sinEpsA + costB * sinEpsB;
+<span class="fc" id="L1815">        double a = 0;</span>
+<span class="fc" id="L1816">        double b = 0;</span>
+
+        // Compute sine
+<span class="fc" id="L1819">        double t = sintA;</span>
+<span class="fc" id="L1820">        double c = a + t;</span>
+<span class="fc" id="L1821">        double d = -(c - a - t);</span>
+<span class="fc" id="L1822">        a = c;</span>
+<span class="fc" id="L1823">        b = b + d;</span>
+
+<span class="fc" id="L1825">        t = costA*sinEpsA;</span>
+<span class="fc" id="L1826">        c = a + t;</span>
+<span class="fc" id="L1827">        d = -(c - a - t);</span>
+<span class="fc" id="L1828">        a = c;</span>
+<span class="fc" id="L1829">        b = b + d;</span>
+
+<span class="fc" id="L1831">        b = b + sintA*cosEpsB + costA*sinEpsB;</span>
+<span class="fc" id="L1832">        b = b + sintB + costB*sinEpsA + sintB*cosEpsB + costB*sinEpsB;</span>
+
+<span class="fc" id="L1834">        double sina = a + b;</span>
+<span class="fc" id="L1835">        double sinb = -(sina - a - b);</span>
+
+        // Compute cosine
+
+<span class="fc" id="L1839">        a = b = c = d = 0.0;</span>
+
+<span class="fc" id="L1841">        t = costA*cosEpsA;</span>
+<span class="fc" id="L1842">        c = a + t;</span>
+<span class="fc" id="L1843">        d = -(c - a - t);</span>
+<span class="fc" id="L1844">        a = c;</span>
+<span class="fc" id="L1845">        b = b + d;</span>
+
+<span class="fc" id="L1847">        t = -sintA*sinEpsA;</span>
+<span class="fc" id="L1848">        c = a + t;</span>
+<span class="fc" id="L1849">        d = -(c - a - t);</span>
+<span class="fc" id="L1850">        a = c;</span>
+<span class="fc" id="L1851">        b = b + d;</span>
+
+<span class="fc" id="L1853">        b = b + costB*cosEpsA + costA*cosEpsB + costB*cosEpsB;</span>
+<span class="fc" id="L1854">        b = b - (sintB*sinEpsA + sintA*sinEpsB + sintB*sinEpsB);</span>
+
+<span class="fc" id="L1856">        double cosa = a + b;</span>
+<span class="fc" id="L1857">        double cosb = -(cosa - a - b);</span>
+
+<span class="fc bfc" id="L1859" title="All 2 branches covered.">        if (cotanFlag) {</span>
+            double tmp;
+<span class="fc" id="L1861">            tmp = cosa; cosa = sina; sina = tmp;</span>
+<span class="fc" id="L1862">            tmp = cosb; cosb = sinb; sinb = tmp;</span>
+        }
+
+
+        /* estimate and correct, compute 1.0/(cosa+cosb) */
+        /*
+    double est = (sina+sinb)/(cosa+cosb);
+    double err = (sina - cosa*est) + (sinb - cosb*est);
+    est += err/(cosa+cosb);
+    err = (sina - cosa*est) + (sinb - cosb*est);
+         */
+
+        // f(x) = 1/x,   f'(x) = -1/x^2
+
+<span class="fc" id="L1876">        double est = sina/cosa;</span>
+
+        /* Split the estimate to get more accurate read on division rounding */
+<span class="fc" id="L1879">        temp = est * HEX_40000000;</span>
+<span class="fc" id="L1880">        double esta = (est + temp) - temp;</span>
+<span class="fc" id="L1881">        double estb =  est - esta;</span>
+
+<span class="fc" id="L1883">        temp = cosa * HEX_40000000;</span>
+<span class="fc" id="L1884">        double cosaa = (cosa + temp) - temp;</span>
+<span class="fc" id="L1885">        double cosab =  cosa - cosaa;</span>
+
+        //double err = (sina - est*cosa)/cosa;  // Correction for division rounding
+<span class="fc" id="L1888">        double err = (sina - esta*cosaa - esta*cosab - estb*cosaa - estb*cosab)/cosa;  // Correction for division rounding</span>
+<span class="fc" id="L1889">        err += sinb/cosa;                     // Change in est due to sinb</span>
+<span class="fc" id="L1890">        err += -sina * cosb / cosa / cosa;    // Change in est due to cosb</span>
+
+<span class="fc bfc" id="L1892" title="All 2 branches covered.">        if (xb != 0.0) {</span>
+            // tan' = 1 + tan^2      cot' = -(1 + cot^2)
+            // Approximate impact of xb
+<span class="fc" id="L1895">            double xbadj = xb + est*est*xb;</span>
+<span class="fc bfc" id="L1896" title="All 2 branches covered.">            if (cotanFlag) {</span>
+<span class="fc" id="L1897">                xbadj = -xbadj;</span>
+            }
+
+<span class="fc" id="L1900">            err += xbadj;</span>
+        }
+
+<span class="fc" id="L1903">        return est+err;</span>
+    }
+
+    /** Reduce the input argument using the Payne and Hanek method.
+     *  This is good for all inputs 0.0 &lt; x &lt; inf
+     *  Output is remainder after dividing by PI/2
+     *  The result array should contain 3 numbers.
+     *  result[0] is the integer portion, so mod 4 this gives the quadrant.
+     *  result[1] is the upper bits of the remainder
+     *  result[2] is the lower bits of the remainder
+     *
+     * @param x number to reduce
+     * @param result placeholder where to put the result
+     */
+    private static void reducePayneHanek(double x, double result[])
+    {
+        /* Convert input double to bits */
+<span class="fc" id="L1920">        long inbits = Double.doubleToLongBits(x);</span>
+<span class="fc" id="L1921">        int exponent = (int) ((inbits &gt;&gt; 52) &amp; 0x7ff) - 1023;</span>
+
+        /* Convert to fixed point representation */
+<span class="fc" id="L1924">        inbits &amp;= 0x000fffffffffffffL;</span>
+<span class="fc" id="L1925">        inbits |= 0x0010000000000000L;</span>
+
+        /* Normalize input to be between 0.5 and 1.0 */
+<span class="fc" id="L1928">        exponent++;</span>
+<span class="fc" id="L1929">        inbits &lt;&lt;= 11;</span>
+
+        /* Based on the exponent, get a shifted copy of recip2pi */
+        long shpi0;
+        long shpiA;
+        long shpiB;
+<span class="fc" id="L1935">        int idx = exponent &gt;&gt; 6;</span>
+<span class="fc" id="L1936">        int shift = exponent - (idx &lt;&lt; 6);</span>
+
+<span class="fc bfc" id="L1938" title="All 2 branches covered.">        if (shift != 0) {</span>
+<span class="pc bpc" id="L1939" title="1 of 2 branches missed.">            shpi0 = (idx == 0) ? 0 : (RECIP_2PI[idx-1] &lt;&lt; shift);</span>
+<span class="fc" id="L1940">            shpi0 |= RECIP_2PI[idx] &gt;&gt;&gt; (64-shift);</span>
+<span class="fc" id="L1941">            shpiA = (RECIP_2PI[idx] &lt;&lt; shift) | (RECIP_2PI[idx+1] &gt;&gt;&gt; (64-shift));</span>
+<span class="fc" id="L1942">            shpiB = (RECIP_2PI[idx+1] &lt;&lt; shift) | (RECIP_2PI[idx+2] &gt;&gt;&gt; (64-shift));</span>
+        } else {
+<span class="pc bpc" id="L1944" title="1 of 2 branches missed.">            shpi0 = (idx == 0) ? 0 : RECIP_2PI[idx-1];</span>
+<span class="fc" id="L1945">            shpiA = RECIP_2PI[idx];</span>
+<span class="fc" id="L1946">            shpiB = RECIP_2PI[idx+1];</span>
+        }
+
+        /* Multiply input by shpiA */
+<span class="fc" id="L1950">        long a = inbits &gt;&gt;&gt; 32;</span>
+<span class="fc" id="L1951">        long b = inbits &amp; 0xffffffffL;</span>
+
+<span class="fc" id="L1953">        long c = shpiA &gt;&gt;&gt; 32;</span>
+<span class="fc" id="L1954">        long d = shpiA &amp; 0xffffffffL;</span>
+
+<span class="fc" id="L1956">        long ac = a * c;</span>
+<span class="fc" id="L1957">        long bd = b * d;</span>
+<span class="fc" id="L1958">        long bc = b * c;</span>
+<span class="fc" id="L1959">        long ad = a * d;</span>
+
+<span class="fc" id="L1961">        long prodB = bd + (ad &lt;&lt; 32);</span>
+<span class="fc" id="L1962">        long prodA = ac + (ad &gt;&gt;&gt; 32);</span>
+
+<span class="fc bfc" id="L1964" title="All 2 branches covered.">        boolean bita = (bd &amp; 0x8000000000000000L) != 0;</span>
+<span class="fc bfc" id="L1965" title="All 2 branches covered.">        boolean bitb = (ad &amp; 0x80000000L ) != 0;</span>
+<span class="fc bfc" id="L1966" title="All 2 branches covered.">        boolean bitsum = (prodB &amp; 0x8000000000000000L) != 0;</span>
+
+        /* Carry */
+<span class="pc bpc" id="L1969" title="2 of 10 branches missed.">        if ( (bita &amp;&amp; bitb) ||</span>
+                ((bita || bitb) &amp;&amp; !bitsum) ) {
+<span class="nc" id="L1971">            prodA++;</span>
+        }
+
+<span class="fc bfc" id="L1974" title="All 2 branches covered.">        bita = (prodB &amp; 0x8000000000000000L) != 0;</span>
+<span class="fc bfc" id="L1975" title="All 2 branches covered.">        bitb = (bc &amp; 0x80000000L ) != 0;</span>
+
+<span class="fc" id="L1977">        prodB = prodB + (bc &lt;&lt; 32);</span>
+<span class="fc" id="L1978">        prodA = prodA + (bc &gt;&gt;&gt; 32);</span>
+
+<span class="fc bfc" id="L1980" title="All 2 branches covered.">        bitsum = (prodB &amp; 0x8000000000000000L) != 0;</span>
+
+        /* Carry */
+<span class="fc bfc" id="L1983" title="All 10 branches covered.">        if ( (bita &amp;&amp; bitb) ||</span>
+                ((bita || bitb) &amp;&amp; !bitsum) ) {
+<span class="fc" id="L1985">            prodA++;</span>
+        }
+
+        /* Multiply input by shpiB */
+<span class="fc" id="L1989">        c = shpiB &gt;&gt;&gt; 32;</span>
+<span class="fc" id="L1990">        d = shpiB &amp; 0xffffffffL;</span>
+<span class="fc" id="L1991">        ac = a * c;</span>
+<span class="fc" id="L1992">        bc = b * c;</span>
+<span class="fc" id="L1993">        ad = a * d;</span>
+
+        /* Collect terms */
+<span class="fc" id="L1996">        ac = ac + ((bc + ad) &gt;&gt;&gt; 32);</span>
+
+<span class="fc bfc" id="L1998" title="All 2 branches covered.">        bita = (prodB &amp; 0x8000000000000000L) != 0;</span>
+<span class="fc bfc" id="L1999" title="All 2 branches covered.">        bitb = (ac &amp; 0x8000000000000000L ) != 0;</span>
+<span class="fc" id="L2000">        prodB += ac;</span>
+<span class="fc bfc" id="L2001" title="All 2 branches covered.">        bitsum = (prodB &amp; 0x8000000000000000L) != 0;</span>
+        /* Carry */
+<span class="fc bfc" id="L2003" title="All 10 branches covered.">        if ( (bita &amp;&amp; bitb) ||</span>
+                ((bita || bitb) &amp;&amp; !bitsum) ) {
+<span class="fc" id="L2005">            prodA++;</span>
+        }
+
+        /* Multiply by shpi0 */
+<span class="fc" id="L2009">        c = shpi0 &gt;&gt;&gt; 32;</span>
+<span class="fc" id="L2010">        d = shpi0 &amp; 0xffffffffL;</span>
+
+<span class="fc" id="L2012">        bd = b * d;</span>
+<span class="fc" id="L2013">        bc = b * c;</span>
+<span class="fc" id="L2014">        ad = a * d;</span>
+
+<span class="fc" id="L2016">        prodA += bd + ((bc + ad) &lt;&lt; 32);</span>
+
+        /*
+         * prodA, prodB now contain the remainder as a fraction of PI.  We want this as a fraction of
+         * PI/2, so use the following steps:
+         * 1.) multiply by 4.
+         * 2.) do a fixed point muliply by PI/4.
+         * 3.) Convert to floating point.
+         * 4.) Multiply by 2
+         */
+
+        /* This identifies the quadrant */
+<span class="fc" id="L2028">        int intPart = (int)(prodA &gt;&gt;&gt; 62);</span>
+
+        /* Multiply by 4 */
+<span class="fc" id="L2031">        prodA &lt;&lt;= 2;</span>
+<span class="fc" id="L2032">        prodA |= prodB &gt;&gt;&gt; 62;</span>
+<span class="fc" id="L2033">        prodB &lt;&lt;= 2;</span>
+
+        /* Multiply by PI/4 */
+<span class="fc" id="L2036">        a = prodA &gt;&gt;&gt; 32;</span>
+<span class="fc" id="L2037">        b = prodA &amp; 0xffffffffL;</span>
+
+<span class="fc" id="L2039">        c = PI_O_4_BITS[0] &gt;&gt;&gt; 32;</span>
+<span class="fc" id="L2040">        d = PI_O_4_BITS[0] &amp; 0xffffffffL;</span>
+
+<span class="fc" id="L2042">        ac = a * c;</span>
+<span class="fc" id="L2043">        bd = b * d;</span>
+<span class="fc" id="L2044">        bc = b * c;</span>
+<span class="fc" id="L2045">        ad = a * d;</span>
+
+<span class="fc" id="L2047">        long prod2B = bd + (ad &lt;&lt; 32);</span>
+<span class="fc" id="L2048">        long prod2A = ac + (ad &gt;&gt;&gt; 32);</span>
+
+<span class="pc bpc" id="L2050" title="1 of 2 branches missed.">        bita = (bd &amp; 0x8000000000000000L) != 0;</span>
+<span class="fc bfc" id="L2051" title="All 2 branches covered.">        bitb = (ad &amp; 0x80000000L ) != 0;</span>
+<span class="fc bfc" id="L2052" title="All 2 branches covered.">        bitsum = (prod2B &amp; 0x8000000000000000L) != 0;</span>
+
+        /* Carry */
+<span class="pc bpc" id="L2055" title="5 of 10 branches missed.">        if ( (bita &amp;&amp; bitb) ||</span>
+                ((bita || bitb) &amp;&amp; !bitsum) ) {
+<span class="nc" id="L2057">            prod2A++;</span>
+        }
+
+<span class="fc bfc" id="L2060" title="All 2 branches covered.">        bita = (prod2B &amp; 0x8000000000000000L) != 0;</span>
+<span class="fc bfc" id="L2061" title="All 2 branches covered.">        bitb = (bc &amp; 0x80000000L ) != 0;</span>
+
+<span class="fc" id="L2063">        prod2B = prod2B + (bc &lt;&lt; 32);</span>
+<span class="fc" id="L2064">        prod2A = prod2A + (bc &gt;&gt;&gt; 32);</span>
+
+<span class="fc bfc" id="L2066" title="All 2 branches covered.">        bitsum = (prod2B &amp; 0x8000000000000000L) != 0;</span>
+
+        /* Carry */
+<span class="fc bfc" id="L2069" title="All 10 branches covered.">        if ( (bita &amp;&amp; bitb) ||</span>
+                ((bita || bitb) &amp;&amp; !bitsum) ) {
+<span class="fc" id="L2071">            prod2A++;</span>
+        }
+
+        /* Multiply input by pio4bits[1] */
+<span class="fc" id="L2075">        c = PI_O_4_BITS[1] &gt;&gt;&gt; 32;</span>
+<span class="fc" id="L2076">        d = PI_O_4_BITS[1] &amp; 0xffffffffL;</span>
+<span class="fc" id="L2077">        ac = a * c;</span>
+<span class="fc" id="L2078">        bc = b * c;</span>
+<span class="fc" id="L2079">        ad = a * d;</span>
+
+        /* Collect terms */
+<span class="fc" id="L2082">        ac = ac + ((bc + ad) &gt;&gt;&gt; 32);</span>
+
+<span class="fc bfc" id="L2084" title="All 2 branches covered.">        bita = (prod2B &amp; 0x8000000000000000L) != 0;</span>
+<span class="fc bfc" id="L2085" title="All 2 branches covered.">        bitb = (ac &amp; 0x8000000000000000L ) != 0;</span>
+<span class="fc" id="L2086">        prod2B += ac;</span>
+<span class="fc bfc" id="L2087" title="All 2 branches covered.">        bitsum = (prod2B &amp; 0x8000000000000000L) != 0;</span>
+        /* Carry */
+<span class="fc bfc" id="L2089" title="All 10 branches covered.">        if ( (bita &amp;&amp; bitb) ||</span>
+                ((bita || bitb) &amp;&amp; !bitsum) ) {
+<span class="fc" id="L2091">            prod2A++;</span>
+        }
+
+        /* Multiply inputB by pio4bits[0] */
+<span class="fc" id="L2095">        a = prodB &gt;&gt;&gt; 32;</span>
+<span class="fc" id="L2096">        b = prodB &amp; 0xffffffffL;</span>
+<span class="fc" id="L2097">        c = PI_O_4_BITS[0] &gt;&gt;&gt; 32;</span>
+<span class="fc" id="L2098">        d = PI_O_4_BITS[0] &amp; 0xffffffffL;</span>
+<span class="fc" id="L2099">        ac = a * c;</span>
+<span class="fc" id="L2100">        bc = b * c;</span>
+<span class="fc" id="L2101">        ad = a * d;</span>
+
+        /* Collect terms */
+<span class="fc" id="L2104">        ac = ac + ((bc + ad) &gt;&gt;&gt; 32);</span>
+
+<span class="fc bfc" id="L2106" title="All 2 branches covered.">        bita = (prod2B &amp; 0x8000000000000000L) != 0;</span>
+<span class="fc bfc" id="L2107" title="All 2 branches covered.">        bitb = (ac &amp; 0x8000000000000000L ) != 0;</span>
+<span class="fc" id="L2108">        prod2B += ac;</span>
+<span class="fc bfc" id="L2109" title="All 2 branches covered.">        bitsum = (prod2B &amp; 0x8000000000000000L) != 0;</span>
+        /* Carry */
+<span class="fc bfc" id="L2111" title="All 10 branches covered.">        if ( (bita &amp;&amp; bitb) ||</span>
+                ((bita || bitb) &amp;&amp; !bitsum) ) {
+<span class="fc" id="L2113">            prod2A++;</span>
+        }
+
+        /* Convert to double */
+<span class="fc" id="L2117">        double tmpA = (prod2A &gt;&gt;&gt; 12) / TWO_POWER_52;  // High order 52 bits</span>
+<span class="fc" id="L2118">        double tmpB = (((prod2A &amp; 0xfffL) &lt;&lt; 40) + (prod2B &gt;&gt;&gt; 24)) / TWO_POWER_52 / TWO_POWER_52; // Low bits</span>
+
+<span class="fc" id="L2120">        double sumA = tmpA + tmpB;</span>
+<span class="fc" id="L2121">        double sumB = -(sumA - tmpA - tmpB);</span>
+
+        /* Multiply by PI/2 and return */
+<span class="fc" id="L2124">        result[0] = intPart;</span>
+<span class="fc" id="L2125">        result[1] = sumA * 2.0;</span>
+<span class="fc" id="L2126">        result[2] = sumB * 2.0;</span>
+<span class="fc" id="L2127">    }</span>
+
+    /**
+     *  Sine function.
+     *  @param x a number
+     *  @return sin(x)
+     */
+    public static double sin(double x) {
+<span class="fc" id="L2135">        boolean negative = false;</span>
+<span class="fc" id="L2136">        int quadrant = 0;</span>
+        double xa;
+<span class="fc" id="L2138">        double xb = 0.0;</span>
+
+        /* Take absolute value of the input */
+<span class="fc" id="L2141">        xa = x;</span>
+<span class="fc bfc" id="L2142" title="All 2 branches covered.">        if (x &lt; 0) {</span>
+<span class="fc" id="L2143">            negative = true;</span>
+<span class="fc" id="L2144">            xa = -xa;</span>
+        }
+
+        /* Check for zero and negative zero */
+<span class="fc bfc" id="L2148" title="All 2 branches covered.">        if (xa == 0.0) {</span>
+<span class="fc" id="L2149">            long bits = Double.doubleToLongBits(x);</span>
+<span class="fc bfc" id="L2150" title="All 2 branches covered.">            if (bits &lt; 0) {</span>
+<span class="fc" id="L2151">                return -0.0;</span>
+            }
+<span class="fc" id="L2153">            return 0.0;</span>
+        }
+
+<span class="fc bfc" id="L2156" title="All 4 branches covered.">        if (xa != xa || xa == Double.POSITIVE_INFINITY) {</span>
+<span class="fc" id="L2157">            return Double.NaN;</span>
+        }
+
+        /* Perform any argument reduction */
+<span class="fc bfc" id="L2161" title="All 2 branches covered.">        if (xa &gt; 3294198.0) {</span>
+            // PI * (2**20)
+            // Argument too big for CodyWaite reduction.  Must use
+            // PayneHanek.
+<span class="fc" id="L2165">            double reduceResults[] = new double[3];</span>
+<span class="fc" id="L2166">            reducePayneHanek(xa, reduceResults);</span>
+<span class="fc" id="L2167">            quadrant = ((int) reduceResults[0]) &amp; 3;</span>
+<span class="fc" id="L2168">            xa = reduceResults[1];</span>
+<span class="fc" id="L2169">            xb = reduceResults[2];</span>
+<span class="fc bfc" id="L2170" title="All 2 branches covered.">        } else if (xa &gt; 1.5707963267948966) {</span>
+            /* Inline the Cody/Waite reduction for performance */
+
+            // Estimate k
+            //k = (int)(xa / 1.5707963267948966);
+<span class="fc" id="L2175">            int k = (int)(xa * 0.6366197723675814);</span>
+
+            // Compute remainder
+            double remA;
+            double remB;
+            while (true) {
+<span class="fc" id="L2181">                double a = -k * 1.570796251296997;</span>
+<span class="fc" id="L2182">                remA = xa + a;</span>
+<span class="fc" id="L2183">                remB = -(remA - xa - a);</span>
+
+<span class="fc" id="L2185">                a = -k * 7.549789948768648E-8;</span>
+<span class="fc" id="L2186">                double b = remA;</span>
+<span class="fc" id="L2187">                remA = a + b;</span>
+<span class="fc" id="L2188">                remB += -(remA - b - a);</span>
+
+<span class="fc" id="L2190">                a = -k * 6.123233995736766E-17;</span>
+<span class="fc" id="L2191">                b = remA;</span>
+<span class="fc" id="L2192">                remA = a + b;</span>
+<span class="fc" id="L2193">                remB += -(remA - b - a);</span>
+
+<span class="fc bfc" id="L2195" title="All 2 branches covered.">                if (remA &gt; 0.0) {</span>
+<span class="fc" id="L2196">                    break;</span>
+                }
+
+                // Remainder is negative, so decrement k and try again.
+                // This should only happen if the input is very close
+                // to an even multiple of pi/2
+<span class="fc" id="L2202">                k--;</span>
+<span class="fc" id="L2203">            }</span>
+<span class="fc" id="L2204">            quadrant = k &amp; 3;</span>
+<span class="fc" id="L2205">            xa = remA;</span>
+<span class="fc" id="L2206">            xb = remB;</span>
+        }
+
+<span class="fc bfc" id="L2209" title="All 2 branches covered.">        if (negative) {</span>
+<span class="fc" id="L2210">            quadrant ^= 2;  // Flip bit 1</span>
+        }
+
+<span class="pc bpc" id="L2213" title="1 of 5 branches missed.">        switch (quadrant) {</span>
+            case 0:
+<span class="fc" id="L2215">                return sinQ(xa, xb);</span>
+            case 1:
+<span class="fc" id="L2217">                return cosQ(xa, xb);</span>
+            case 2:
+<span class="fc" id="L2219">                return -sinQ(xa, xb);</span>
+            case 3:
+<span class="fc" id="L2221">                return -cosQ(xa, xb);</span>
+            default:
+<span class="nc" id="L2223">                return Double.NaN;</span>
+        }
+    }
+
+    /**
+     *  Cosine function
+     *  @param x a number
+     *  @return cos(x)
+     */
+    public static double cos(double x) {
+<span class="fc" id="L2233">        int quadrant = 0;</span>
+
+        /* Take absolute value of the input */
+<span class="fc" id="L2236">        double xa = x;</span>
+<span class="fc bfc" id="L2237" title="All 2 branches covered.">        if (x &lt; 0) {</span>
+<span class="fc" id="L2238">            xa = -xa;</span>
+        }
+
+<span class="fc bfc" id="L2241" title="All 4 branches covered.">        if (xa != xa || xa == Double.POSITIVE_INFINITY) {</span>
+<span class="fc" id="L2242">            return Double.NaN;</span>
+        }
+
+        /* Perform any argument reduction */
+<span class="fc" id="L2246">        double xb = 0;</span>
+<span class="fc bfc" id="L2247" title="All 2 branches covered.">        if (xa &gt; 3294198.0) {</span>
+            // PI * (2**20)
+            // Argument too big for CodyWaite reduction.  Must use
+            // PayneHanek.
+<span class="fc" id="L2251">            double reduceResults[] = new double[3];</span>
+<span class="fc" id="L2252">            reducePayneHanek(xa, reduceResults);</span>
+<span class="fc" id="L2253">            quadrant = ((int) reduceResults[0]) &amp; 3;</span>
+<span class="fc" id="L2254">            xa = reduceResults[1];</span>
+<span class="fc" id="L2255">            xb = reduceResults[2];</span>
+<span class="fc bfc" id="L2256" title="All 2 branches covered.">        } else if (xa &gt; 1.5707963267948966) {</span>
+            /* Inline the Cody/Waite reduction for performance */
+
+            // Estimate k
+            //k = (int)(xa / 1.5707963267948966);
+<span class="fc" id="L2261">            int k = (int)(xa * 0.6366197723675814);</span>
+
+            // Compute remainder
+            double remA;
+            double remB;
+            while (true) {
+<span class="fc" id="L2267">                double a = -k * 1.570796251296997;</span>
+<span class="fc" id="L2268">                remA = xa + a;</span>
+<span class="fc" id="L2269">                remB = -(remA - xa - a);</span>
+
+<span class="fc" id="L2271">                a = -k * 7.549789948768648E-8;</span>
+<span class="fc" id="L2272">                double b = remA;</span>
+<span class="fc" id="L2273">                remA = a + b;</span>
+<span class="fc" id="L2274">                remB += -(remA - b - a);</span>
+
+<span class="fc" id="L2276">                a = -k * 6.123233995736766E-17;</span>
+<span class="fc" id="L2277">                b = remA;</span>
+<span class="fc" id="L2278">                remA = a + b;</span>
+<span class="fc" id="L2279">                remB += -(remA - b - a);</span>
+
+<span class="fc bfc" id="L2281" title="All 2 branches covered.">                if (remA &gt; 0.0) {</span>
+<span class="fc" id="L2282">                    break;</span>
+                }
+
+                // Remainder is negative, so decrement k and try again.
+                // This should only happen if the input is very close
+                // to an even multiple of pi/2
+<span class="fc" id="L2288">                k--;</span>
+<span class="fc" id="L2289">            }</span>
+<span class="fc" id="L2290">            quadrant = k &amp; 3;</span>
+<span class="fc" id="L2291">            xa = remA;</span>
+<span class="fc" id="L2292">            xb = remB;</span>
+        }
+
+        //if (negative)
+        //  quadrant = (quadrant + 2) % 4;
+
+<span class="pc bpc" id="L2298" title="1 of 5 branches missed.">        switch (quadrant) {</span>
+            case 0:
+<span class="fc" id="L2300">                return cosQ(xa, xb);</span>
+            case 1:
+<span class="fc" id="L2302">                return -sinQ(xa, xb);</span>
+            case 2:
+<span class="fc" id="L2304">                return -cosQ(xa, xb);</span>
+            case 3:
+<span class="fc" id="L2306">                return sinQ(xa, xb);</span>
+            default:
+<span class="nc" id="L2308">                return Double.NaN;</span>
+        }
+    }
+
+    /**
+     *   Tangent function
+     *  @param x a number
+     *  @return tan(x)
+     */
+    public static double tan(double x) {
+<span class="fc" id="L2318">        boolean negative = false;</span>
+<span class="fc" id="L2319">        int quadrant = 0;</span>
+
+        /* Take absolute value of the input */
+<span class="fc" id="L2322">        double xa = x;</span>
+<span class="fc bfc" id="L2323" title="All 2 branches covered.">        if (x &lt; 0) {</span>
+<span class="fc" id="L2324">            negative = true;</span>
+<span class="fc" id="L2325">            xa = -xa;</span>
+        }
+
+        /* Check for zero and negative zero */
+<span class="fc bfc" id="L2329" title="All 2 branches covered.">        if (xa == 0.0) {</span>
+<span class="fc" id="L2330">            long bits = Double.doubleToLongBits(x);</span>
+<span class="fc bfc" id="L2331" title="All 2 branches covered.">            if (bits &lt; 0) {</span>
+<span class="fc" id="L2332">                return -0.0;</span>
+            }
+<span class="fc" id="L2334">            return 0.0;</span>
+        }
+
+<span class="fc bfc" id="L2337" title="All 4 branches covered.">        if (xa != xa || xa == Double.POSITIVE_INFINITY) {</span>
+<span class="fc" id="L2338">            return Double.NaN;</span>
+        }
+
+        /* Perform any argument reduction */
+<span class="fc" id="L2342">        double xb = 0;</span>
+<span class="fc bfc" id="L2343" title="All 2 branches covered.">        if (xa &gt; 3294198.0) {</span>
+            // PI * (2**20)
+            // Argument too big for CodyWaite reduction.  Must use
+            // PayneHanek.
+<span class="fc" id="L2347">            double reduceResults[] = new double[3];</span>
+<span class="fc" id="L2348">            reducePayneHanek(xa, reduceResults);</span>
+<span class="fc" id="L2349">            quadrant = ((int) reduceResults[0]) &amp; 3;</span>
+<span class="fc" id="L2350">            xa = reduceResults[1];</span>
+<span class="fc" id="L2351">            xb = reduceResults[2];</span>
+<span class="fc bfc" id="L2352" title="All 2 branches covered.">        } else if (xa &gt; 1.5707963267948966) {</span>
+            /* Inline the Cody/Waite reduction for performance */
+
+            // Estimate k
+            //k = (int)(xa / 1.5707963267948966);
+<span class="fc" id="L2357">            int k = (int)(xa * 0.6366197723675814);</span>
+
+            // Compute remainder
+            double remA;
+            double remB;
+            while (true) {
+<span class="fc" id="L2363">                double a = -k * 1.570796251296997;</span>
+<span class="fc" id="L2364">                remA = xa + a;</span>
+<span class="fc" id="L2365">                remB = -(remA - xa - a);</span>
+
+<span class="fc" id="L2367">                a = -k * 7.549789948768648E-8;</span>
+<span class="fc" id="L2368">                double b = remA;</span>
+<span class="fc" id="L2369">                remA = a + b;</span>
+<span class="fc" id="L2370">                remB += -(remA - b - a);</span>
+
+<span class="fc" id="L2372">                a = -k * 6.123233995736766E-17;</span>
+<span class="fc" id="L2373">                b = remA;</span>
+<span class="fc" id="L2374">                remA = a + b;</span>
+<span class="fc" id="L2375">                remB += -(remA - b - a);</span>
+
+<span class="pc bpc" id="L2377" title="1 of 2 branches missed.">                if (remA &gt; 0.0) {</span>
+<span class="fc" id="L2378">                    break;</span>
+                }
+
+                // Remainder is negative, so decrement k and try again.
+                // This should only happen if the input is very close
+                // to an even multiple of pi/2
+<span class="nc" id="L2384">                k--;</span>
+<span class="nc" id="L2385">            }</span>
+<span class="fc" id="L2386">            quadrant = k &amp; 3;</span>
+<span class="fc" id="L2387">            xa = remA;</span>
+<span class="fc" id="L2388">            xb = remB;</span>
+        }
+
+<span class="fc bfc" id="L2391" title="All 2 branches covered.">        if (xa &gt; 1.5) {</span>
+            // Accurracy suffers between 1.5 and PI/2
+<span class="fc" id="L2393">            final double pi2a = 1.5707963267948966;</span>
+<span class="fc" id="L2394">            final double pi2b = 6.123233995736766E-17;</span>
+
+<span class="fc" id="L2396">            final double a = pi2a - xa;</span>
+<span class="fc" id="L2397">            double b = -(a - pi2a + xa);</span>
+<span class="fc" id="L2398">            b += pi2b - xb;</span>
+
+<span class="fc" id="L2400">            xa = a + b;</span>
+<span class="fc" id="L2401">            xb = -(xa - a - b);</span>
+<span class="fc" id="L2402">            quadrant ^= 1;</span>
+<span class="fc" id="L2403">            negative ^= true;</span>
+        }
+
+        double result;
+<span class="fc bfc" id="L2407" title="All 2 branches covered.">        if ((quadrant &amp; 1) == 0) {</span>
+<span class="fc" id="L2408">            result = tanQ(xa, xb, false);</span>
+        } else {
+<span class="fc" id="L2410">            result = -tanQ(xa, xb, true);</span>
+        }
+
+<span class="fc bfc" id="L2413" title="All 2 branches covered.">        if (negative) {</span>
+<span class="fc" id="L2414">            result = -result;</span>
+        }
+
+<span class="fc" id="L2417">        return result;</span>
+    }
+
+    /**
+     * Arctangent function
+     *  @param x a number
+     *  @return atan(x)
+     */
+    public static double atan(double x) {
+<span class="fc" id="L2426">        return atan(x, 0.0, false);</span>
+    }
+
+    /** Internal helper function to compute arctangent.
+     * @param xa number from which arctangent is requested
+     * @param xb extra bits for x (may be 0.0)
+     * @param leftPlane if true, result angle must be put in the left half plane
+     * @return atan(xa + xb) (or angle shifted by {@code PI} if leftPlane is true)
+     */
+    private static double atan(double xa, double xb, boolean leftPlane) {
+<span class="fc" id="L2436">        boolean negate = false;</span>
+        int idx;
+
+<span class="fc bfc" id="L2439" title="All 2 branches covered.">        if (xa == 0.0) { // Matches +/- 0.0; return correct sign</span>
+<span class="fc bfc" id="L2440" title="All 2 branches covered.">            return leftPlane ? copySign(Math.PI, xa) : xa;</span>
+        }
+
+<span class="fc bfc" id="L2443" title="All 2 branches covered.">        if (xa &lt; 0) {</span>
+            // negative
+<span class="fc" id="L2445">            xa = -xa;</span>
+<span class="fc" id="L2446">            xb = -xb;</span>
+<span class="fc" id="L2447">            negate = true;</span>
+        }
+
+<span class="fc bfc" id="L2450" title="All 2 branches covered.">        if (xa &gt; 1.633123935319537E16) { // Very large input</span>
+<span class="fc bfc" id="L2451" title="All 2 branches covered.">            return (negate ^ leftPlane) ? (-Math.PI/2.0) : (Math.PI/2.0);</span>
+        }
+
+        /* Estimate the closest tabulated arctan value, compute eps = xa-tangentTable */
+<span class="fc bfc" id="L2455" title="All 2 branches covered.">        if (xa &lt; 1.0) {</span>
+<span class="fc" id="L2456">            idx = (int) (((-1.7168146928204136 * xa * xa + 8.0) * xa) + 0.5);</span>
+        } else {
+<span class="fc" id="L2458">            double temp = 1.0/xa;</span>
+<span class="fc" id="L2459">            idx = (int) (-((-1.7168146928204136 * temp * temp + 8.0) * temp) + 13.07);</span>
+        }
+<span class="fc" id="L2461">        double epsA = xa - TANGENT_TABLE_A[idx];</span>
+<span class="fc" id="L2462">        double epsB = -(epsA - xa + TANGENT_TABLE_A[idx]);</span>
+<span class="fc" id="L2463">        epsB += xb - TANGENT_TABLE_B[idx];</span>
+
+<span class="fc" id="L2465">        double temp = epsA + epsB;</span>
+<span class="fc" id="L2466">        epsB = -(temp - epsA - epsB);</span>
+<span class="fc" id="L2467">        epsA = temp;</span>
+
+        /* Compute eps = eps / (1.0 + xa*tangent) */
+<span class="fc" id="L2470">        temp = xa * HEX_40000000;</span>
+<span class="fc" id="L2471">        double ya = xa + temp - temp;</span>
+<span class="fc" id="L2472">        double yb = xb + xa - ya;</span>
+<span class="fc" id="L2473">        xa = ya;</span>
+<span class="fc" id="L2474">        xb += yb;</span>
+
+        //if (idx &gt; 8 || idx == 0)
+<span class="fc bfc" id="L2477" title="All 2 branches covered.">        if (idx == 0) {</span>
+            /* If the slope of the arctan is gentle enough (&lt; 0.45), this approximation will suffice */
+            //double denom = 1.0 / (1.0 + xa*tangentTableA[idx] + xb*tangentTableA[idx] + xa*tangentTableB[idx] + xb*tangentTableB[idx]);
+<span class="fc" id="L2480">            double denom = 1.0 / (1.0 + (xa + xb) * (TANGENT_TABLE_A[idx] + TANGENT_TABLE_B[idx]));</span>
+            //double denom = 1.0 / (1.0 + xa*tangentTableA[idx]);
+<span class="fc" id="L2482">            ya = epsA * denom;</span>
+<span class="fc" id="L2483">            yb = epsB * denom;</span>
+<span class="fc" id="L2484">        } else {</span>
+<span class="fc" id="L2485">            double temp2 = xa * TANGENT_TABLE_A[idx];</span>
+<span class="fc" id="L2486">            double za = 1.0 + temp2;</span>
+<span class="fc" id="L2487">            double zb = -(za - 1.0 - temp2);</span>
+<span class="fc" id="L2488">            temp2 = xb * TANGENT_TABLE_A[idx] + xa * TANGENT_TABLE_B[idx];</span>
+<span class="fc" id="L2489">            temp = za + temp2;</span>
+<span class="fc" id="L2490">            zb += -(temp - za - temp2);</span>
+<span class="fc" id="L2491">            za = temp;</span>
+
+<span class="fc" id="L2493">            zb += xb * TANGENT_TABLE_B[idx];</span>
+<span class="fc" id="L2494">            ya = epsA / za;</span>
+
+<span class="fc" id="L2496">            temp = ya * HEX_40000000;</span>
+<span class="fc" id="L2497">            final double yaa = (ya + temp) - temp;</span>
+<span class="fc" id="L2498">            final double yab = ya - yaa;</span>
+
+<span class="fc" id="L2500">            temp = za * HEX_40000000;</span>
+<span class="fc" id="L2501">            final double zaa = (za + temp) - temp;</span>
+<span class="fc" id="L2502">            final double zab = za - zaa;</span>
+
+            /* Correct for rounding in division */
+<span class="fc" id="L2505">            yb = (epsA - yaa * zaa - yaa * zab - yab * zaa - yab * zab) / za;</span>
+
+<span class="fc" id="L2507">            yb += -epsA * zb / za / za;</span>
+<span class="fc" id="L2508">            yb += epsB / za;</span>
+        }
+
+
+<span class="fc" id="L2512">        epsA = ya;</span>
+<span class="fc" id="L2513">        epsB = yb;</span>
+
+        /* Evaluate polynomial */
+<span class="fc" id="L2516">        double epsA2 = epsA*epsA;</span>
+
+        /*
+    yb = -0.09001346640161823;
+    yb = yb * epsA2 + 0.11110718400605211;
+    yb = yb * epsA2 + -0.1428571349122913;
+    yb = yb * epsA2 + 0.19999999999273194;
+    yb = yb * epsA2 + -0.33333333333333093;
+    yb = yb * epsA2 * epsA;
+         */
+
+<span class="fc" id="L2527">        yb = 0.07490822288864472;</span>
+<span class="fc" id="L2528">        yb = yb * epsA2 + -0.09088450866185192;</span>
+<span class="fc" id="L2529">        yb = yb * epsA2 + 0.11111095942313305;</span>
+<span class="fc" id="L2530">        yb = yb * epsA2 + -0.1428571423679182;</span>
+<span class="fc" id="L2531">        yb = yb * epsA2 + 0.19999999999923582;</span>
+<span class="fc" id="L2532">        yb = yb * epsA2 + -0.33333333333333287;</span>
+<span class="fc" id="L2533">        yb = yb * epsA2 * epsA;</span>
+
+
+<span class="fc" id="L2536">        ya = epsA;</span>
+
+<span class="fc" id="L2538">        temp = ya + yb;</span>
+<span class="fc" id="L2539">        yb = -(temp - ya - yb);</span>
+<span class="fc" id="L2540">        ya = temp;</span>
+
+        /* Add in effect of epsB.   atan'(x) = 1/(1+x^2) */
+<span class="fc" id="L2543">        yb += epsB / (1.0 + epsA * epsA);</span>
+
+        double result;
+        double resultb;
+
+        //result = yb + eighths[idx] + ya;
+<span class="fc" id="L2549">        double za = EIGHTHS[idx] + ya;</span>
+<span class="fc" id="L2550">        double zb = -(za - EIGHTHS[idx] - ya);</span>
+<span class="fc" id="L2551">        temp = za + yb;</span>
+<span class="fc" id="L2552">        zb += -(temp - za - yb);</span>
+<span class="fc" id="L2553">        za = temp;</span>
+
+<span class="fc" id="L2555">        result = za + zb;</span>
+<span class="fc" id="L2556">        resultb = -(result - za - zb);</span>
+
+<span class="fc bfc" id="L2558" title="All 2 branches covered.">        if (leftPlane) {</span>
+            // Result is in the left plane
+<span class="fc" id="L2560">            final double pia = 1.5707963267948966*2.0;</span>
+<span class="fc" id="L2561">            final double pib = 6.123233995736766E-17*2.0;</span>
+
+<span class="fc" id="L2563">            za = pia - result;</span>
+<span class="fc" id="L2564">            zb = -(za - pia + result);</span>
+<span class="fc" id="L2565">            zb += pib - resultb;</span>
+
+<span class="fc" id="L2567">            result = za + zb;</span>
+<span class="fc" id="L2568">            resultb = -(result - za - zb);</span>
+        }
+
+
+<span class="fc bfc" id="L2572" title="All 2 branches covered.">        if (negate ^ leftPlane) {</span>
+<span class="fc" id="L2573">            result = -result;</span>
+        }
+
+<span class="fc" id="L2576">        return result;</span>
+    }
+
+    /**
+     * Two arguments arctangent function
+     * @param y ordinate
+     * @param x abscissa
+     * @return phase angle of point (x,y) between {@code -PI} and {@code PI}
+     */
+    public static double atan2(double y, double x) {
+<span class="fc bfc" id="L2586" title="All 4 branches covered.">        if (x !=x || y != y) {</span>
+<span class="fc" id="L2587">            return Double.NaN;</span>
+        }
+
+<span class="fc bfc" id="L2590" title="All 2 branches covered.">        if (y == 0.0) {</span>
+<span class="fc" id="L2591">            double result = x*y;</span>
+<span class="fc" id="L2592">            double invx = 1.0/x;</span>
+<span class="fc" id="L2593">            double invy = 1.0/y;</span>
+
+<span class="fc bfc" id="L2595" title="All 2 branches covered.">            if (invx == 0.0) { // X is infinite</span>
+<span class="fc bfc" id="L2596" title="All 2 branches covered.">                if (x &gt; 0) {</span>
+<span class="fc" id="L2597">                    return y; // return +/- 0.0</span>
+                } else {
+<span class="fc" id="L2599">                    return copySign(Math.PI, y);</span>
+                }
+            }
+
+<span class="fc bfc" id="L2603" title="All 4 branches covered.">            if (x &lt; 0.0 || invx &lt; 0.0) {</span>
+<span class="pc bpc" id="L2604" title="1 of 4 branches missed.">                if (y &lt; 0.0 || invy &lt; 0.0) {</span>
+<span class="fc" id="L2605">                    return -Math.PI;</span>
+                } else {
+<span class="fc" id="L2607">                    return Math.PI;</span>
+                }
+            } else {
+<span class="fc" id="L2610">                return result;</span>
+            }
+        }
+
+        // y cannot now be zero
+
+<span class="fc bfc" id="L2616" title="All 2 branches covered.">        if (y == Double.POSITIVE_INFINITY) {</span>
+<span class="fc bfc" id="L2617" title="All 2 branches covered.">            if (x == Double.POSITIVE_INFINITY) {</span>
+<span class="fc" id="L2618">                return Math.PI/4.0;</span>
+            }
+
+<span class="fc bfc" id="L2621" title="All 2 branches covered.">            if (x == Double.NEGATIVE_INFINITY) {</span>
+<span class="fc" id="L2622">                return Math.PI * F_3_4;</span>
+            }
+
+<span class="fc" id="L2625">            return Math.PI/2.0;</span>
+        }
+
+<span class="fc bfc" id="L2628" title="All 2 branches covered.">        if (y == Double.NEGATIVE_INFINITY) {</span>
+<span class="fc bfc" id="L2629" title="All 2 branches covered.">            if (x == Double.POSITIVE_INFINITY) {</span>
+<span class="fc" id="L2630">                return -Math.PI/4.0;</span>
+            }
+
+<span class="fc bfc" id="L2633" title="All 2 branches covered.">            if (x == Double.NEGATIVE_INFINITY) {</span>
+<span class="fc" id="L2634">                return -Math.PI * F_3_4;</span>
+            }
+
+<span class="fc" id="L2637">            return -Math.PI/2.0;</span>
+        }
+
+<span class="fc bfc" id="L2640" title="All 2 branches covered.">        if (x == Double.POSITIVE_INFINITY) {</span>
+<span class="pc bpc" id="L2641" title="1 of 4 branches missed.">            if (y &gt; 0.0 || 1/y &gt; 0.0) {</span>
+<span class="fc" id="L2642">                return 0.0;</span>
+            }
+
+<span class="pc bpc" id="L2645" title="3 of 4 branches missed.">            if (y &lt; 0.0 || 1/y &lt; 0.0) {</span>
+<span class="fc" id="L2646">                return -0.0;</span>
+            }
+        }
+
+<span class="fc bfc" id="L2650" title="All 2 branches covered.">        if (x == Double.NEGATIVE_INFINITY)</span>
+        {
+<span class="pc bpc" id="L2652" title="1 of 4 branches missed.">            if (y &gt; 0.0 || 1/y &gt; 0.0) {</span>
+<span class="fc" id="L2653">                return Math.PI;</span>
+            }
+
+<span class="pc bpc" id="L2656" title="3 of 4 branches missed.">            if (y &lt; 0.0 || 1/y &lt; 0.0) {</span>
+<span class="fc" id="L2657">                return -Math.PI;</span>
+            }
+        }
+
+        // Neither y nor x can be infinite or NAN here
+
+<span class="fc bfc" id="L2663" title="All 2 branches covered.">        if (x == 0) {</span>
+<span class="pc bpc" id="L2664" title="1 of 4 branches missed.">            if (y &gt; 0.0 || 1/y &gt; 0.0) {</span>
+<span class="fc" id="L2665">                return Math.PI/2.0;</span>
+            }
+
+<span class="pc bpc" id="L2668" title="3 of 4 branches missed.">            if (y &lt; 0.0 || 1/y &lt; 0.0) {</span>
+<span class="fc" id="L2669">                return -Math.PI/2.0;</span>
+            }
+        }
+
+        // Compute ratio r = y/x
+<span class="fc" id="L2674">        final double r = y/x;</span>
+<span class="fc bfc" id="L2675" title="All 2 branches covered.">        if (Double.isInfinite(r)) { // bypass calculations that can create NaN</span>
+<span class="fc bfc" id="L2676" title="All 2 branches covered.">            return atan(r, 0, x &lt; 0);</span>
+        }
+
+<span class="fc" id="L2679">        double ra = doubleHighPart(r);</span>
+<span class="fc" id="L2680">        double rb = r - ra;</span>
+
+        // Split x
+<span class="fc" id="L2683">        final double xa = doubleHighPart(x);</span>
+<span class="fc" id="L2684">        final double xb = x - xa;</span>
+
+<span class="fc" id="L2686">        rb += (y - ra * xa - ra * xb - rb * xa - rb * xb) / x;</span>
+
+<span class="fc" id="L2688">        double temp = ra + rb;</span>
+<span class="fc" id="L2689">        rb = -(temp - ra - rb);</span>
+<span class="fc" id="L2690">        ra = temp;</span>
+
+<span class="fc bfc" id="L2692" title="All 2 branches covered.">        if (ra == 0) { // Fix up the sign so atan works correctly</span>
+<span class="fc" id="L2693">            ra = copySign(0.0, y);</span>
+        }
+
+        // Call atan
+<span class="fc bfc" id="L2697" title="All 2 branches covered.">        double result = atan(ra, rb, x &lt; 0);</span>
+
+<span class="fc" id="L2699">        return result;</span>
+    }
+
+    /** Compute the arc sine of a number.
+     * @param x number on which evaluation is done
+     * @return arc sine of x
+     */
+    public static double asin(double x) {
+<span class="fc bfc" id="L2707" title="All 2 branches covered.">      if (x != x) {</span>
+<span class="fc" id="L2708">          return Double.NaN;</span>
+      }
+
+<span class="fc bfc" id="L2711" title="All 4 branches covered.">      if (x &gt; 1.0 || x &lt; -1.0) {</span>
+<span class="fc" id="L2712">          return Double.NaN;</span>
+      }
+
+<span class="fc bfc" id="L2715" title="All 2 branches covered.">      if (x == 1.0) {</span>
+<span class="fc" id="L2716">          return Math.PI/2.0;</span>
+      }
+
+<span class="fc bfc" id="L2719" title="All 2 branches covered.">      if (x == -1.0) {</span>
+<span class="fc" id="L2720">          return -Math.PI/2.0;</span>
+      }
+
+<span class="fc bfc" id="L2723" title="All 2 branches covered.">      if (x == 0.0) { // Matches +/- 0.0; return correct sign</span>
+<span class="fc" id="L2724">          return x;</span>
+      }
+
+      /* Compute asin(x) = atan(x/sqrt(1-x*x)) */
+
+      /* Split x */
+<span class="fc" id="L2730">      double temp = x * HEX_40000000;</span>
+<span class="fc" id="L2731">      final double xa = x + temp - temp;</span>
+<span class="fc" id="L2732">      final double xb = x - xa;</span>
+
+      /* Square it */
+<span class="fc" id="L2735">      double ya = xa*xa;</span>
+<span class="fc" id="L2736">      double yb = xa*xb*2.0 + xb*xb;</span>
+
+      /* Subtract from 1 */
+<span class="fc" id="L2739">      ya = -ya;</span>
+<span class="fc" id="L2740">      yb = -yb;</span>
+
+<span class="fc" id="L2742">      double za = 1.0 + ya;</span>
+<span class="fc" id="L2743">      double zb = -(za - 1.0 - ya);</span>
+
+<span class="fc" id="L2745">      temp = za + yb;</span>
+<span class="fc" id="L2746">      zb += -(temp - za - yb);</span>
+<span class="fc" id="L2747">      za = temp;</span>
+
+      /* Square root */
+      double y;
+<span class="fc" id="L2751">      y = sqrt(za);</span>
+<span class="fc" id="L2752">      temp = y * HEX_40000000;</span>
+<span class="fc" id="L2753">      ya = y + temp - temp;</span>
+<span class="fc" id="L2754">      yb = y - ya;</span>
+
+      /* Extend precision of sqrt */
+<span class="fc" id="L2757">      yb += (za - ya*ya - 2*ya*yb - yb*yb) / (2.0*y);</span>
+
+      /* Contribution of zb to sqrt */
+<span class="fc" id="L2760">      double dx = zb / (2.0*y);</span>
+
+      // Compute ratio r = x/y
+<span class="fc" id="L2763">      double r = x/y;</span>
+<span class="fc" id="L2764">      temp = r * HEX_40000000;</span>
+<span class="fc" id="L2765">      double ra = r + temp - temp;</span>
+<span class="fc" id="L2766">      double rb = r - ra;</span>
+
+<span class="fc" id="L2768">      rb += (x - ra*ya - ra*yb - rb*ya - rb*yb) / y;  // Correct for rounding in division</span>
+<span class="fc" id="L2769">      rb += -x * dx / y / y;  // Add in effect additional bits of sqrt.</span>
+
+<span class="fc" id="L2771">      temp = ra + rb;</span>
+<span class="fc" id="L2772">      rb = -(temp - ra - rb);</span>
+<span class="fc" id="L2773">      ra = temp;</span>
+
+<span class="fc" id="L2775">      return atan(ra, rb, false);</span>
+    }
+
+    /** Compute the arc cosine of a number.
+     * @param x number on which evaluation is done
+     * @return arc cosine of x
+     */
+    public static double acos(double x) {
+<span class="fc bfc" id="L2783" title="All 2 branches covered.">      if (x != x) {</span>
+<span class="fc" id="L2784">          return Double.NaN;</span>
+      }
+
+<span class="fc bfc" id="L2787" title="All 4 branches covered.">      if (x &gt; 1.0 || x &lt; -1.0) {</span>
+<span class="fc" id="L2788">          return Double.NaN;</span>
+      }
+
+<span class="fc bfc" id="L2791" title="All 2 branches covered.">      if (x == -1.0) {</span>
+<span class="fc" id="L2792">          return Math.PI;</span>
+      }
+
+<span class="fc bfc" id="L2795" title="All 2 branches covered.">      if (x == 1.0) {</span>
+<span class="fc" id="L2796">          return 0.0;</span>
+      }
+
+<span class="fc bfc" id="L2799" title="All 2 branches covered.">      if (x == 0) {</span>
+<span class="fc" id="L2800">          return Math.PI/2.0;</span>
+      }
+
+      /* Compute acos(x) = atan(sqrt(1-x*x)/x) */
+
+      /* Split x */
+<span class="fc" id="L2806">      double temp = x * HEX_40000000;</span>
+<span class="fc" id="L2807">      final double xa = x + temp - temp;</span>
+<span class="fc" id="L2808">      final double xb = x - xa;</span>
+
+      /* Square it */
+<span class="fc" id="L2811">      double ya = xa*xa;</span>
+<span class="fc" id="L2812">      double yb = xa*xb*2.0 + xb*xb;</span>
+
+      /* Subtract from 1 */
+<span class="fc" id="L2815">      ya = -ya;</span>
+<span class="fc" id="L2816">      yb = -yb;</span>
+
+<span class="fc" id="L2818">      double za = 1.0 + ya;</span>
+<span class="fc" id="L2819">      double zb = -(za - 1.0 - ya);</span>
+
+<span class="fc" id="L2821">      temp = za + yb;</span>
+<span class="fc" id="L2822">      zb += -(temp - za - yb);</span>
+<span class="fc" id="L2823">      za = temp;</span>
+
+      /* Square root */
+<span class="fc" id="L2826">      double y = sqrt(za);</span>
+<span class="fc" id="L2827">      temp = y * HEX_40000000;</span>
+<span class="fc" id="L2828">      ya = y + temp - temp;</span>
+<span class="fc" id="L2829">      yb = y - ya;</span>
+
+      /* Extend precision of sqrt */
+<span class="fc" id="L2832">      yb += (za - ya*ya - 2*ya*yb - yb*yb) / (2.0*y);</span>
+
+      /* Contribution of zb to sqrt */
+<span class="fc" id="L2835">      yb += zb / (2.0*y);</span>
+<span class="fc" id="L2836">      y = ya+yb;</span>
+<span class="fc" id="L2837">      yb = -(y - ya - yb);</span>
+
+      // Compute ratio r = y/x
+<span class="fc" id="L2840">      double r = y/x;</span>
+
+      // Did r overflow?
+<span class="fc bfc" id="L2843" title="All 2 branches covered.">      if (Double.isInfinite(r)) { // x is effectively zero</span>
+<span class="fc" id="L2844">          return Math.PI/2; // so return the appropriate value</span>
+      }
+
+<span class="fc" id="L2847">      double ra = doubleHighPart(r);</span>
+<span class="fc" id="L2848">      double rb = r - ra;</span>
+
+<span class="fc" id="L2850">      rb += (y - ra*xa - ra*xb - rb*xa - rb*xb) / x;  // Correct for rounding in division</span>
+<span class="fc" id="L2851">      rb += yb / x;  // Add in effect additional bits of sqrt.</span>
+
+<span class="fc" id="L2853">      temp = ra + rb;</span>
+<span class="fc" id="L2854">      rb = -(temp - ra - rb);</span>
+<span class="fc" id="L2855">      ra = temp;</span>
+
+<span class="fc bfc" id="L2857" title="All 2 branches covered.">      return atan(ra, rb, x&lt;0);</span>
+    }
+
+    /** Compute the cubic root of a number.
+     * @param x number on which evaluation is done
+     * @return cubic root of x
+     */
+    public static double cbrt(double x) {
+      /* Convert input double to bits */
+<span class="fc" id="L2866">      long inbits = Double.doubleToLongBits(x);</span>
+<span class="fc" id="L2867">      int exponent = (int) ((inbits &gt;&gt; 52) &amp; 0x7ff) - 1023;</span>
+<span class="fc" id="L2868">      boolean subnormal = false;</span>
+
+<span class="fc bfc" id="L2870" title="All 2 branches covered.">      if (exponent == -1023) {</span>
+<span class="fc bfc" id="L2871" title="All 2 branches covered.">          if (x == 0) {</span>
+<span class="fc" id="L2872">              return x;</span>
+          }
+
+          /* Subnormal, so normalize */
+<span class="fc" id="L2876">          subnormal = true;</span>
+<span class="fc" id="L2877">          x *= 1.8014398509481984E16;  // 2^54</span>
+<span class="fc" id="L2878">          inbits = Double.doubleToLongBits(x);</span>
+<span class="fc" id="L2879">          exponent = (int) ((inbits &gt;&gt; 52) &amp; 0x7ff) - 1023;</span>
+      }
+
+<span class="fc bfc" id="L2882" title="All 2 branches covered.">      if (exponent == 1024) {</span>
+          // Nan or infinity.  Don't care which.
+<span class="fc" id="L2884">          return x;</span>
+      }
+
+      /* Divide the exponent by 3 */
+<span class="fc" id="L2888">      int exp3 = exponent / 3;</span>
+
+      /* p2 will be the nearest power of 2 to x with its exponent divided by 3 */
+<span class="fc" id="L2891">      double p2 = Double.longBitsToDouble((inbits &amp; 0x8000000000000000L) |</span>
+                                          (long)(((exp3 + 1023) &amp; 0x7ff)) &lt;&lt; 52);
+
+      /* This will be a number between 1 and 2 */
+<span class="fc" id="L2895">      final double mant = Double.longBitsToDouble((inbits &amp; 0x000fffffffffffffL) | 0x3ff0000000000000L);</span>
+
+      /* Estimate the cube root of mant by polynomial */
+<span class="fc" id="L2898">      double est = -0.010714690733195933;</span>
+<span class="fc" id="L2899">      est = est * mant + 0.0875862700108075;</span>
+<span class="fc" id="L2900">      est = est * mant + -0.3058015757857271;</span>
+<span class="fc" id="L2901">      est = est * mant + 0.7249995199969751;</span>
+<span class="fc" id="L2902">      est = est * mant + 0.5039018405998233;</span>
+
+<span class="fc" id="L2904">      est *= CBRTTWO[exponent % 3 + 2];</span>
+
+      // est should now be good to about 15 bits of precision.   Do 2 rounds of
+      // Newton's method to get closer,  this should get us full double precision
+      // Scale down x for the purpose of doing newtons method.  This avoids over/under flows.
+<span class="fc" id="L2909">      final double xs = x / (p2*p2*p2);</span>
+<span class="fc" id="L2910">      est += (xs - est*est*est) / (3*est*est);</span>
+<span class="fc" id="L2911">      est += (xs - est*est*est) / (3*est*est);</span>
+
+      // Do one round of Newton's method in extended precision to get the last bit right.
+<span class="fc" id="L2914">      double temp = est * HEX_40000000;</span>
+<span class="fc" id="L2915">      double ya = est + temp - temp;</span>
+<span class="fc" id="L2916">      double yb = est - ya;</span>
+
+<span class="fc" id="L2918">      double za = ya * ya;</span>
+<span class="fc" id="L2919">      double zb = ya * yb * 2.0 + yb * yb;</span>
+<span class="fc" id="L2920">      temp = za * HEX_40000000;</span>
+<span class="fc" id="L2921">      double temp2 = za + temp - temp;</span>
+<span class="fc" id="L2922">      zb += za - temp2;</span>
+<span class="fc" id="L2923">      za = temp2;</span>
+
+<span class="fc" id="L2925">      zb = za * yb + ya * zb + zb * yb;</span>
+<span class="fc" id="L2926">      za = za * ya;</span>
+
+<span class="fc" id="L2928">      double na = xs - za;</span>
+<span class="fc" id="L2929">      double nb = -(na - xs + za);</span>
+<span class="fc" id="L2930">      nb -= zb;</span>
+
+<span class="fc" id="L2932">      est += (na+nb)/(3*est*est);</span>
+
+      /* Scale by a power of two, so this is exact. */
+<span class="fc" id="L2935">      est *= p2;</span>
+
+<span class="fc bfc" id="L2937" title="All 2 branches covered.">      if (subnormal) {</span>
+<span class="fc" id="L2938">          est *= 3.814697265625E-6;  // 2^-18</span>
+      }
+
+<span class="fc" id="L2941">      return est;</span>
+    }
+
+    /**
+     *  Convert degrees to radians, with error of less than 0.5 ULP
+     *  @param x angle in degrees
+     *  @return x converted into radians
+     */
+    public static double toRadians(double x)
+    {
+<span class="fc bfc" id="L2951" title="All 4 branches covered.">        if (Double.isInfinite(x) || x == 0.0) { // Matches +/- 0.0; return correct sign</span>
+<span class="fc" id="L2952">            return x;</span>
+        }
+
+        // These are PI/180 split into high and low order bits
+<span class="fc" id="L2956">        final double facta = 0.01745329052209854;</span>
+<span class="fc" id="L2957">        final double factb = 1.997844754509471E-9;</span>
+
+<span class="fc" id="L2959">        double xa = doubleHighPart(x);</span>
+<span class="fc" id="L2960">        double xb = x - xa;</span>
+
+<span class="fc" id="L2962">        double result = xb * factb + xb * facta + xa * factb + xa * facta;</span>
+<span class="fc bfc" id="L2963" title="All 2 branches covered.">        if (result == 0) {</span>
+<span class="fc" id="L2964">            result = result * x; // ensure correct sign if calculation underflows</span>
+        }
+<span class="fc" id="L2966">        return result;</span>
+    }
+
+    /**
+     *  Convert radians to degrees, with error of less than 0.5 ULP
+     *  @param x angle in radians
+     *  @return x converted into degrees
+     */
+    public static double toDegrees(double x)
+    {
+<span class="fc bfc" id="L2976" title="All 4 branches covered.">        if (Double.isInfinite(x) || x == 0.0) { // Matches +/- 0.0; return correct sign</span>
+<span class="fc" id="L2977">            return x;</span>
+        }
+
+        // These are 180/PI split into high and low order bits
+<span class="fc" id="L2981">        final double facta = 57.2957763671875;</span>
+<span class="fc" id="L2982">        final double factb = 3.145894820876798E-6;</span>
+
+<span class="fc" id="L2984">        double xa = doubleHighPart(x);</span>
+<span class="fc" id="L2985">        double xb = x - xa;</span>
+
+<span class="fc" id="L2987">        return xb * factb + xb * facta + xa * factb + xa * facta;</span>
+    }
+
+    /**
+     * Absolute value.
+     * @param x number from which absolute value is requested
+     * @return abs(x)
+     */
+    public static int abs(final int x) {
+<span class="fc bfc" id="L2996" title="All 2 branches covered.">        return (x &lt; 0) ? -x : x;</span>
+    }
+
+    /**
+     * Absolute value.
+     * @param x number from which absolute value is requested
+     * @return abs(x)
+     */
+    public static long abs(final long x) {
+<span class="fc bfc" id="L3005" title="All 2 branches covered.">        return (x &lt; 0l) ? -x : x;</span>
+    }
+
+    /**
+     * Absolute value.
+     * @param x number from which absolute value is requested
+     * @return abs(x)
+     */
+    public static float abs(final float x) {
+<span class="fc bfc" id="L3014" title="All 4 branches covered.">        return (x &lt; 0.0f) ? -x : (x == 0.0f) ? 0.0f : x; // -0.0 =&gt; +0.0</span>
+    }
+
+    /**
+     * Absolute value.
+     * @param x number from which absolute value is requested
+     * @return abs(x)
+     */
+    public static double abs(double x) {
+<span class="fc bfc" id="L3023" title="All 4 branches covered.">        return (x &lt; 0.0) ? -x : (x == 0.0) ? 0.0 : x; // -0.0 =&gt; +0.0</span>
+    }
+
+    /**
+     * Compute least significant bit (Unit in Last Position) for a number.
+     * @param x number from which ulp is requested
+     * @return ulp(x)
+     */
+    public static double ulp(double x) {
+<span class="fc bfc" id="L3032" title="All 2 branches covered.">        if (Double.isInfinite(x)) {</span>
+<span class="fc" id="L3033">            return Double.POSITIVE_INFINITY;</span>
+        }
+<span class="fc" id="L3035">        return abs(x - Double.longBitsToDouble(Double.doubleToLongBits(x) ^ 1));</span>
+    }
+
+    /**
+     * Compute least significant bit (Unit in Last Position) for a number.
+     * @param x number from which ulp is requested
+     * @return ulp(x)
+     */
+    public static float ulp(float x) {
+<span class="fc bfc" id="L3044" title="All 2 branches covered.">        if (Float.isInfinite(x)) {</span>
+<span class="fc" id="L3045">            return Float.POSITIVE_INFINITY;</span>
+        }
+<span class="fc" id="L3047">        return abs(x - Float.intBitsToFloat(Float.floatToIntBits(x) ^ 1));</span>
+    }
+
+    /**
+     * Multiply a double number by a power of 2.
+     * @param d number to multiply
+     * @param n power of 2
+     * @return d &amp;times; 2&lt;sup&gt;n&lt;/sup&gt;
+     */
+    public static double scalb(final double d, final int n) {
+
+        // first simple and fast handling when 2^n can be represented using normal numbers
+<span class="fc bfc" id="L3059" title="All 4 branches covered.">        if ((n &gt; -1023) &amp;&amp; (n &lt; 1024)) {</span>
+<span class="fc" id="L3060">            return d * Double.longBitsToDouble(((long) (n + 1023)) &lt;&lt; 52);</span>
+        }
+
+        // handle special cases
+<span class="fc bfc" id="L3064" title="All 6 branches covered.">        if (Double.isNaN(d) || Double.isInfinite(d) || (d == 0)) {</span>
+<span class="fc" id="L3065">            return d;</span>
+        }
+<span class="fc bfc" id="L3067" title="All 2 branches covered.">        if (n &lt; -2098) {</span>
+<span class="fc bfc" id="L3068" title="All 2 branches covered.">            return (d &gt; 0) ? 0.0 : -0.0;</span>
+        }
+<span class="fc bfc" id="L3070" title="All 2 branches covered.">        if (n &gt; 2097) {</span>
+<span class="fc bfc" id="L3071" title="All 2 branches covered.">            return (d &gt; 0) ? Double.POSITIVE_INFINITY : Double.NEGATIVE_INFINITY;</span>
+        }
+
+        // decompose d
+<span class="fc" id="L3075">        final long bits = Double.doubleToLongBits(d);</span>
+<span class="fc" id="L3076">        final long sign = bits &amp; 0x8000000000000000L;</span>
+<span class="fc" id="L3077">        int  exponent   = ((int) (bits &gt;&gt;&gt; 52)) &amp; 0x7ff;</span>
+<span class="fc" id="L3078">        long mantissa   = bits &amp; 0x000fffffffffffffL;</span>
+
+        // compute scaled exponent
+<span class="fc" id="L3081">        int scaledExponent = exponent + n;</span>
+
+<span class="fc bfc" id="L3083" title="All 2 branches covered.">        if (n &lt; 0) {</span>
+            // we are really in the case n &lt;= -1023
+<span class="fc bfc" id="L3085" title="All 2 branches covered.">            if (scaledExponent &gt; 0) {</span>
+                // both the input and the result are normal numbers, we only adjust the exponent
+<span class="fc" id="L3087">                return Double.longBitsToDouble(sign | (((long) scaledExponent) &lt;&lt; 52) | mantissa);</span>
+<span class="pc bpc" id="L3088" title="1 of 2 branches missed.">            } else if (scaledExponent &gt; -53) {</span>
+                // the input is a normal number and the result is a subnormal number
+
+                // recover the hidden mantissa bit
+<span class="fc" id="L3092">                mantissa = mantissa | (1L &lt;&lt; 52);</span>
+
+                // scales down complete mantissa, hence losing least significant bits
+<span class="fc" id="L3095">                final long mostSignificantLostBit = mantissa &amp; (1L &lt;&lt; (-scaledExponent));</span>
+<span class="fc" id="L3096">                mantissa = mantissa &gt;&gt;&gt; (1 - scaledExponent);</span>
+<span class="fc bfc" id="L3097" title="All 2 branches covered.">                if (mostSignificantLostBit != 0) {</span>
+                    // we need to add 1 bit to round up the result
+<span class="fc" id="L3099">                    mantissa++;</span>
+                }
+<span class="fc" id="L3101">                return Double.longBitsToDouble(sign | mantissa);</span>
+
+            } else {
+                // no need to compute the mantissa, the number scales down to 0
+<span class="nc bnc" id="L3105" title="All 2 branches missed.">                return (sign == 0L) ? 0.0 : -0.0;</span>
+            }
+        } else {
+            // we are really in the case n &gt;= 1024
+<span class="fc bfc" id="L3109" title="All 2 branches covered.">            if (exponent == 0) {</span>
+
+                // the input number is subnormal, normalize it
+<span class="fc bfc" id="L3112" title="All 2 branches covered.">                while ((mantissa &gt;&gt;&gt; 52) != 1) {</span>
+<span class="fc" id="L3113">                    mantissa = mantissa &lt;&lt; 1;</span>
+<span class="fc" id="L3114">                    --scaledExponent;</span>
+                }
+<span class="fc" id="L3116">                ++scaledExponent;</span>
+<span class="fc" id="L3117">                mantissa = mantissa &amp; 0x000fffffffffffffL;</span>
+
+<span class="pc bpc" id="L3119" title="1 of 2 branches missed.">                if (scaledExponent &lt; 2047) {</span>
+<span class="fc" id="L3120">                    return Double.longBitsToDouble(sign | (((long) scaledExponent) &lt;&lt; 52) | mantissa);</span>
+                } else {
+<span class="nc bnc" id="L3122" title="All 2 branches missed.">                    return (sign == 0L) ? Double.POSITIVE_INFINITY : Double.NEGATIVE_INFINITY;</span>
+                }
+
+<span class="fc bfc" id="L3125" title="All 2 branches covered.">            } else if (scaledExponent &lt; 2047) {</span>
+<span class="fc" id="L3126">                return Double.longBitsToDouble(sign | (((long) scaledExponent) &lt;&lt; 52) | mantissa);</span>
+            } else {
+<span class="pc bpc" id="L3128" title="1 of 2 branches missed.">                return (sign == 0L) ? Double.POSITIVE_INFINITY : Double.NEGATIVE_INFINITY;</span>
+            }
+        }
+
+    }
+
+    /**
+     * Multiply a float number by a power of 2.
+     * @param f number to multiply
+     * @param n power of 2
+     * @return f &amp;times; 2&lt;sup&gt;n&lt;/sup&gt;
+     */
+    public static float scalb(final float f, final int n) {
+
+        // first simple and fast handling when 2^n can be represented using normal numbers
+<span class="fc bfc" id="L3143" title="All 4 branches covered.">        if ((n &gt; -127) &amp;&amp; (n &lt; 128)) {</span>
+<span class="fc" id="L3144">            return f * Float.intBitsToFloat((n + 127) &lt;&lt; 23);</span>
+        }
+
+        // handle special cases
+<span class="fc bfc" id="L3148" title="All 6 branches covered.">        if (Float.isNaN(f) || Float.isInfinite(f) || (f == 0f)) {</span>
+<span class="fc" id="L3149">            return f;</span>
+        }
+<span class="fc bfc" id="L3151" title="All 2 branches covered.">        if (n &lt; -277) {</span>
+<span class="fc bfc" id="L3152" title="All 2 branches covered.">            return (f &gt; 0) ? 0.0f : -0.0f;</span>
+        }
+<span class="fc bfc" id="L3154" title="All 2 branches covered.">        if (n &gt; 276) {</span>
+<span class="fc bfc" id="L3155" title="All 2 branches covered.">            return (f &gt; 0) ? Float.POSITIVE_INFINITY : Float.NEGATIVE_INFINITY;</span>
+        }
+
+        // decompose f
+<span class="fc" id="L3159">        final int bits = Float.floatToIntBits(f);</span>
+<span class="fc" id="L3160">        final int sign = bits &amp; 0x80000000;</span>
+<span class="fc" id="L3161">        int  exponent  = (bits &gt;&gt;&gt; 23) &amp; 0xff;</span>
+<span class="fc" id="L3162">        int mantissa   = bits &amp; 0x007fffff;</span>
+
+        // compute scaled exponent
+<span class="fc" id="L3165">        int scaledExponent = exponent + n;</span>
+
+<span class="fc bfc" id="L3167" title="All 2 branches covered.">        if (n &lt; 0) {</span>
+            // we are really in the case n &lt;= -127
+<span class="pc bpc" id="L3169" title="1 of 2 branches missed.">            if (scaledExponent &gt; 0) {</span>
+                // both the input and the result are normal numbers, we only adjust the exponent
+<span class="nc" id="L3171">                return Float.intBitsToFloat(sign | (scaledExponent &lt;&lt; 23) | mantissa);</span>
+<span class="pc bpc" id="L3172" title="1 of 2 branches missed.">            } else if (scaledExponent &gt; -24) {</span>
+                // the input is a normal number and the result is a subnormal number
+
+                // recover the hidden mantissa bit
+<span class="fc" id="L3176">                mantissa = mantissa | (1 &lt;&lt; 23);</span>
+
+                // scales down complete mantissa, hence losing least significant bits
+<span class="fc" id="L3179">                final int mostSignificantLostBit = mantissa &amp; (1 &lt;&lt; (-scaledExponent));</span>
+<span class="fc" id="L3180">                mantissa = mantissa &gt;&gt;&gt; (1 - scaledExponent);</span>
+<span class="pc bpc" id="L3181" title="1 of 2 branches missed.">                if (mostSignificantLostBit != 0) {</span>
+                    // we need to add 1 bit to round up the result
+<span class="fc" id="L3183">                    mantissa++;</span>
+                }
+<span class="fc" id="L3185">                return Float.intBitsToFloat(sign | mantissa);</span>
+
+            } else {
+                // no need to compute the mantissa, the number scales down to 0
+<span class="nc bnc" id="L3189" title="All 2 branches missed.">                return (sign == 0) ? 0.0f : -0.0f;</span>
+            }
+        } else {
+            // we are really in the case n &gt;= 128
+<span class="fc bfc" id="L3193" title="All 2 branches covered.">            if (exponent == 0) {</span>
+
+                // the input number is subnormal, normalize it
+<span class="fc bfc" id="L3196" title="All 2 branches covered.">                while ((mantissa &gt;&gt;&gt; 23) != 1) {</span>
+<span class="fc" id="L3197">                    mantissa = mantissa &lt;&lt; 1;</span>
+<span class="fc" id="L3198">                    --scaledExponent;</span>
+                }
+<span class="fc" id="L3200">                ++scaledExponent;</span>
+<span class="fc" id="L3201">                mantissa = mantissa &amp; 0x007fffff;</span>
+
+<span class="pc bpc" id="L3203" title="1 of 2 branches missed.">                if (scaledExponent &lt; 255) {</span>
+<span class="fc" id="L3204">                    return Float.intBitsToFloat(sign | (scaledExponent &lt;&lt; 23) | mantissa);</span>
+                } else {
+<span class="nc bnc" id="L3206" title="All 2 branches missed.">                    return (sign == 0) ? Float.POSITIVE_INFINITY : Float.NEGATIVE_INFINITY;</span>
+                }
+
+<span class="fc bfc" id="L3209" title="All 2 branches covered.">            } else if (scaledExponent &lt; 255) {</span>
+<span class="fc" id="L3210">                return Float.intBitsToFloat(sign | (scaledExponent &lt;&lt; 23) | mantissa);</span>
+            } else {
+<span class="pc bpc" id="L3212" title="1 of 2 branches missed.">                return (sign == 0) ? Float.POSITIVE_INFINITY : Float.NEGATIVE_INFINITY;</span>
+            }
+        }
+
+    }
+
+    /**
+     * Get the next machine representable number after a number, moving
+     * in the direction of another number.
+     * &lt;p&gt;
+     * The ordering is as follows (increasing):
+     * &lt;ul&gt;
+     * &lt;li&gt;-INFINITY&lt;/li&gt;
+     * &lt;li&gt;-MAX_VALUE&lt;/li&gt;
+     * &lt;li&gt;-MIN_VALUE&lt;/li&gt;
+     * &lt;li&gt;-0.0&lt;/li&gt;
+     * &lt;li&gt;+0.0&lt;/li&gt;
+     * &lt;li&gt;+MIN_VALUE&lt;/li&gt;
+     * &lt;li&gt;+MAX_VALUE&lt;/li&gt;
+     * &lt;li&gt;+INFINITY&lt;/li&gt;
+     * &lt;li&gt;&lt;/li&gt;
+     * &lt;p&gt;
+     * If arguments compare equal, then the second argument is returned.
+     * &lt;p&gt;
+     * If {@code direction} is greater than {@code d},
+     * the smallest machine representable number strictly greater than
+     * {@code d} is returned; if less, then the largest representable number
+     * strictly less than {@code d} is returned.&lt;/p&gt;
+     * &lt;p&gt;
+     * If {@code d} is infinite and direction does not
+     * bring it back to finite numbers, it is returned unchanged.&lt;/p&gt;
+     *
+     * @param d base number
+     * @param direction (the only important thing is whether
+     * {@code direction} is greater or smaller than {@code d})
+     * @return the next machine representable number in the specified direction
+     */
+    public static double nextAfter(double d, double direction) {
+
+        // handling of some important special cases
+<span class="fc bfc" id="L3252" title="All 4 branches covered.">        if (Double.isNaN(d) || Double.isNaN(direction)) {</span>
+<span class="fc" id="L3253">            return Double.NaN;</span>
+<span class="fc bfc" id="L3254" title="All 2 branches covered.">        } else if (d == direction) {</span>
+<span class="fc" id="L3255">            return direction;</span>
+<span class="fc bfc" id="L3256" title="All 2 branches covered.">        } else if (Double.isInfinite(d)) {</span>
+<span class="fc bfc" id="L3257" title="All 2 branches covered.">            return (d &lt; 0) ? -Double.MAX_VALUE : Double.MAX_VALUE;</span>
+<span class="fc bfc" id="L3258" title="All 2 branches covered.">        } else if (d == 0) {</span>
+<span class="fc bfc" id="L3259" title="All 2 branches covered.">            return (direction &lt; 0) ? -Double.MIN_VALUE : Double.MIN_VALUE;</span>
+        }
+        // special cases MAX_VALUE to infinity and  MIN_VALUE to 0
+        // are handled just as normal numbers
+
+<span class="fc" id="L3264">        final long bits = Double.doubleToLongBits(d);</span>
+<span class="fc" id="L3265">        final long sign = bits &amp; 0x8000000000000000L;</span>
+<span class="fc bfc" id="L3266" title="All 6 branches covered.">        if ((direction &lt; d) ^ (sign == 0L)) {</span>
+<span class="fc" id="L3267">            return Double.longBitsToDouble(sign | ((bits &amp; 0x7fffffffffffffffL) + 1));</span>
+        } else {
+<span class="fc" id="L3269">            return Double.longBitsToDouble(sign | ((bits &amp; 0x7fffffffffffffffL) - 1));</span>
+        }
+
+    }
+
+    /**
+     * Get the next machine representable number after a number, moving
+     * in the direction of another number.
+     * &lt;p&gt;
+     * The ordering is as follows (increasing):
+     * &lt;ul&gt;
+     * &lt;li&gt;-INFINITY&lt;/li&gt;
+     * &lt;li&gt;-MAX_VALUE&lt;/li&gt;
+     * &lt;li&gt;-MIN_VALUE&lt;/li&gt;
+     * &lt;li&gt;-0.0&lt;/li&gt;
+     * &lt;li&gt;+0.0&lt;/li&gt;
+     * &lt;li&gt;+MIN_VALUE&lt;/li&gt;
+     * &lt;li&gt;+MAX_VALUE&lt;/li&gt;
+     * &lt;li&gt;+INFINITY&lt;/li&gt;
+     * &lt;li&gt;&lt;/li&gt;
+     * &lt;p&gt;
+     * If arguments compare equal, then the second argument is returned.
+     * &lt;p&gt;
+     * If {@code direction} is greater than {@code f},
+     * the smallest machine representable number strictly greater than
+     * {@code f} is returned; if less, then the largest representable number
+     * strictly less than {@code f} is returned.&lt;/p&gt;
+     * &lt;p&gt;
+     * If {@code f} is infinite and direction does not
+     * bring it back to finite numbers, it is returned unchanged.&lt;/p&gt;
+     *
+     * @param f base number
+     * @param direction (the only important thing is whether
+     * {@code direction} is greater or smaller than {@code f})
+     * @return the next machine representable number in the specified direction
+     */
+    public static float nextAfter(final float f, final double direction) {
+
+        // handling of some important special cases
+<span class="fc bfc" id="L3308" title="All 4 branches covered.">        if (Double.isNaN(f) || Double.isNaN(direction)) {</span>
+<span class="fc" id="L3309">            return Float.NaN;</span>
+<span class="fc bfc" id="L3310" title="All 2 branches covered.">        } else if (f == direction) {</span>
+<span class="fc" id="L3311">            return (float) direction;</span>
+<span class="fc bfc" id="L3312" title="All 2 branches covered.">        } else if (Float.isInfinite(f)) {</span>
+<span class="fc bfc" id="L3313" title="All 2 branches covered.">            return (f &lt; 0f) ? -Float.MAX_VALUE : Float.MAX_VALUE;</span>
+<span class="fc bfc" id="L3314" title="All 2 branches covered.">        } else if (f == 0f) {</span>
+<span class="fc bfc" id="L3315" title="All 2 branches covered.">            return (direction &lt; 0) ? -Float.MIN_VALUE : Float.MIN_VALUE;</span>
+        }
+        // special cases MAX_VALUE to infinity and  MIN_VALUE to 0
+        // are handled just as normal numbers
+
+<span class="fc" id="L3320">        final int bits = Float.floatToIntBits(f);</span>
+<span class="fc" id="L3321">        final int sign = bits &amp; 0x80000000;</span>
+<span class="fc bfc" id="L3322" title="All 6 branches covered.">        if ((direction &lt; f) ^ (sign == 0)) {</span>
+<span class="fc" id="L3323">            return Float.intBitsToFloat(sign | ((bits &amp; 0x7fffffff) + 1));</span>
+        } else {
+<span class="fc" id="L3325">            return Float.intBitsToFloat(sign | ((bits &amp; 0x7fffffff) - 1));</span>
+        }
+
+    }
+
+    /** Get the largest whole number smaller than x.
+     * @param x number from which floor is requested
+     * @return a double number f such that f is an integer f &lt;= x &lt; f + 1.0
+     */
+    public static double floor(double x) {
+        long y;
+
+<span class="fc bfc" id="L3337" title="All 2 branches covered.">        if (x != x) { // NaN</span>
+<span class="fc" id="L3338">            return x;</span>
+        }
+
+<span class="fc bfc" id="L3341" title="All 4 branches covered.">        if (x &gt;= TWO_POWER_52 || x &lt;= -TWO_POWER_52) {</span>
+<span class="fc" id="L3342">            return x;</span>
+        }
+
+<span class="fc" id="L3345">        y = (long) x;</span>
+<span class="fc bfc" id="L3346" title="All 4 branches covered.">        if (x &lt; 0 &amp;&amp; y != x) {</span>
+<span class="fc" id="L3347">            y--;</span>
+        }
+
+<span class="fc bfc" id="L3350" title="All 2 branches covered.">        if (y == 0) {</span>
+<span class="fc" id="L3351">            return x*y;</span>
+        }
+
+<span class="fc" id="L3354">        return y;</span>
+    }
+
+    /** Get the smallest whole number larger than x.
+     * @param x number from which ceil is requested
+     * @return a double number c such that c is an integer c - 1.0 &lt; x &lt;= c
+     */
+    public static double ceil(double x) {
+        double y;
+
+<span class="fc bfc" id="L3364" title="All 2 branches covered.">        if (x != x) { // NaN</span>
+<span class="fc" id="L3365">            return x;</span>
+        }
+
+<span class="fc" id="L3368">        y = floor(x);</span>
+<span class="fc bfc" id="L3369" title="All 2 branches covered.">        if (y == x) {</span>
+<span class="fc" id="L3370">            return y;</span>
+        }
+
+<span class="fc" id="L3373">        y += 1.0;</span>
+
+<span class="fc bfc" id="L3375" title="All 2 branches covered.">        if (y == 0) {</span>
+<span class="fc" id="L3376">            return x*y;</span>
+        }
+
+<span class="fc" id="L3379">        return y;</span>
+    }
+
+    /** Get the whole number that is the nearest to x, or the even one if x is exactly half way between two integers.
+     * @param x number from which nearest whole number is requested
+     * @return a double number r such that r is an integer r - 0.5 &lt;= x &lt;= r + 0.5
+     */
+    public static double rint(double x) {
+<span class="fc" id="L3387">        double y = floor(x);</span>
+<span class="fc" id="L3388">        double d = x - y;</span>
+
+<span class="fc bfc" id="L3390" title="All 2 branches covered.">        if (d &gt; 0.5) {</span>
+<span class="fc bfc" id="L3391" title="All 2 branches covered.">            if (y == -1.0) {</span>
+<span class="fc" id="L3392">                return -0.0; // Preserve sign of operand</span>
+            }
+<span class="fc" id="L3394">            return y+1.0;</span>
+        }
+<span class="fc bfc" id="L3396" title="All 2 branches covered.">        if (d &lt; 0.5) {</span>
+<span class="fc" id="L3397">            return y;</span>
+        }
+
+        /* half way, round to even */
+<span class="fc" id="L3401">        long z = (long) y;</span>
+<span class="fc bfc" id="L3402" title="All 2 branches covered.">        return (z &amp; 1) == 0 ? y : y + 1.0;</span>
+    }
+
+    /** Get the closest long to x.
+     * @param x number from which closest long is requested
+     * @return closest long to x
+     */
+    public static long round(double x) {
+<span class="fc" id="L3410">        return (long) floor(x + 0.5);</span>
+    }
+
+    /** Get the closest int to x.
+     * @param x number from which closest int is requested
+     * @return closest int to x
+     */
+    public static int round(final float x) {
+<span class="fc" id="L3418">        return (int) floor(x + 0.5f);</span>
+    }
+
+    /** Compute the minimum of two values
+     * @param a first value
+     * @param b second value
+     * @return a if a is lesser or equal to b, b otherwise
+     */
+    public static int min(final int a, final int b) {
+<span class="fc bfc" id="L3427" title="All 2 branches covered.">        return (a &lt;= b) ? a : b;</span>
+    }
+
+    /** Compute the minimum of two values
+     * @param a first value
+     * @param b second value
+     * @return a if a is lesser or equal to b, b otherwise
+     */
+    public static long min(final long a, final long b) {
+<span class="fc bfc" id="L3436" title="All 2 branches covered.">        return (a &lt;= b) ? a : b;</span>
+    }
+
+    /** Compute the minimum of two values
+     * @param a first value
+     * @param b second value
+     * @return a if a is lesser or equal to b, b otherwise
+     */
+    public static float min(final float a, final float b) {
+<span class="fc bfc" id="L3445" title="All 2 branches covered.">        if (a &gt; b) {</span>
+<span class="fc" id="L3446">            return b;</span>
+        }
+<span class="fc bfc" id="L3448" title="All 2 branches covered.">        if (a &lt; b) {</span>
+<span class="fc" id="L3449">            return a;</span>
+        }
+        /* if either arg is NaN, return NaN */
+<span class="fc bfc" id="L3452" title="All 2 branches covered.">        if (a != b) {</span>
+<span class="fc" id="L3453">            return Float.NaN;</span>
+        }
+        /* min(+0.0,-0.0) == -0.0 */
+        /* 0x80000000 == Float.floatToRawIntBits(-0.0d) */
+<span class="fc" id="L3457">        int bits = Float.floatToRawIntBits(a);</span>
+<span class="fc bfc" id="L3458" title="All 2 branches covered.">        if (bits == 0x80000000) {</span>
+<span class="fc" id="L3459">            return a;</span>
+        }
+<span class="fc" id="L3461">        return b;</span>
+    }
+
+    /** Compute the minimum of two values
+     * @param a first value
+     * @param b second value
+     * @return a if a is lesser or equal to b, b otherwise
+     */
+    public static double min(final double a, final double b) {
+<span class="fc bfc" id="L3470" title="All 2 branches covered.">        if (a &gt; b) {</span>
+<span class="fc" id="L3471">            return b;</span>
+        }
+<span class="fc bfc" id="L3473" title="All 2 branches covered.">        if (a &lt; b) {</span>
+<span class="fc" id="L3474">            return a;</span>
+        }
+        /* if either arg is NaN, return NaN */
+<span class="fc bfc" id="L3477" title="All 2 branches covered.">        if (a != b) {</span>
+<span class="fc" id="L3478">            return Double.NaN;</span>
+        }
+        /* min(+0.0,-0.0) == -0.0 */
+        /* 0x8000000000000000L == Double.doubleToRawLongBits(-0.0d) */
+<span class="fc" id="L3482">        long bits = Double.doubleToRawLongBits(a);</span>
+<span class="fc bfc" id="L3483" title="All 2 branches covered.">        if (bits == 0x8000000000000000L) {</span>
+<span class="fc" id="L3484">            return a;</span>
+        }
+<span class="fc" id="L3486">        return b;</span>
+    }
+
+    /** Compute the maximum of two values
+     * @param a first value
+     * @param b second value
+     * @return b if a is lesser or equal to b, a otherwise
+     */
+    public static int max(final int a, final int b) {
+<span class="fc bfc" id="L3495" title="All 2 branches covered.">        return (a &lt;= b) ? b : a;</span>
+    }
+
+    /** Compute the maximum of two values
+     * @param a first value
+     * @param b second value
+     * @return b if a is lesser or equal to b, a otherwise
+     */
+    public static long max(final long a, final long b) {
+<span class="fc bfc" id="L3504" title="All 2 branches covered.">        return (a &lt;= b) ? b : a;</span>
+    }
+
+    /** Compute the maximum of two values
+     * @param a first value
+     * @param b second value
+     * @return b if a is lesser or equal to b, a otherwise
+     */
+    public static float max(final float a, final float b) {
+<span class="fc bfc" id="L3513" title="All 2 branches covered.">        if (a &gt; b) {</span>
+<span class="fc" id="L3514">            return a;</span>
+        }
+<span class="fc bfc" id="L3516" title="All 2 branches covered.">        if (a &lt; b) {</span>
+<span class="fc" id="L3517">            return b;</span>
+        }
+        /* if either arg is NaN, return NaN */
+<span class="fc bfc" id="L3520" title="All 2 branches covered.">        if (a != b) {</span>
+<span class="fc" id="L3521">            return Float.NaN;</span>
+        }
+        /* min(+0.0,-0.0) == -0.0 */
+        /* 0x80000000 == Float.floatToRawIntBits(-0.0d) */
+<span class="fc" id="L3525">        int bits = Float.floatToRawIntBits(a);</span>
+<span class="fc bfc" id="L3526" title="All 2 branches covered.">        if (bits == 0x80000000) {</span>
+<span class="fc" id="L3527">            return b;</span>
+        }
+<span class="fc" id="L3529">        return a;</span>
+    }
+
+    /** Compute the maximum of two values
+     * @param a first value
+     * @param b second value
+     * @return b if a is lesser or equal to b, a otherwise
+     */
+    public static double max(final double a, final double b) {
+<span class="fc bfc" id="L3538" title="All 2 branches covered.">        if (a &gt; b) {</span>
+<span class="fc" id="L3539">            return a;</span>
+        }
+<span class="fc bfc" id="L3541" title="All 2 branches covered.">        if (a &lt; b) {</span>
+<span class="fc" id="L3542">            return b;</span>
+        }
+        /* if either arg is NaN, return NaN */
+<span class="fc bfc" id="L3545" title="All 2 branches covered.">        if (a != b) {</span>
+<span class="fc" id="L3546">            return Double.NaN;</span>
+        }
+        /* min(+0.0,-0.0) == -0.0 */
+        /* 0x8000000000000000L == Double.doubleToRawLongBits(-0.0d) */
+<span class="fc" id="L3550">        long bits = Double.doubleToRawLongBits(a);</span>
+<span class="fc bfc" id="L3551" title="All 2 branches covered.">        if (bits == 0x8000000000000000L) {</span>
+<span class="fc" id="L3552">            return b;</span>
+        }
+<span class="fc" id="L3554">        return a;</span>
+    }
+
+    /**
+     * Returns the hypotenuse of a triangle with sides {@code x} and {@code y}
+     * - sqrt(&lt;i&gt;x&lt;/i&gt;&lt;sup&gt;2&lt;/sup&gt;&amp;nbsp;+&lt;i&gt;y&lt;/i&gt;&lt;sup&gt;2&lt;/sup&gt;)&lt;br/&gt;
+     * avoiding intermediate overflow or underflow.
+     *
+     * &lt;ul&gt;
+     * &lt;li&gt; If either argument is infinite, then the result is positive infinity.&lt;/li&gt;
+     * &lt;li&gt; else, if either argument is NaN then the result is NaN.&lt;/li&gt;
+     * &lt;/ul&gt;
+     *
+     * @param x a value
+     * @param y a value
+     * @return sqrt(&lt;i&gt;x&lt;/i&gt;&lt;sup&gt;2&lt;/sup&gt;&amp;nbsp;+&lt;i&gt;y&lt;/i&gt;&lt;sup&gt;2&lt;/sup&gt;)
+     */
+    public static double hypot(final double x, final double y) {
+<span class="fc bfc" id="L3572" title="All 4 branches covered.">        if (Double.isInfinite(x) || Double.isInfinite(y)) {</span>
+<span class="fc" id="L3573">            return Double.POSITIVE_INFINITY;</span>
+<span class="fc bfc" id="L3574" title="All 4 branches covered.">        } else if (Double.isNaN(x) || Double.isNaN(y)) {</span>
+<span class="fc" id="L3575">            return Double.NaN;</span>
+        } else {
+
+<span class="fc" id="L3578">            final int expX = getExponent(x);</span>
+<span class="fc" id="L3579">            final int expY = getExponent(y);</span>
+<span class="fc bfc" id="L3580" title="All 2 branches covered.">            if (expX &gt; expY + 27) {</span>
+                // y is neglectible with respect to x
+<span class="fc" id="L3582">                return abs(x);</span>
+<span class="fc bfc" id="L3583" title="All 2 branches covered.">            } else if (expY &gt; expX + 27) {</span>
+                // x is neglectible with respect to y
+<span class="fc" id="L3585">                return abs(y);</span>
+            } else {
+
+                // find an intermediate scale to avoid both overflow and underflow
+<span class="fc" id="L3589">                final int middleExp = (expX + expY) / 2;</span>
+
+                // scale parameters without losing precision
+<span class="fc" id="L3592">                final double scaledX = scalb(x, -middleExp);</span>
+<span class="fc" id="L3593">                final double scaledY = scalb(y, -middleExp);</span>
+
+                // compute scaled hypotenuse
+<span class="fc" id="L3596">                final double scaledH = sqrt(scaledX * scaledX + scaledY * scaledY);</span>
+
+                // remove scaling
+<span class="fc" id="L3599">                return scalb(scaledH, middleExp);</span>
+
+            }
+
+        }
+    }
+
+    /**
+     * Computes the remainder as prescribed by the IEEE 754 standard.
+     * The remainder value is mathematically equal to {@code x - y*n}
+     * where {@code n} is the mathematical integer closest to the exact mathematical value
+     * of the quotient {@code x/y}.
+     * If two mathematical integers are equally close to {@code x/y} then
+     * {@code n} is the integer that is even.
+     * &lt;p&gt;
+     * &lt;ul&gt;
+     * &lt;li&gt;If either operand is NaN, the result is NaN.&lt;/li&gt;
+     * &lt;li&gt;If the result is not NaN, the sign of the result equals the sign of the dividend.&lt;/li&gt;
+     * &lt;li&gt;If the dividend is an infinity, or the divisor is a zero, or both, the result is NaN.&lt;/li&gt;
+     * &lt;li&gt;If the dividend is finite and the divisor is an infinity, the result equals the dividend.&lt;/li&gt;
+     * &lt;li&gt;If the dividend is a zero and the divisor is finite, the result equals the dividend.&lt;/li&gt;
+     * &lt;/ul&gt;
+     * &lt;p&gt;&lt;b&gt;Note:&lt;/b&gt; this implementation currently delegates to {@link StrictMath#IEEEremainder}
+     * @param dividend the number to be divided
+     * @param divisor the number by which to divide
+     * @return the remainder, rounded
+     */
+    public static double IEEEremainder(double dividend, double divisor) {
+<span class="fc" id="L3627">        return StrictMath.IEEEremainder(dividend, divisor); // TODO provide our own implementation</span>
+    }
+
+    /**
+     * Returns the first argument with the sign of the second argument.
+     * A NaN {@code sign} argument is treated as positive.
+     *
+     * @param magnitude the value to return
+     * @param sign the sign for the returned value
+     * @return the magnitude with the same sign as the {@code sign} argument
+     */
+    public static double copySign(double magnitude, double sign){
+<span class="fc" id="L3639">        long m = Double.doubleToLongBits(magnitude);</span>
+<span class="fc" id="L3640">        long s = Double.doubleToLongBits(sign);</span>
+<span class="fc bfc" id="L3641" title="All 8 branches covered.">        if ((m &gt;= 0 &amp;&amp; s &gt;= 0) || (m &lt; 0 &amp;&amp; s &lt; 0)) { // Sign is currently OK</span>
+<span class="fc" id="L3642">            return magnitude;</span>
+        }
+<span class="fc" id="L3644">        return -magnitude; // flip sign</span>
+    }
+
+    /**
+     * Returns the first argument with the sign of the second argument.
+     * A NaN {@code sign} argument is treated as positive.
+     *
+     * @param magnitude the value to return
+     * @param sign the sign for the returned value
+     * @return the magnitude with the same sign as the {@code sign} argument
+     */
+    public static float copySign(float magnitude, float sign){
+<span class="fc" id="L3656">        int m = Float.floatToIntBits(magnitude);</span>
+<span class="fc" id="L3657">        int s = Float.floatToIntBits(sign);</span>
+<span class="fc bfc" id="L3658" title="All 8 branches covered.">        if ((m &gt;= 0 &amp;&amp; s &gt;= 0) || (m &lt; 0 &amp;&amp; s &lt; 0)) { // Sign is currently OK</span>
+<span class="fc" id="L3659">            return magnitude;</span>
+        }
+<span class="fc" id="L3661">        return -magnitude; // flip sign</span>
+    }
+
+    /**
+     * Return the exponent of a double number, removing the bias.
+     * &lt;p&gt;
+     * For double numbers of the form 2&lt;sup&gt;x&lt;/sup&gt;, the unbiased
+     * exponent is exactly x.
+     * &lt;/p&gt;
+     * @param d number from which exponent is requested
+     * @return exponent for d in IEEE754 representation, without bias
+     */
+    public static int getExponent(final double d) {
+<span class="fc" id="L3674">        return (int) ((Double.doubleToLongBits(d) &gt;&gt;&gt; 52) &amp; 0x7ff) - 1023;</span>
+    }
+
+    /**
+     * Return the exponent of a float number, removing the bias.
+     * &lt;p&gt;
+     * For float numbers of the form 2&lt;sup&gt;x&lt;/sup&gt;, the unbiased
+     * exponent is exactly x.
+     * &lt;/p&gt;
+     * @param f number from which exponent is requested
+     * @return exponent for d in IEEE754 representation, without bias
+     */
+    public static int getExponent(final float f) {
+<span class="fc" id="L3687">        return ((Float.floatToIntBits(f) &gt;&gt;&gt; 23) &amp; 0xff) - 127;</span>
+    }
+
+    /**
+     * Print out contents of arrays, and check the length.
+     * &lt;p&gt;used to generate the preset arrays originally.&lt;/p&gt;
+     * @param a unused
+     */
+    public static void main(String[] a) {
+<span class="nc" id="L3696">        PrintStream out = System.out;</span>
+<span class="nc" id="L3697">        FastMathCalc.printarray(out, &quot;EXP_INT_TABLE_A&quot;, EXP_INT_TABLE_LEN, ExpIntTable.EXP_INT_TABLE_A);</span>
+<span class="nc" id="L3698">        FastMathCalc.printarray(out, &quot;EXP_INT_TABLE_B&quot;, EXP_INT_TABLE_LEN, ExpIntTable.EXP_INT_TABLE_B);</span>
+<span class="nc" id="L3699">        FastMathCalc.printarray(out, &quot;EXP_FRAC_TABLE_A&quot;, EXP_FRAC_TABLE_LEN, ExpFracTable.EXP_FRAC_TABLE_A);</span>
+<span class="nc" id="L3700">        FastMathCalc.printarray(out, &quot;EXP_FRAC_TABLE_B&quot;, EXP_FRAC_TABLE_LEN, ExpFracTable.EXP_FRAC_TABLE_B);</span>
+<span class="nc" id="L3701">        FastMathCalc.printarray(out, &quot;LN_MANT&quot;,LN_MANT_LEN, lnMant.LN_MANT);</span>
+<span class="nc" id="L3702">        FastMathCalc.printarray(out, &quot;SINE_TABLE_A&quot;, SINE_TABLE_LEN, SINE_TABLE_A);</span>
+<span class="nc" id="L3703">        FastMathCalc.printarray(out, &quot;SINE_TABLE_B&quot;, SINE_TABLE_LEN, SINE_TABLE_B);</span>
+<span class="nc" id="L3704">        FastMathCalc.printarray(out, &quot;COSINE_TABLE_A&quot;, SINE_TABLE_LEN, COSINE_TABLE_A);</span>
+<span class="nc" id="L3705">        FastMathCalc.printarray(out, &quot;COSINE_TABLE_B&quot;, SINE_TABLE_LEN, COSINE_TABLE_B);</span>
+<span class="nc" id="L3706">        FastMathCalc.printarray(out, &quot;TANGENT_TABLE_A&quot;, SINE_TABLE_LEN, TANGENT_TABLE_A);</span>
+<span class="nc" id="L3707">        FastMathCalc.printarray(out, &quot;TANGENT_TABLE_B&quot;, SINE_TABLE_LEN, TANGENT_TABLE_B);</span>
+<span class="nc" id="L3708">    }</span>
+
+    /** Enclose large data table in nested static class so it's only loaded on first access. */
+    private static class ExpIntTable {
+        /** Exponential evaluated at integer values,
+         * exp(x) =  expIntTableA[x + EXP_INT_TABLE_MAX_INDEX] + expIntTableB[x+EXP_INT_TABLE_MAX_INDEX].
+         */
+        private static final double[] EXP_INT_TABLE_A;
+        /** Exponential evaluated at integer values,
+         * exp(x) =  expIntTableA[x + EXP_INT_TABLE_MAX_INDEX] + expIntTableB[x+EXP_INT_TABLE_MAX_INDEX]
+         */
+        private static final double[] EXP_INT_TABLE_B;
+
+        static {
+<span class="pc bpc" id="L3722" title="1 of 2 branches missed.">            if (RECOMPUTE_TABLES_AT_RUNTIME) {</span>
+<span class="nc" id="L3723">                EXP_INT_TABLE_A = new double[FastMath.EXP_INT_TABLE_LEN];</span>
+<span class="nc" id="L3724">                EXP_INT_TABLE_B = new double[FastMath.EXP_INT_TABLE_LEN];</span>
+
+<span class="nc" id="L3726">                final double tmp[] = new double[2];</span>
+<span class="nc" id="L3727">                final double recip[] = new double[2];</span>
+
+                // Populate expIntTable
+<span class="nc bnc" id="L3730" title="All 2 branches missed.">                for (int i = 0; i &lt; FastMath.EXP_INT_TABLE_MAX_INDEX; i++) {</span>
+<span class="nc" id="L3731">                    FastMathCalc.expint(i, tmp);</span>
+<span class="nc" id="L3732">                    EXP_INT_TABLE_A[i + FastMath.EXP_INT_TABLE_MAX_INDEX] = tmp[0];</span>
+<span class="nc" id="L3733">                    EXP_INT_TABLE_B[i + FastMath.EXP_INT_TABLE_MAX_INDEX] = tmp[1];</span>
+
+<span class="nc bnc" id="L3735" title="All 2 branches missed.">                    if (i != 0) {</span>
+                        // Negative integer powers
+<span class="nc" id="L3737">                        FastMathCalc.splitReciprocal(tmp, recip);</span>
+<span class="nc" id="L3738">                        EXP_INT_TABLE_A[FastMath.EXP_INT_TABLE_MAX_INDEX - i] = recip[0];</span>
+<span class="nc" id="L3739">                        EXP_INT_TABLE_B[FastMath.EXP_INT_TABLE_MAX_INDEX - i] = recip[1];</span>
+                    }
+                }
+<span class="pc bpc" id="L3742" title="1 of 2 branches missed.">            } else if (LOAD_RESOURCES) {</span>
+<span class="nc" id="L3743">                final double[][] expInt = FastMathResources.loadExpInt();</span>
+<span class="nc" id="L3744">                EXP_INT_TABLE_A = expInt[0];</span>
+<span class="nc" id="L3745">                EXP_INT_TABLE_B = expInt[1];</span>
+<span class="nc" id="L3746">            } else {</span>
+<span class="fc" id="L3747">                EXP_INT_TABLE_A = FastMathLiteralArrays.loadExpIntA();</span>
+<span class="fc" id="L3748">                EXP_INT_TABLE_B = FastMathLiteralArrays.loadExpIntB();</span>
+            }
+<span class="fc" id="L3750">        }</span>
+    }
+
+    /** Enclose large data table in nested static class so it's only loaded on first access. */
+    private static class ExpFracTable {
+        /** Exponential over the range of 0 - 1 in increments of 2^-10
+         * exp(x/1024) =  expFracTableA[x] + expFracTableB[x].
+         * 1024 = 2^10
+         */
+        private static final double[] EXP_FRAC_TABLE_A;
+        /** Exponential over the range of 0 - 1 in increments of 2^-10
+         * exp(x/1024) =  expFracTableA[x] + expFracTableB[x].
+         */
+        private static final double[] EXP_FRAC_TABLE_B;
+
+        static {
+<span class="pc bpc" id="L3766" title="1 of 2 branches missed.">            if (RECOMPUTE_TABLES_AT_RUNTIME) {</span>
+<span class="nc" id="L3767">                EXP_FRAC_TABLE_A = new double[FastMath.EXP_FRAC_TABLE_LEN];</span>
+<span class="nc" id="L3768">                EXP_FRAC_TABLE_B = new double[FastMath.EXP_FRAC_TABLE_LEN];</span>
+
+<span class="nc" id="L3770">                final double tmp[] = new double[2];</span>
+
+                // Populate expFracTable
+<span class="nc" id="L3773">                final double factor = 1d / (EXP_FRAC_TABLE_LEN - 1);</span>
+<span class="nc bnc" id="L3774" title="All 2 branches missed.">                for (int i = 0; i &lt; EXP_FRAC_TABLE_A.length; i++) {</span>
+<span class="nc" id="L3775">                    FastMathCalc.slowexp(i * factor, tmp);</span>
+<span class="nc" id="L3776">                    EXP_FRAC_TABLE_A[i] = tmp[0];</span>
+<span class="nc" id="L3777">                    EXP_FRAC_TABLE_B[i] = tmp[1];</span>
+                }
+<span class="pc bpc" id="L3779" title="1 of 2 branches missed.">            } else if (LOAD_RESOURCES) {</span>
+<span class="nc" id="L3780">                final double[][] expFrac = FastMathResources.loadExpFrac();</span>
+<span class="nc" id="L3781">                EXP_FRAC_TABLE_A = expFrac[0];</span>
+<span class="nc" id="L3782">                EXP_FRAC_TABLE_B = expFrac[1];</span>
+<span class="nc" id="L3783">            } else {</span>
+<span class="fc" id="L3784">                EXP_FRAC_TABLE_A = FastMathLiteralArrays.loadExpFracA();</span>
+<span class="fc" id="L3785">                EXP_FRAC_TABLE_B = FastMathLiteralArrays.loadExpFracB();</span>
+            }
+<span class="fc" id="L3787">        }</span>
+    }
+
+    /** Enclose large data table in nested static class so it's only loaded on first access. */
+    private static class lnMant {
+        /** Extended precision logarithm table over the range 1 - 2 in increments of 2^-10. */
+        private static final double[][] LN_MANT;
+
+        static {
+<span class="pc bpc" id="L3796" title="1 of 2 branches missed.">            if (RECOMPUTE_TABLES_AT_RUNTIME) {</span>
+<span class="nc" id="L3797">                LN_MANT = new double[FastMath.LN_MANT_LEN][];</span>
+
+                // Populate lnMant table
+<span class="nc bnc" id="L3800" title="All 2 branches missed.">                for (int i = 0; i &lt; LN_MANT.length; i++) {</span>
+<span class="nc" id="L3801">                    final double d = Double.longBitsToDouble( (((long) i) &lt;&lt; 42) | 0x3ff0000000000000L );</span>
+<span class="nc" id="L3802">                    LN_MANT[i] = FastMathCalc.slowLog(d);</span>
+                }
+<span class="pc bpc" id="L3804" title="1 of 2 branches missed.">            } else if (LOAD_RESOURCES) {</span>
+<span class="nc" id="L3805">                LN_MANT = FastMathResources.loadLnMant();</span>
+            } else {
+<span class="fc" id="L3807">                LN_MANT = FastMathLiteralArrays.loadLnMant();</span>
+            }
+<span class="fc" id="L3809">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

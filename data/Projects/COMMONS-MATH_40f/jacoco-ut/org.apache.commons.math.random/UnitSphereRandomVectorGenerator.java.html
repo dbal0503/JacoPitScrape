@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UnitSphereRandomVectorGenerator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Commons Math</a> &gt; <a href="index.source.html" class="el_package">org.apache.commons.math.random</a> &gt; <span class="el_source">UnitSphereRandomVectorGenerator.java</span></div><h1>UnitSphereRandomVectorGenerator.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.commons.math.random;
+
+import org.apache.commons.math.util.FastMath;
+
+
+/**
+ * Generate random vectors isotropically located on the surface of a sphere.
+ *
+ * @since 2.1
+ * @version $Id$
+ */
+
+public class UnitSphereRandomVectorGenerator
+    implements RandomVectorGenerator {
+    /**
+     * RNG used for generating the individual components of the vectors.
+     */
+    private final RandomGenerator rand;
+    /**
+     * Space dimension.
+     */
+    private final int dimension;
+
+    /**
+     * @param dimension Space dimension.
+     * @param rand RNG for the individual components of the vectors.
+     */
+    public UnitSphereRandomVectorGenerator(final int dimension,
+<span class="fc" id="L46">                                           final RandomGenerator rand) {</span>
+<span class="fc" id="L47">        this.dimension = dimension;</span>
+<span class="fc" id="L48">        this.rand = rand;</span>
+<span class="fc" id="L49">    }</span>
+    /**
+     * Create an object that will use a default RNG ({@link MersenneTwister}),
+     * in order to generate the individual components.
+     *
+     * @param dimension Space dimension.
+     */
+    public UnitSphereRandomVectorGenerator(final int dimension) {
+<span class="fc" id="L57">        this(dimension, new MersenneTwister());</span>
+<span class="fc" id="L58">    }</span>
+
+    /** {@inheritDoc} */
+    public double[] nextVector() {
+
+<span class="fc" id="L63">        final double[] v = new double[dimension];</span>
+
+        double normSq;
+        do {
+<span class="fc" id="L67">            normSq = 0;</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">            for (int i = 0; i &lt; dimension; i++) {</span>
+<span class="fc" id="L69">                final double comp = 2 * rand.nextDouble() - 1;</span>
+<span class="fc" id="L70">                v[i] = comp;</span>
+<span class="fc" id="L71">                normSq += comp * comp;</span>
+            }
+<span class="fc bfc" id="L73" title="All 2 branches covered.">        } while (normSq &gt; 1);</span>
+
+<span class="fc" id="L75">        final double f = 1 / FastMath.sqrt(normSq);</span>
+<span class="fc bfc" id="L76" title="All 2 branches covered.">        for (int i = 0; i &lt; dimension; i++) {</span>
+<span class="fc" id="L77">            v[i] *= f;</span>
+        }
+
+<span class="fc" id="L80">        return v;</span>
+
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

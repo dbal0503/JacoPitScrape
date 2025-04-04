@@ -1,0 +1,603 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ZonedChronology.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Joda time</a> &gt; <a href="index.source.html" class="el_package">org.joda.time.chrono</a> &gt; <span class="el_source">ZonedChronology.java</span></div><h1>ZonedChronology.java</h1><pre class="source lang-java linenums">/*
+ *  Copyright 2001-2009 Stephen Colebourne
+ *
+ *  Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+package org.joda.time.chrono;
+
+import java.util.HashMap;
+import java.util.Locale;
+
+import org.joda.time.Chronology;
+import org.joda.time.DateTimeConstants;
+import org.joda.time.DateTimeField;
+import org.joda.time.DateTimeZone;
+import org.joda.time.DurationField;
+import org.joda.time.IllegalFieldValueException;
+import org.joda.time.Instant;
+import org.joda.time.ReadablePartial;
+import org.joda.time.field.BaseDateTimeField;
+import org.joda.time.field.BaseDurationField;
+import org.joda.time.format.DateTimeFormat;
+
+/**
+ * Wraps another Chronology to add support for time zones.
+ * &lt;p&gt;
+ * ZonedChronology is thread-safe and immutable.
+ *
+ * @author Brian S O'Neill
+ * @author Stephen Colebourne
+ * @since 1.0
+ */
+public final class ZonedChronology extends AssembledChronology {
+
+    /** Serialization lock */
+    private static final long serialVersionUID = -1079258847191166848L;
+
+    /**
+     * Create a ZonedChronology for any chronology, overriding any time zone it
+     * may already have.
+     *
+     * @param base base chronology to wrap
+     * @param zone the time zone
+     * @throws IllegalArgumentException if chronology or time zone is null
+     */
+    public static ZonedChronology getInstance(Chronology base, DateTimeZone zone) {
+<span class="pc bpc" id="L56" title="1 of 2 branches missed.">        if (base == null) {</span>
+<span class="nc" id="L57">            throw new IllegalArgumentException(&quot;Must supply a chronology&quot;);</span>
+        }
+<span class="fc" id="L59">        base = base.withUTC();</span>
+<span class="pc bpc" id="L60" title="1 of 2 branches missed.">        if (base == null) {</span>
+<span class="nc" id="L61">            throw new IllegalArgumentException(&quot;UTC chronology must not be null&quot;);</span>
+        }
+<span class="pc bpc" id="L63" title="1 of 2 branches missed.">        if (zone == null) {</span>
+<span class="nc" id="L64">            throw new IllegalArgumentException(&quot;DateTimeZone must not be null&quot;);</span>
+        }
+<span class="fc" id="L66">        return new ZonedChronology(base, zone);</span>
+    }
+
+    static boolean useTimeArithmetic(DurationField field) {
+        // Use time of day arithmetic rules for unit durations less than
+        // typical time zone offsets.
+<span class="pc bpc" id="L72" title="1 of 4 branches missed.">        return field != null &amp;&amp; field.getUnitMillis() &lt; DateTimeConstants.MILLIS_PER_HOUR * 12;</span>
+    }
+
+    /**
+     * Restricted constructor
+     *
+     * @param base base chronology to wrap
+     * @param zone the time zone
+     */
+    private ZonedChronology(Chronology base, DateTimeZone zone) {
+<span class="fc" id="L82">        super(base, zone);</span>
+<span class="fc" id="L83">    }</span>
+
+    public DateTimeZone getZone() {
+<span class="fc" id="L86">        return (DateTimeZone)getParam();</span>
+    }
+
+    public Chronology withUTC() {
+<span class="nc" id="L90">        return getBase();</span>
+    }
+
+    public Chronology withZone(DateTimeZone zone) {
+<span class="nc bnc" id="L94" title="All 2 branches missed.">        if (zone == null) {</span>
+<span class="nc" id="L95">            zone = DateTimeZone.getDefault();</span>
+        }
+<span class="nc bnc" id="L97" title="All 2 branches missed.">        if (zone == getParam()) {</span>
+<span class="nc" id="L98">            return this;</span>
+        }
+<span class="nc bnc" id="L100" title="All 2 branches missed.">        if (zone == DateTimeZone.UTC) {</span>
+<span class="nc" id="L101">            return getBase();</span>
+        }
+<span class="nc" id="L103">        return new ZonedChronology(getBase(), zone);</span>
+    }
+
+    public long getDateTimeMillis(int year, int monthOfYear, int dayOfMonth,
+                                  int millisOfDay)
+        throws IllegalArgumentException
+    {
+<span class="fc" id="L110">        return localToUTC(getBase().getDateTimeMillis</span>
+<span class="fc" id="L111">                          (year, monthOfYear, dayOfMonth, millisOfDay));</span>
+    }
+
+    public long getDateTimeMillis(int year, int monthOfYear, int dayOfMonth,
+                                  int hourOfDay, int minuteOfHour,
+                                  int secondOfMinute, int millisOfSecond)
+        throws IllegalArgumentException
+    {
+<span class="fc" id="L119">        return localToUTC(getBase().getDateTimeMillis</span>
+<span class="fc" id="L120">                          (year, monthOfYear, dayOfMonth, </span>
+                           hourOfDay, minuteOfHour, secondOfMinute, millisOfSecond));
+    }
+
+    public long getDateTimeMillis(long instant,
+                                  int hourOfDay, int minuteOfHour,
+                                  int secondOfMinute, int millisOfSecond)
+        throws IllegalArgumentException
+    {
+<span class="fc" id="L129">        return localToUTC(getBase().getDateTimeMillis</span>
+<span class="fc" id="L130">                          (instant + getZone().getOffset(instant),</span>
+                           hourOfDay, minuteOfHour, secondOfMinute, millisOfSecond));
+    }
+
+    /**
+     * @param instant instant from 1970-01-01T00:00:00 local time
+     * @return instant from 1970-01-01T00:00:00Z
+     */
+    private long localToUTC(long instant) {
+<span class="fc" id="L139">        DateTimeZone zone = getZone();</span>
+<span class="fc" id="L140">        int offset = zone.getOffsetFromLocal(instant);</span>
+<span class="fc" id="L141">        instant -= offset;</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">        if (offset != zone.getOffset(instant)) {</span>
+<span class="fc" id="L143">            throw new IllegalArgumentException</span>
+                (&quot;Illegal instant due to time zone offset transition: &quot; +
+<span class="fc" id="L145">                    DateTimeFormat.forPattern(&quot;yyyy-MM-dd'T'HH:mm:ss.SSS&quot;).print(new Instant(instant)));</span>
+        }
+<span class="fc" id="L147">        return instant;</span>
+    }
+
+    protected void assemble(Fields fields) {
+        // Keep a local cache of converted fields so as not to create redundant
+        // objects.
+<span class="fc" id="L153">        HashMap&lt;Object, Object&gt; converted = new HashMap&lt;Object, Object&gt;();</span>
+
+        // Convert duration fields...
+
+<span class="fc" id="L157">        fields.eras = convertField(fields.eras, converted);</span>
+<span class="fc" id="L158">        fields.centuries = convertField(fields.centuries, converted);</span>
+<span class="fc" id="L159">        fields.years = convertField(fields.years, converted);</span>
+<span class="fc" id="L160">        fields.months = convertField(fields.months, converted);</span>
+<span class="fc" id="L161">        fields.weekyears = convertField(fields.weekyears, converted);</span>
+<span class="fc" id="L162">        fields.weeks = convertField(fields.weeks, converted);</span>
+<span class="fc" id="L163">        fields.days = convertField(fields.days, converted);</span>
+
+<span class="fc" id="L165">        fields.halfdays = convertField(fields.halfdays, converted);</span>
+<span class="fc" id="L166">        fields.hours = convertField(fields.hours, converted);</span>
+<span class="fc" id="L167">        fields.minutes = convertField(fields.minutes, converted);</span>
+<span class="fc" id="L168">        fields.seconds = convertField(fields.seconds, converted);</span>
+<span class="fc" id="L169">        fields.millis = convertField(fields.millis, converted);</span>
+
+        // Convert datetime fields...
+
+<span class="fc" id="L173">        fields.year = convertField(fields.year, converted);</span>
+<span class="fc" id="L174">        fields.yearOfEra = convertField(fields.yearOfEra, converted);</span>
+<span class="fc" id="L175">        fields.yearOfCentury = convertField(fields.yearOfCentury, converted);</span>
+<span class="fc" id="L176">        fields.centuryOfEra = convertField(fields.centuryOfEra, converted);</span>
+<span class="fc" id="L177">        fields.era = convertField(fields.era, converted);</span>
+<span class="fc" id="L178">        fields.dayOfWeek = convertField(fields.dayOfWeek, converted);</span>
+<span class="fc" id="L179">        fields.dayOfMonth = convertField(fields.dayOfMonth, converted);</span>
+<span class="fc" id="L180">        fields.dayOfYear = convertField(fields.dayOfYear, converted);</span>
+<span class="fc" id="L181">        fields.monthOfYear = convertField(fields.monthOfYear, converted);</span>
+<span class="fc" id="L182">        fields.weekOfWeekyear = convertField(fields.weekOfWeekyear, converted);</span>
+<span class="fc" id="L183">        fields.weekyear = convertField(fields.weekyear, converted);</span>
+<span class="fc" id="L184">        fields.weekyearOfCentury = convertField(fields.weekyearOfCentury, converted);</span>
+
+<span class="fc" id="L186">        fields.millisOfSecond = convertField(fields.millisOfSecond, converted);</span>
+<span class="fc" id="L187">        fields.millisOfDay = convertField(fields.millisOfDay, converted);</span>
+<span class="fc" id="L188">        fields.secondOfMinute = convertField(fields.secondOfMinute, converted);</span>
+<span class="fc" id="L189">        fields.secondOfDay = convertField(fields.secondOfDay, converted);</span>
+<span class="fc" id="L190">        fields.minuteOfHour = convertField(fields.minuteOfHour, converted);</span>
+<span class="fc" id="L191">        fields.minuteOfDay = convertField(fields.minuteOfDay, converted);</span>
+<span class="fc" id="L192">        fields.hourOfDay = convertField(fields.hourOfDay, converted);</span>
+<span class="fc" id="L193">        fields.hourOfHalfday = convertField(fields.hourOfHalfday, converted);</span>
+<span class="fc" id="L194">        fields.clockhourOfDay = convertField(fields.clockhourOfDay, converted);</span>
+<span class="fc" id="L195">        fields.clockhourOfHalfday = convertField(fields.clockhourOfHalfday, converted);</span>
+<span class="fc" id="L196">        fields.halfdayOfDay = convertField(fields.halfdayOfDay, converted);</span>
+<span class="fc" id="L197">    }</span>
+
+    private DurationField convertField(DurationField field, HashMap&lt;Object, Object&gt; converted) {
+<span class="fc bfc" id="L200" title="All 4 branches covered.">        if (field == null || !field.isSupported()) {</span>
+<span class="fc" id="L201">            return field;</span>
+        }
+<span class="fc bfc" id="L203" title="All 2 branches covered.">        if (converted.containsKey(field)) {</span>
+<span class="fc" id="L204">            return (DurationField)converted.get(field);</span>
+        }
+<span class="fc" id="L206">        ZonedDurationField zonedField = new ZonedDurationField(field, getZone());</span>
+<span class="fc" id="L207">        converted.put(field, zonedField);</span>
+<span class="fc" id="L208">        return zonedField;</span>
+    }
+
+    private DateTimeField convertField(DateTimeField field, HashMap&lt;Object, Object&gt; converted) {
+<span class="pc bpc" id="L212" title="2 of 4 branches missed.">        if (field == null || !field.isSupported()) {</span>
+<span class="nc" id="L213">            return field;</span>
+        }
+<span class="pc bpc" id="L215" title="1 of 2 branches missed.">        if (converted.containsKey(field)) {</span>
+<span class="nc" id="L216">            return (DateTimeField)converted.get(field);</span>
+        }
+<span class="fc" id="L218">        ZonedDateTimeField zonedField =</span>
+<span class="fc" id="L219">            new ZonedDateTimeField(field, getZone(),</span>
+<span class="fc" id="L220">                                   convertField(field.getDurationField(), converted),</span>
+<span class="fc" id="L221">                                   convertField(field.getRangeDurationField(), converted),</span>
+<span class="fc" id="L222">                                   convertField(field.getLeapDurationField(), converted));</span>
+<span class="fc" id="L223">        converted.put(field, zonedField);</span>
+<span class="fc" id="L224">        return zonedField;</span>
+    }
+
+    //-----------------------------------------------------------------------
+    /**
+     * A zoned chronology is only equal to a zoned chronology with the
+     * same base chronology and zone.
+     * 
+     * @param obj  the object to compare to
+     * @return true if equal
+     * @since 1.4
+     */
+    public boolean equals(Object obj) {
+<span class="pc bpc" id="L237" title="1 of 2 branches missed.">        if (this == obj) {</span>
+<span class="nc" id="L238">            return true;</span>
+        }
+<span class="pc bpc" id="L240" title="1 of 2 branches missed.">        if (obj instanceof ZonedChronology == false) {</span>
+<span class="nc" id="L241">            return false;</span>
+        }
+<span class="fc" id="L243">        ZonedChronology chrono = (ZonedChronology) obj;</span>
+<span class="fc" id="L244">        return</span>
+<span class="pc bpc" id="L245" title="1 of 2 branches missed.">            getBase().equals(chrono.getBase()) &amp;&amp;</span>
+<span class="fc bfc" id="L246" title="All 2 branches covered.">            getZone().equals(chrono.getZone());</span>
+    }
+
+    /**
+     * A suitable hashcode for the chronology.
+     * 
+     * @return the hashcode
+     * @since 1.4
+     */
+    public int hashCode() {
+<span class="fc" id="L256">        return 326565 + getZone().hashCode() * 11 + getBase().hashCode() * 7;</span>
+    }
+
+    /**
+     * A debugging string for the chronology.
+     * 
+     * @return the debugging string
+     */
+    public String toString() {
+<span class="fc" id="L265">        return &quot;ZonedChronology[&quot; + getBase() + &quot;, &quot; + getZone().getID() + ']';</span>
+    }
+
+    //-----------------------------------------------------------------------
+    /*
+     * Because time durations are typically smaller than time zone offsets, the
+     * arithmetic methods subtract the original offset. This produces a more
+     * expected behavior when crossing time zone offset transitions. For dates,
+     * the new offset is subtracted off. This behavior, if applied to time
+     * fields, can nullify or reverse an add when crossing a transition.
+     */
+    static class ZonedDurationField extends BaseDurationField {
+        private static final long serialVersionUID = -485345310999208286L;
+
+        final DurationField iField;
+        final boolean iTimeField;
+        final DateTimeZone iZone;
+
+        ZonedDurationField(DurationField field, DateTimeZone zone) {
+<span class="fc" id="L284">            super(field.getType());</span>
+<span class="pc bpc" id="L285" title="1 of 2 branches missed.">            if (!field.isSupported()) {</span>
+<span class="nc" id="L286">                throw new IllegalArgumentException();</span>
+            }
+<span class="fc" id="L288">            iField = field;</span>
+<span class="fc" id="L289">            iTimeField = useTimeArithmetic(field);</span>
+<span class="fc" id="L290">            iZone = zone;</span>
+<span class="fc" id="L291">        }</span>
+
+        public boolean isPrecise() {
+<span class="fc bfc" id="L294" title="All 6 branches covered.">            return iTimeField ? iField.isPrecise() : iField.isPrecise() &amp;&amp; this.iZone.isFixed();</span>
+        }
+
+        public long getUnitMillis() {
+<span class="fc" id="L298">            return iField.getUnitMillis();</span>
+        }
+
+        public int getValue(long duration, long instant) {
+<span class="nc" id="L302">            return iField.getValue(duration, addOffset(instant));</span>
+        }
+
+        public long getValueAsLong(long duration, long instant) {
+<span class="nc" id="L306">            return iField.getValueAsLong(duration, addOffset(instant));</span>
+        }
+
+        public long getMillis(int value, long instant) {
+<span class="nc" id="L310">            return iField.getMillis(value, addOffset(instant));</span>
+        }
+
+        public long getMillis(long value, long instant) {
+<span class="nc" id="L314">            return iField.getMillis(value, addOffset(instant));</span>
+        }
+
+        public long add(long instant, int value) {
+<span class="fc" id="L318">            int offset = getOffsetToAdd(instant);</span>
+<span class="fc" id="L319">            instant = iField.add(instant + offset, value);</span>
+<span class="fc bfc" id="L320" title="All 2 branches covered.">            return instant - (iTimeField ? offset : getOffsetFromLocalToSubtract(instant));</span>
+        }
+
+        public long add(long instant, long value) {
+<span class="fc" id="L324">            int offset = getOffsetToAdd(instant);</span>
+<span class="fc" id="L325">            instant = iField.add(instant + offset, value);</span>
+<span class="fc bfc" id="L326" title="All 2 branches covered.">            return instant - (iTimeField ? offset : getOffsetFromLocalToSubtract(instant));</span>
+        }
+
+        public int getDifference(long minuendInstant, long subtrahendInstant) {
+<span class="fc" id="L330">            int offset = getOffsetToAdd(subtrahendInstant);</span>
+<span class="fc" id="L331">            return iField.getDifference</span>
+<span class="fc bfc" id="L332" title="All 2 branches covered.">                (minuendInstant + (iTimeField ? offset : getOffsetToAdd(minuendInstant)),</span>
+                 subtrahendInstant + offset);
+        }
+
+        public long getDifferenceAsLong(long minuendInstant, long subtrahendInstant) {
+<span class="fc" id="L337">            int offset = getOffsetToAdd(subtrahendInstant);</span>
+<span class="fc" id="L338">            return iField.getDifferenceAsLong</span>
+<span class="pc bpc" id="L339" title="1 of 2 branches missed.">                (minuendInstant + (iTimeField ? offset : getOffsetToAdd(minuendInstant)),</span>
+                 subtrahendInstant + offset);
+        }
+
+        private int getOffsetToAdd(long instant) {
+<span class="fc" id="L344">            int offset = this.iZone.getOffset(instant);</span>
+<span class="fc" id="L345">            long sum = instant + offset;</span>
+            // If there is a sign change, but the two values have the same sign...
+<span class="pc bpc" id="L347" title="1 of 4 branches missed.">            if ((instant ^ sum) &lt; 0 &amp;&amp; (instant ^ offset) &gt;= 0) {</span>
+<span class="nc" id="L348">                throw new ArithmeticException(&quot;Adding time zone offset caused overflow&quot;);</span>
+            }
+<span class="fc" id="L350">            return offset;</span>
+        }
+
+        private int getOffsetFromLocalToSubtract(long instant) {
+<span class="fc" id="L354">            int offset = this.iZone.getOffsetFromLocal(instant);</span>
+<span class="fc" id="L355">            long diff = instant - offset;</span>
+            // If there is a sign change, but the two values have different signs...
+<span class="pc bpc" id="L357" title="3 of 4 branches missed.">            if ((instant ^ diff) &lt; 0 &amp;&amp; (instant ^ offset) &lt; 0) {</span>
+<span class="nc" id="L358">                throw new ArithmeticException(&quot;Subtracting time zone offset caused overflow&quot;);</span>
+            }
+<span class="fc" id="L360">            return offset;</span>
+        }
+
+        private long addOffset(long instant) {
+<span class="nc" id="L364">            return iZone.convertUTCToLocal(instant);</span>
+        }
+    }
+
+    /**
+     * A DateTimeField that decorates another to add timezone behaviour.
+     * &lt;p&gt;
+     * This class converts passed in instants to local wall time, and vice
+     * versa on output.
+     */
+    static final class ZonedDateTimeField extends BaseDateTimeField {
+        private static final long serialVersionUID = -3968986277775529794L;
+
+        final DateTimeField iField;
+        final DateTimeZone iZone;
+        final DurationField iDurationField;
+        final boolean iTimeField;
+        final DurationField iRangeDurationField;
+        final DurationField iLeapDurationField;
+
+        ZonedDateTimeField(DateTimeField field,
+                           DateTimeZone zone,
+                           DurationField durationField,
+                           DurationField rangeDurationField,
+                           DurationField leapDurationField) {
+<span class="fc" id="L389">            super(field.getType());</span>
+<span class="pc bpc" id="L390" title="1 of 2 branches missed.">            if (!field.isSupported()) {</span>
+<span class="nc" id="L391">                throw new IllegalArgumentException();</span>
+            }
+<span class="fc" id="L393">            iField = field;</span>
+<span class="fc" id="L394">            iZone = zone;</span>
+<span class="fc" id="L395">            iDurationField = durationField;</span>
+<span class="fc" id="L396">            iTimeField = useTimeArithmetic(durationField);</span>
+<span class="fc" id="L397">            iRangeDurationField = rangeDurationField;</span>
+<span class="fc" id="L398">            iLeapDurationField = leapDurationField;</span>
+<span class="fc" id="L399">        }</span>
+
+        public boolean isLenient() {
+<span class="fc" id="L402">            return iField.isLenient();</span>
+        }
+
+        public int get(long instant) {
+<span class="fc" id="L406">            long localInstant = iZone.convertUTCToLocal(instant);</span>
+<span class="fc" id="L407">            return iField.get(localInstant);</span>
+        }
+
+        public String getAsText(long instant, Locale locale) {
+<span class="fc" id="L411">            long localInstant = iZone.convertUTCToLocal(instant);</span>
+<span class="fc" id="L412">            return iField.getAsText(localInstant, locale);</span>
+        }
+
+        public String getAsShortText(long instant, Locale locale) {
+<span class="fc" id="L416">            long localInstant = iZone.convertUTCToLocal(instant);</span>
+<span class="fc" id="L417">            return iField.getAsShortText(localInstant, locale);</span>
+        }
+
+        public String getAsText(int fieldValue, Locale locale) {
+<span class="fc" id="L421">            return iField.getAsText(fieldValue, locale);</span>
+        }
+
+        public String getAsShortText(int fieldValue, Locale locale) {
+<span class="fc" id="L425">            return iField.getAsShortText(fieldValue, locale);</span>
+        }
+
+        public long add(long instant, int value) {
+<span class="fc bfc" id="L429" title="All 2 branches covered.">            if (iTimeField) {</span>
+<span class="fc" id="L430">                int offset = getOffsetToAdd(instant);</span>
+<span class="fc" id="L431">                long localInstant = iField.add(instant + offset, value);</span>
+<span class="fc" id="L432">                return localInstant - offset;</span>
+            } else {
+<span class="fc" id="L434">               long localInstant = iZone.convertUTCToLocal(instant);</span>
+<span class="fc" id="L435">               localInstant = iField.add(localInstant, value);</span>
+<span class="fc" id="L436">               return iZone.convertLocalToUTC(localInstant, false, instant);</span>
+            }
+        }
+
+        public long add(long instant, long value) {
+<span class="pc bpc" id="L441" title="1 of 2 branches missed.">            if (iTimeField) {</span>
+<span class="nc" id="L442">                int offset = getOffsetToAdd(instant);</span>
+<span class="nc" id="L443">                long localInstant = iField.add(instant + offset, value);</span>
+<span class="nc" id="L444">                return localInstant - offset;</span>
+            } else {
+<span class="fc" id="L446">               long localInstant = iZone.convertUTCToLocal(instant);</span>
+<span class="fc" id="L447">               localInstant = iField.add(localInstant, value);</span>
+<span class="fc" id="L448">               return iZone.convertLocalToUTC(localInstant, false, instant);</span>
+            }
+        }
+
+        public long addWrapField(long instant, int value) {
+<span class="pc bpc" id="L453" title="1 of 2 branches missed.">            if (iTimeField) {</span>
+<span class="nc" id="L454">                int offset = getOffsetToAdd(instant);</span>
+<span class="nc" id="L455">                long localInstant = iField.addWrapField(instant + offset, value);</span>
+<span class="nc" id="L456">                return localInstant - offset;</span>
+            } else {
+<span class="fc" id="L458">                long localInstant = iZone.convertUTCToLocal(instant);</span>
+<span class="fc" id="L459">                localInstant = iField.addWrapField(localInstant, value);</span>
+<span class="fc" id="L460">                return iZone.convertLocalToUTC(localInstant, false, instant);</span>
+            }
+        }
+
+        public long set(long instant, int value) {
+<span class="fc" id="L465">            long localInstant = iZone.convertUTCToLocal(instant);</span>
+<span class="fc" id="L466">            localInstant = iField.set(localInstant, value);</span>
+<span class="fc" id="L467">            long result = iZone.convertLocalToUTC(localInstant, false, instant);</span>
+<span class="fc bfc" id="L468" title="All 2 branches covered.">            if (get(result) != value) {</span>
+<span class="fc" id="L469">                throw new IllegalFieldValueException(iField.getType(), Integer.valueOf(value),</span>
+                    &quot;Illegal instant due to time zone offset transition: &quot; +
+<span class="fc" id="L471">                    DateTimeFormat.forPattern(&quot;yyyy-MM-dd'T'HH:mm:ss.SSS&quot;).print(new Instant(localInstant)) +</span>
+<span class="fc" id="L472">                    &quot; (&quot; + iZone.getID() + &quot;)&quot;);</span>
+            }
+<span class="fc" id="L474">            return result;</span>
+        }
+
+        public long set(long instant, String text, Locale locale) {
+            // cannot verify that new value stuck because set may be lenient
+<span class="fc" id="L479">            long localInstant = iZone.convertUTCToLocal(instant);</span>
+<span class="fc" id="L480">            localInstant = iField.set(localInstant, text, locale);</span>
+<span class="fc" id="L481">            return iZone.convertLocalToUTC(localInstant, false, instant);</span>
+        }
+
+        public int getDifference(long minuendInstant, long subtrahendInstant) {
+<span class="fc" id="L485">            int offset = getOffsetToAdd(subtrahendInstant);</span>
+<span class="fc" id="L486">            return iField.getDifference</span>
+<span class="fc bfc" id="L487" title="All 2 branches covered.">                (minuendInstant + (iTimeField ? offset : getOffsetToAdd(minuendInstant)),</span>
+                 subtrahendInstant + offset);
+        }
+
+        public long getDifferenceAsLong(long minuendInstant, long subtrahendInstant) {
+<span class="fc" id="L492">            int offset = getOffsetToAdd(subtrahendInstant);</span>
+<span class="fc" id="L493">            return iField.getDifferenceAsLong</span>
+<span class="fc bfc" id="L494" title="All 2 branches covered.">                (minuendInstant + (iTimeField ? offset : getOffsetToAdd(minuendInstant)),</span>
+                 subtrahendInstant + offset);
+        }
+
+        public final DurationField getDurationField() {
+<span class="fc" id="L499">            return iDurationField;</span>
+        }
+
+        public final DurationField getRangeDurationField() {
+<span class="fc" id="L503">            return iRangeDurationField;</span>
+        }
+
+        public boolean isLeap(long instant) {
+<span class="fc" id="L507">            long localInstant = iZone.convertUTCToLocal(instant);</span>
+<span class="fc" id="L508">            return iField.isLeap(localInstant);</span>
+        }
+
+        public int getLeapAmount(long instant) {
+<span class="fc" id="L512">            long localInstant = iZone.convertUTCToLocal(instant);</span>
+<span class="fc" id="L513">            return iField.getLeapAmount(localInstant);</span>
+        }
+
+        public final DurationField getLeapDurationField() {
+<span class="fc" id="L517">            return iLeapDurationField;</span>
+        }
+
+        public long roundFloor(long instant) {
+<span class="fc bfc" id="L521" title="All 2 branches covered.">            if (iTimeField) {</span>
+<span class="fc" id="L522">                int offset = getOffsetToAdd(instant);</span>
+<span class="fc" id="L523">                instant = iField.roundFloor(instant + offset);</span>
+<span class="fc" id="L524">                return instant - offset;</span>
+            } else {
+<span class="fc" id="L526">                long localInstant = iZone.convertUTCToLocal(instant);</span>
+<span class="fc" id="L527">                localInstant = iField.roundFloor(localInstant);</span>
+<span class="fc" id="L528">                return iZone.convertLocalToUTC(localInstant, false, instant);</span>
+            }
+        }
+
+        public long roundCeiling(long instant) {
+<span class="fc bfc" id="L533" title="All 2 branches covered.">            if (iTimeField) {</span>
+<span class="fc" id="L534">                int offset = getOffsetToAdd(instant);</span>
+<span class="fc" id="L535">                instant = iField.roundCeiling(instant + offset);</span>
+<span class="fc" id="L536">                return instant - offset;</span>
+            } else {
+<span class="fc" id="L538">                long localInstant = iZone.convertUTCToLocal(instant);</span>
+<span class="fc" id="L539">                localInstant = iField.roundCeiling(localInstant);</span>
+<span class="fc" id="L540">                return iZone.convertLocalToUTC(localInstant, false, instant);</span>
+            }
+        }
+
+        public long remainder(long instant) {
+<span class="fc" id="L545">            long localInstant = iZone.convertUTCToLocal(instant);</span>
+<span class="fc" id="L546">            return iField.remainder(localInstant);</span>
+        }
+
+        public int getMinimumValue() {
+<span class="fc" id="L550">            return iField.getMinimumValue();</span>
+        }
+
+        public int getMinimumValue(long instant) {
+<span class="fc" id="L554">            long localInstant = iZone.convertUTCToLocal(instant);</span>
+<span class="fc" id="L555">            return iField.getMinimumValue(localInstant);</span>
+        }
+
+        public int getMinimumValue(ReadablePartial instant) {
+<span class="nc" id="L559">            return iField.getMinimumValue(instant);</span>
+        }
+
+        public int getMinimumValue(ReadablePartial instant, int[] values) {
+<span class="nc" id="L563">            return iField.getMinimumValue(instant, values);</span>
+        }
+
+        public int getMaximumValue() {
+<span class="fc" id="L567">            return iField.getMaximumValue();</span>
+        }
+
+        public int getMaximumValue(long instant) {
+<span class="fc" id="L571">            long localInstant = iZone.convertUTCToLocal(instant);</span>
+<span class="fc" id="L572">            return iField.getMaximumValue(localInstant);</span>
+        }
+
+        public int getMaximumValue(ReadablePartial instant) {
+<span class="fc" id="L576">            return iField.getMaximumValue(instant);</span>
+        }
+
+        public int getMaximumValue(ReadablePartial instant, int[] values) {
+<span class="nc" id="L580">            return iField.getMaximumValue(instant, values);</span>
+        }
+
+        public int getMaximumTextLength(Locale locale) {
+<span class="fc" id="L584">            return iField.getMaximumTextLength(locale);</span>
+        }
+
+        public int getMaximumShortTextLength(Locale locale) {
+<span class="fc" id="L588">            return iField.getMaximumShortTextLength(locale);</span>
+        }
+
+        private int getOffsetToAdd(long instant) {
+<span class="fc" id="L592">            int offset = this.iZone.getOffset(instant);</span>
+<span class="fc" id="L593">            long sum = instant + offset;</span>
+            // If there is a sign change, but the two values have the same sign...
+<span class="pc bpc" id="L595" title="1 of 4 branches missed.">            if ((instant ^ sum) &lt; 0 &amp;&amp; (instant ^ offset) &gt;= 0) {</span>
+<span class="nc" id="L596">                throw new ArithmeticException(&quot;Adding time zone offset caused overflow&quot;);</span>
+            }
+<span class="fc" id="L598">            return offset;</span>
+        }
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

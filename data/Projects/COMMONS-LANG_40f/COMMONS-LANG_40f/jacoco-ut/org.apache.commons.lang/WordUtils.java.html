@@ -1,0 +1,648 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>WordUtils.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Commons Lang</a> &gt; <a href="index.source.html" class="el_package">org.apache.commons.lang</a> &gt; <span class="el_source">WordUtils.java</span></div><h1>WordUtils.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ * 
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.commons.lang;
+
+/**
+ * &lt;p&gt;Operations on Strings that contain words.&lt;/p&gt;
+ * 
+ * &lt;p&gt;This class tries to handle &lt;code&gt;null&lt;/code&gt; input gracefully.
+ * An exception will not be thrown for a &lt;code&gt;null&lt;/code&gt; input.
+ * Each method documents its behaviour in more detail.&lt;/p&gt;
+ * 
+ * @author Apache Jakarta Velocity
+ * @author Stephen Colebourne
+ * @author &lt;a href=&quot;mailto:hps@intermeta.de&quot;&gt;Henning P. Schmiedehausen&lt;/a&gt;
+ * @author Gary Gregory
+ * @since 2.0
+ * @version $Id$
+ */
+public class WordUtils {
+
+    /**
+     * &lt;p&gt;&lt;code&gt;WordUtils&lt;/code&gt; instances should NOT be constructed in
+     * standard programming. Instead, the class should be used as
+     * &lt;code&gt;WordUtils.wrap(&quot;foo bar&quot;, 20);&lt;/code&gt;.&lt;/p&gt;
+     *
+     * &lt;p&gt;This constructor is public to permit tools that require a JavaBean
+     * instance to operate.&lt;/p&gt;
+     */
+    public WordUtils() {
+<span class="fc" id="L44">      super();</span>
+<span class="fc" id="L45">    }</span>
+
+    // Wrapping
+    //--------------------------------------------------------------------------
+//    /**
+//     * &lt;p&gt;Wraps a block of text to a specified line length using '\n' as
+//     * a newline.&lt;/p&gt;
+//     *
+//     * &lt;p&gt;This method takes a block of text, which might have long lines in it
+//     * and wraps the long lines based on the supplied lineLength parameter.&lt;/p&gt;
+//     * 
+//     * &lt;p&gt;If a single word is longer than the line length (eg. a URL), it will
+//     * not be broken, and will display beyond the expected width.&lt;/p&gt;
+//     * 
+//     * &lt;p&gt;If there are tabs in inString, you are going to get results that are
+//     * a bit strange. Tabs are a single character but are displayed as 4 or 8
+//     * spaces. Remove the tabs.&lt;/p&gt;
+//     *
+//     * @param str  text which is in need of word-wrapping, may be null
+//     * @param lineLength  the column to wrap the words at
+//     * @return the text with all the long lines word-wrapped
+//     *  &lt;code&gt;null&lt;/code&gt; if null string input
+//     */
+//    public static String wrapText(String str, int lineLength) {
+//        return wrap(str, null, lineLength);
+//    }
+    
+//    /**
+//     * &lt;p&gt;Wraps a block of text to a specified line length.&lt;/p&gt;
+//     *
+//     * &lt;p&gt;This method takes a block of text, which might have long lines in it
+//     * and wraps the long lines based on the supplied lineLength parameter.&lt;/p&gt;
+//     * 
+//     * &lt;p&gt;If a single word is longer than the wrapColumn (eg. a URL), it will
+//     * not be broken, and will display beyond the expected width.&lt;/p&gt;
+//     * 
+//     * &lt;p&gt;If there are tabs in inString, you are going to get results that are
+//     * a bit strange. Tabs are a single character but are displayed as 4 or 8
+//     * spaces. Remove the tabs.&lt;/p&gt;
+//     *
+//     * @param str  text which is in need of word-wrapping, may be null
+//     * @param newLineChars  the characters that define a newline, null treated as \n
+//     * @param lineLength  the column to wrap the words at
+//     * @return the text with all the long lines word-wrapped
+//     *  &lt;code&gt;null&lt;/code&gt; if null string input
+//     */
+//    public static String wrapText(String str, String newLineChars, int lineLength) {
+//        if (str == null) {
+//            return null;
+//        }
+//        if (newLineChars == null) {
+//            newLineChars = &quot;\n&quot;;
+//        }
+//        StringTokenizer lineTokenizer = new StringTokenizer(str, newLineChars, true);
+//        StringBuffer stringBuffer = new StringBuffer();
+//
+//        while (lineTokenizer.hasMoreTokens()) {
+//            try {
+//                String nextLine = lineTokenizer.nextToken();
+//
+//                if (nextLine.length() &gt; lineLength) {
+//                    // This line is long enough to be wrapped.
+//                    nextLine = wrapLine(nextLine, null, lineLength, false);
+//                }
+//
+//                stringBuffer.append(nextLine);
+//
+//            } catch (NoSuchElementException nsee) {
+//                // thrown by nextToken(), but I don't know why it would
+//                break;
+//            }
+//        }
+//
+//        return stringBuffer.toString();
+//    }
+
+    // Wrapping
+    //-----------------------------------------------------------------------
+    /**
+     * &lt;p&gt;Wraps a single line of text, identifying words by &lt;code&gt;' '&lt;/code&gt;.&lt;/p&gt;
+     * 
+     * &lt;p&gt;New lines will be separated by the system property line separator.
+     * Very long words, such as URLs will &lt;i&gt;not&lt;/i&gt; be wrapped.&lt;/p&gt;
+     * 
+     * &lt;p&gt;Leading spaces on a new line are stripped.
+     * Trailing spaces are not stripped.&lt;/p&gt;
+     *
+     * &lt;pre&gt;
+     * WordUtils.wrap(null, *) = null
+     * WordUtils.wrap(&quot;&quot;, *) = &quot;&quot;
+     * &lt;/pre&gt;
+     *
+     * @param str  the String to be word wrapped, may be null
+     * @param wrapLength  the column to wrap the words at, less than 1 is treated as 1
+     * @return a line with newlines inserted, &lt;code&gt;null&lt;/code&gt; if null input
+     */
+    public static String wrap(String str, int wrapLength) {
+<span class="fc" id="L142">        return wrap(str, wrapLength, null, false);</span>
+    }
+    
+    /**
+     * &lt;p&gt;Wraps a single line of text, identifying words by &lt;code&gt;' '&lt;/code&gt;.&lt;/p&gt;
+     * 
+     * &lt;p&gt;Leading spaces on a new line are stripped.
+     * Trailing spaces are not stripped.&lt;/p&gt;
+     * 
+     * &lt;pre&gt;
+     * WordUtils.wrap(null, *, *, *) = null
+     * WordUtils.wrap(&quot;&quot;, *, *, *) = &quot;&quot;
+     * &lt;/pre&gt;
+     *
+     * @param str  the String to be word wrapped, may be null
+     * @param wrapLength  the column to wrap the words at, less than 1 is treated as 1
+     * @param newLineStr  the string to insert for a new line, 
+     *  &lt;code&gt;null&lt;/code&gt; uses the system property line separator
+     * @param wrapLongWords  true if long words (such as URLs) should be wrapped
+     * @return a line with newlines inserted, &lt;code&gt;null&lt;/code&gt; if null input
+     */
+    public static String wrap(String str, int wrapLength, String newLineStr, boolean wrapLongWords) {
+<span class="fc bfc" id="L164" title="All 2 branches covered.">        if (str == null) {</span>
+<span class="fc" id="L165">            return null;</span>
+        }
+<span class="fc bfc" id="L167" title="All 2 branches covered.">        if (newLineStr == null) {</span>
+<span class="fc" id="L168">            newLineStr = SystemUtils.LINE_SEPARATOR;</span>
+        }
+<span class="fc bfc" id="L170" title="All 2 branches covered.">        if (wrapLength &lt; 1) {</span>
+<span class="fc" id="L171">            wrapLength = 1;</span>
+        }
+<span class="fc" id="L173">        int inputLineLength = str.length();</span>
+<span class="fc" id="L174">        int offset = 0;</span>
+<span class="fc" id="L175">        StringBuilder wrappedLine = new StringBuilder(inputLineLength + 32);</span>
+        
+<span class="fc bfc" id="L177" title="All 2 branches covered.">        while ((inputLineLength - offset) &gt; wrapLength) {</span>
+<span class="fc bfc" id="L178" title="All 2 branches covered.">            if (str.charAt(offset) == ' ') {</span>
+<span class="fc" id="L179">                offset++;</span>
+<span class="fc" id="L180">                continue;</span>
+            }
+<span class="fc" id="L182">            int spaceToWrapAt = str.lastIndexOf(' ', wrapLength + offset);</span>
+
+<span class="fc bfc" id="L184" title="All 2 branches covered.">            if (spaceToWrapAt &gt;= offset) {</span>
+                // normal case
+<span class="fc" id="L186">                wrappedLine.append(str.substring(offset, spaceToWrapAt));</span>
+<span class="fc" id="L187">                wrappedLine.append(newLineStr);</span>
+<span class="fc" id="L188">                offset = spaceToWrapAt + 1;</span>
+                
+            } else {
+                // really long word or URL
+<span class="fc bfc" id="L192" title="All 2 branches covered.">                if (wrapLongWords) {</span>
+                    // wrap really long word one line at a time
+<span class="fc" id="L194">                    wrappedLine.append(str.substring(offset, wrapLength + offset));</span>
+<span class="fc" id="L195">                    wrappedLine.append(newLineStr);</span>
+<span class="fc" id="L196">                    offset += wrapLength;</span>
+                } else {
+                    // do not wrap really long word, just extend beyond limit
+<span class="fc" id="L199">                    spaceToWrapAt = str.indexOf(' ', wrapLength + offset);</span>
+<span class="fc bfc" id="L200" title="All 2 branches covered.">                    if (spaceToWrapAt &gt;= 0) {</span>
+<span class="fc" id="L201">                        wrappedLine.append(str.substring(offset, spaceToWrapAt));</span>
+<span class="fc" id="L202">                        wrappedLine.append(newLineStr);</span>
+<span class="fc" id="L203">                        offset = spaceToWrapAt + 1;</span>
+                    } else {
+<span class="fc" id="L205">                        wrappedLine.append(str.substring(offset));</span>
+<span class="fc" id="L206">                        offset = inputLineLength;</span>
+                    }
+                }
+            }
+<span class="fc" id="L210">        }</span>
+
+        // Whatever is left in line is short enough to just pass through
+<span class="fc" id="L213">        wrappedLine.append(str.substring(offset));</span>
+
+<span class="fc" id="L215">        return wrappedLine.toString();</span>
+    }
+
+    // Capitalizing
+    //-----------------------------------------------------------------------
+    /**
+     * &lt;p&gt;Capitalizes all the whitespace separated words in a String.
+     * Only the first letter of each word is changed. To convert the 
+     * rest of each word to lowercase at the same time, 
+     * use {@link #capitalizeFully(String)}.&lt;/p&gt;
+     *
+     * &lt;p&gt;Whitespace is defined by {@link Character#isWhitespace(char)}.
+     * A &lt;code&gt;null&lt;/code&gt; input String returns &lt;code&gt;null&lt;/code&gt;.
+     * Capitalization uses the unicode title case, normally equivalent to
+     * upper case.&lt;/p&gt;
+     *
+     * &lt;pre&gt;
+     * WordUtils.capitalize(null)        = null
+     * WordUtils.capitalize(&quot;&quot;)          = &quot;&quot;
+     * WordUtils.capitalize(&quot;i am FINE&quot;) = &quot;I Am FINE&quot;
+     * &lt;/pre&gt;
+     * 
+     * @param str  the String to capitalize, may be null
+     * @return capitalized String, &lt;code&gt;null&lt;/code&gt; if null String input
+     * @see #uncapitalize(String)
+     * @see #capitalizeFully(String)
+     */
+    public static String capitalize(String str) {
+<span class="fc" id="L243">        return capitalize(str, null);</span>
+    }
+
+    /**
+     * &lt;p&gt;Capitalizes all the delimiter separated words in a String.
+     * Only the first letter of each word is changed. To convert the 
+     * rest of each word to lowercase at the same time, 
+     * use {@link #capitalizeFully(String, char[])}.&lt;/p&gt;
+     *
+     * &lt;p&gt;The delimiters represent a set of characters understood to separate words.
+     * The first string character and the first non-delimiter character after a
+     * delimiter will be capitalized. &lt;/p&gt;
+     *
+     * &lt;p&gt;A &lt;code&gt;null&lt;/code&gt; input String returns &lt;code&gt;null&lt;/code&gt;.
+     * Capitalization uses the unicode title case, normally equivalent to
+     * upper case.&lt;/p&gt;
+     *
+     * &lt;pre&gt;
+     * WordUtils.capitalize(null, *)            = null
+     * WordUtils.capitalize(&quot;&quot;, *)              = &quot;&quot;
+     * WordUtils.capitalize(*, new char[0])     = *
+     * WordUtils.capitalize(&quot;i am fine&quot;, null)  = &quot;I Am Fine&quot;
+     * WordUtils.capitalize(&quot;i aM.fine&quot;, {'.'}) = &quot;I aM.Fine&quot;
+     * &lt;/pre&gt;
+     * 
+     * @param str  the String to capitalize, may be null
+     * @param delimiters  set of characters to determine capitalization, null means whitespace
+     * @return capitalized String, &lt;code&gt;null&lt;/code&gt; if null String input
+     * @see #uncapitalize(String)
+     * @see #capitalizeFully(String)
+     * @since 2.1
+     */
+    public static String capitalize(String str, char[] delimiters) {
+<span class="fc bfc" id="L276" title="All 2 branches covered.">        int delimLen = (delimiters == null ? -1 : delimiters.length);</span>
+<span class="fc bfc" id="L277" title="All 6 branches covered.">        if (str == null || str.length() == 0 || delimLen == 0) {</span>
+<span class="fc" id="L278">            return str;</span>
+        }
+<span class="fc" id="L280">        int strLen = str.length();</span>
+<span class="fc" id="L281">        StringBuilder buffer = new StringBuilder(strLen);</span>
+<span class="fc" id="L282">        boolean capitalizeNext = true;</span>
+<span class="fc bfc" id="L283" title="All 2 branches covered.">        for (int i = 0; i &lt; strLen; i++) {</span>
+<span class="fc" id="L284">            char ch = str.charAt(i);</span>
+
+<span class="fc bfc" id="L286" title="All 2 branches covered.">            if (isDelimiter(ch, delimiters)) {</span>
+<span class="fc" id="L287">                buffer.append(ch);</span>
+<span class="fc" id="L288">                capitalizeNext = true;</span>
+<span class="fc bfc" id="L289" title="All 2 branches covered.">            } else if (capitalizeNext) {</span>
+<span class="fc" id="L290">                buffer.append(Character.toTitleCase(ch));</span>
+<span class="fc" id="L291">                capitalizeNext = false;</span>
+            } else {
+<span class="fc" id="L293">                buffer.append(ch);</span>
+            }
+        }
+<span class="fc" id="L296">        return buffer.toString();</span>
+    }
+
+    //-----------------------------------------------------------------------
+    /**
+     * &lt;p&gt;Converts all the whitespace separated words in a String into capitalized words, 
+     * that is each word is made up of a titlecase character and then a series of 
+     * lowercase characters.  &lt;/p&gt;
+     *
+     * &lt;p&gt;Whitespace is defined by {@link Character#isWhitespace(char)}.
+     * A &lt;code&gt;null&lt;/code&gt; input String returns &lt;code&gt;null&lt;/code&gt;.
+     * Capitalization uses the unicode title case, normally equivalent to
+     * upper case.&lt;/p&gt;
+     *
+     * &lt;pre&gt;
+     * WordUtils.capitalizeFully(null)        = null
+     * WordUtils.capitalizeFully(&quot;&quot;)          = &quot;&quot;
+     * WordUtils.capitalizeFully(&quot;i am FINE&quot;) = &quot;I Am Fine&quot;
+     * &lt;/pre&gt;
+     * 
+     * @param str  the String to capitalize, may be null
+     * @return capitalized String, &lt;code&gt;null&lt;/code&gt; if null String input
+     */
+    public static String capitalizeFully(String str) {
+<span class="fc" id="L320">        return capitalizeFully(str, null);</span>
+    }
+
+    /**
+     * &lt;p&gt;Converts all the delimiter separated words in a String into capitalized words, 
+     * that is each word is made up of a titlecase character and then a series of 
+     * lowercase characters. &lt;/p&gt;
+     *
+     * &lt;p&gt;The delimiters represent a set of characters understood to separate words.
+     * The first string character and the first non-delimiter character after a
+     * delimiter will be capitalized. &lt;/p&gt;
+     *
+     * &lt;p&gt;A &lt;code&gt;null&lt;/code&gt; input String returns &lt;code&gt;null&lt;/code&gt;.
+     * Capitalization uses the unicode title case, normally equivalent to
+     * upper case.&lt;/p&gt;
+     *
+     * &lt;pre&gt;
+     * WordUtils.capitalizeFully(null, *)            = null
+     * WordUtils.capitalizeFully(&quot;&quot;, *)              = &quot;&quot;
+     * WordUtils.capitalizeFully(*, null)            = *
+     * WordUtils.capitalizeFully(*, new char[0])     = *
+     * WordUtils.capitalizeFully(&quot;i aM.fine&quot;, {'.'}) = &quot;I am.Fine&quot;
+     * &lt;/pre&gt;
+     * 
+     * @param str  the String to capitalize, may be null
+     * @param delimiters  set of characters to determine capitalization, null means whitespace
+     * @return capitalized String, &lt;code&gt;null&lt;/code&gt; if null String input
+     * @since 2.1
+     */
+    public static String capitalizeFully(String str, char[] delimiters) {
+<span class="fc bfc" id="L350" title="All 2 branches covered.">        int delimLen = (delimiters == null ? -1 : delimiters.length);</span>
+<span class="fc bfc" id="L351" title="All 6 branches covered.">        if (str == null || str.length() == 0 || delimLen == 0) {</span>
+<span class="fc" id="L352">            return str;</span>
+        }
+<span class="fc" id="L354">        str = str.toLowerCase();</span>
+<span class="fc" id="L355">        return capitalize(str, delimiters);</span>
+    }
+
+    //-----------------------------------------------------------------------
+    /**
+     * &lt;p&gt;Uncapitalizes all the whitespace separated words in a String.
+     * Only the first letter of each word is changed.&lt;/p&gt;
+     *
+     * &lt;p&gt;Whitespace is defined by {@link Character#isWhitespace(char)}.
+     * A &lt;code&gt;null&lt;/code&gt; input String returns &lt;code&gt;null&lt;/code&gt;.&lt;/p&gt;
+     *
+     * &lt;pre&gt;
+     * WordUtils.uncapitalize(null)        = null
+     * WordUtils.uncapitalize(&quot;&quot;)          = &quot;&quot;
+     * WordUtils.uncapitalize(&quot;I Am FINE&quot;) = &quot;i am fINE&quot;
+     * &lt;/pre&gt;
+     * 
+     * @param str  the String to uncapitalize, may be null
+     * @return uncapitalized String, &lt;code&gt;null&lt;/code&gt; if null String input
+     * @see #capitalize(String)
+     */
+    public static String uncapitalize(String str) {
+<span class="fc" id="L377">        return uncapitalize(str, null);</span>
+    }
+
+    /**
+     * &lt;p&gt;Uncapitalizes all the whitespace separated words in a String.
+     * Only the first letter of each word is changed.&lt;/p&gt;
+     *
+     * &lt;p&gt;The delimiters represent a set of characters understood to separate words.
+     * The first string character and the first non-delimiter character after a
+     * delimiter will be uncapitalized. &lt;/p&gt;
+     *
+     * &lt;p&gt;Whitespace is defined by {@link Character#isWhitespace(char)}.
+     * A &lt;code&gt;null&lt;/code&gt; input String returns &lt;code&gt;null&lt;/code&gt;.&lt;/p&gt;
+     *
+     * &lt;pre&gt;
+     * WordUtils.uncapitalize(null, *)            = null
+     * WordUtils.uncapitalize(&quot;&quot;, *)              = &quot;&quot;
+     * WordUtils.uncapitalize(*, null)            = *
+     * WordUtils.uncapitalize(*, new char[0])     = *
+     * WordUtils.uncapitalize(&quot;I AM.FINE&quot;, {'.'}) = &quot;i AM.fINE&quot;
+     * &lt;/pre&gt;
+     * 
+     * @param str  the String to uncapitalize, may be null
+     * @param delimiters  set of characters to determine uncapitalization, null means whitespace
+     * @return uncapitalized String, &lt;code&gt;null&lt;/code&gt; if null String input
+     * @see #capitalize(String)
+     * @since 2.1
+     */
+    public static String uncapitalize(String str, char[] delimiters) {
+<span class="fc bfc" id="L406" title="All 2 branches covered.">        int delimLen = (delimiters == null ? -1 : delimiters.length);</span>
+<span class="fc bfc" id="L407" title="All 6 branches covered.">        if (str == null || str.length() == 0 || delimLen == 0) {</span>
+<span class="fc" id="L408">            return str;</span>
+        }
+<span class="fc" id="L410">        int strLen = str.length();</span>
+<span class="fc" id="L411">        StringBuilder buffer = new StringBuilder(strLen);</span>
+<span class="fc" id="L412">        boolean uncapitalizeNext = true;</span>
+<span class="fc bfc" id="L413" title="All 2 branches covered.">        for (int i = 0; i &lt; strLen; i++) {</span>
+<span class="fc" id="L414">            char ch = str.charAt(i);</span>
+
+<span class="fc bfc" id="L416" title="All 2 branches covered.">            if (isDelimiter(ch, delimiters)) {</span>
+<span class="fc" id="L417">                buffer.append(ch);</span>
+<span class="fc" id="L418">                uncapitalizeNext = true;</span>
+<span class="fc bfc" id="L419" title="All 2 branches covered.">            } else if (uncapitalizeNext) {</span>
+<span class="fc" id="L420">                buffer.append(Character.toLowerCase(ch));</span>
+<span class="fc" id="L421">                uncapitalizeNext = false;</span>
+            } else {
+<span class="fc" id="L423">                buffer.append(ch);</span>
+            }
+        }
+<span class="fc" id="L426">        return buffer.toString();</span>
+    }
+
+    //-----------------------------------------------------------------------
+    /**
+     * &lt;p&gt;Swaps the case of a String using a word based algorithm.&lt;/p&gt;
+     * 
+     * &lt;ul&gt;
+     *  &lt;li&gt;Upper case character converts to Lower case&lt;/li&gt;
+     *  &lt;li&gt;Title case character converts to Lower case&lt;/li&gt;
+     *  &lt;li&gt;Lower case character after Whitespace or at start converts to Title case&lt;/li&gt;
+     *  &lt;li&gt;Other Lower case character converts to Upper case&lt;/li&gt;
+     * &lt;/ul&gt;
+     * 
+     * &lt;p&gt;Whitespace is defined by {@link Character#isWhitespace(char)}.
+     * A &lt;code&gt;null&lt;/code&gt; input String returns &lt;code&gt;null&lt;/code&gt;.&lt;/p&gt;
+     * 
+     * &lt;pre&gt;
+     * StringUtils.swapCase(null)                 = null
+     * StringUtils.swapCase(&quot;&quot;)                   = &quot;&quot;
+     * StringUtils.swapCase(&quot;The dog has a BONE&quot;) = &quot;tHE DOG HAS A bone&quot;
+     * &lt;/pre&gt;
+     * 
+     * @param str  the String to swap case, may be null
+     * @return the changed String, &lt;code&gt;null&lt;/code&gt; if null String input
+     */
+    public static String swapCase(String str) {
+        int strLen;
+<span class="fc bfc" id="L454" title="All 4 branches covered.">        if (str == null || (strLen = str.length()) == 0) {</span>
+<span class="fc" id="L455">            return str;</span>
+        }
+<span class="fc" id="L457">        StringBuilder buffer = new StringBuilder(strLen);</span>
+
+<span class="fc" id="L459">        boolean whitespace = true;</span>
+<span class="fc" id="L460">        char ch = 0;</span>
+<span class="fc" id="L461">        char tmp = 0;</span>
+
+<span class="fc bfc" id="L463" title="All 2 branches covered.">        for (int i = 0; i &lt; strLen; i++) {</span>
+<span class="fc" id="L464">            ch = str.charAt(i);</span>
+<span class="fc bfc" id="L465" title="All 2 branches covered.">            if (Character.isUpperCase(ch)) {</span>
+<span class="fc" id="L466">                tmp = Character.toLowerCase(ch);</span>
+<span class="fc bfc" id="L467" title="All 2 branches covered.">            } else if (Character.isTitleCase(ch)) {</span>
+<span class="fc" id="L468">                tmp = Character.toLowerCase(ch);</span>
+<span class="fc bfc" id="L469" title="All 2 branches covered.">            } else if (Character.isLowerCase(ch)) {</span>
+<span class="fc bfc" id="L470" title="All 2 branches covered.">                if (whitespace) {</span>
+<span class="fc" id="L471">                    tmp = Character.toTitleCase(ch);</span>
+                } else {
+<span class="fc" id="L473">                    tmp = Character.toUpperCase(ch);</span>
+                }
+            } else {
+<span class="fc" id="L476">                tmp = ch;</span>
+            }
+<span class="fc" id="L478">            buffer.append(tmp);</span>
+<span class="fc" id="L479">            whitespace = Character.isWhitespace(ch);</span>
+        }
+<span class="fc" id="L481">        return buffer.toString();</span>
+    }
+
+    //-----------------------------------------------------------------------
+    /**
+     * &lt;p&gt;Extracts the initial letters from each word in the String.&lt;/p&gt;
+     * 
+     * &lt;p&gt;The first letter of the string and all first letters after
+     * whitespace are returned as a new string.
+     * Their case is not changed.&lt;/p&gt;
+     *
+     * &lt;p&gt;Whitespace is defined by {@link Character#isWhitespace(char)}.
+     * A &lt;code&gt;null&lt;/code&gt; input String returns &lt;code&gt;null&lt;/code&gt;.&lt;/p&gt;
+     *
+     * &lt;pre&gt;
+     * WordUtils.initials(null)             = null
+     * WordUtils.initials(&quot;&quot;)               = &quot;&quot;
+     * WordUtils.initials(&quot;Ben John Lee&quot;)   = &quot;BJL&quot;
+     * WordUtils.initials(&quot;Ben J.Lee&quot;)      = &quot;BJ&quot;
+     * &lt;/pre&gt;
+     *
+     * @param str  the String to get initials from, may be null
+     * @return String of initial letters, &lt;code&gt;null&lt;/code&gt; if null String input
+     * @see #initials(String,char[])
+     * @since 2.2
+     */
+    public static String initials(String str) {
+<span class="fc" id="L508">        return initials(str, null);</span>
+    }
+
+    /**
+     * &lt;p&gt;Extracts the initial letters from each word in the String.&lt;/p&gt;
+     * 
+     * &lt;p&gt;The first letter of the string and all first letters after the
+     * defined delimiters are returned as a new string.
+     * Their case is not changed.&lt;/p&gt;
+     *
+     * &lt;p&gt;If the delimiters array is null, then Whitespace is used.
+     * Whitespace is defined by {@link Character#isWhitespace(char)}.
+     * A &lt;code&gt;null&lt;/code&gt; input String returns &lt;code&gt;null&lt;/code&gt;.
+     * An empty delimiter array returns an empty String.&lt;/p&gt;
+     *
+     * &lt;pre&gt;
+     * WordUtils.initials(null, *)                = null
+     * WordUtils.initials(&quot;&quot;, *)                  = &quot;&quot;
+     * WordUtils.initials(&quot;Ben John Lee&quot;, null)   = &quot;BJL&quot;
+     * WordUtils.initials(&quot;Ben J.Lee&quot;, null)      = &quot;BJ&quot;
+     * WordUtils.initials(&quot;Ben J.Lee&quot;, [' ','.']) = &quot;BJL&quot;
+     * WordUtils.initials(*, new char[0])         = &quot;&quot;
+     * &lt;/pre&gt;
+     * 
+     * @param str  the String to get initials from, may be null
+     * @param delimiters  set of characters to determine words, null means whitespace
+     * @return String of initial letters, &lt;code&gt;null&lt;/code&gt; if null String input
+     * @see #initials(String)
+     * @since 2.2
+     */
+    public static String initials(String str, char[] delimiters) {
+<span class="fc bfc" id="L539" title="All 4 branches covered.">        if (str == null || str.length() == 0) {</span>
+<span class="fc" id="L540">            return str;</span>
+        }
+<span class="fc bfc" id="L542" title="All 4 branches covered.">        if (delimiters != null &amp;&amp; delimiters.length == 0) {</span>
+<span class="fc" id="L543">            return &quot;&quot;;</span>
+        }
+<span class="fc" id="L545">        int strLen = str.length();</span>
+<span class="fc" id="L546">        char[] buf = new char[strLen / 2 + 1];</span>
+<span class="fc" id="L547">        int count = 0;</span>
+<span class="fc" id="L548">        boolean lastWasGap = true;</span>
+<span class="fc bfc" id="L549" title="All 2 branches covered.">        for (int i = 0; i &lt; strLen; i++) {</span>
+<span class="fc" id="L550">            char ch = str.charAt(i);</span>
+
+<span class="fc bfc" id="L552" title="All 2 branches covered.">            if (isDelimiter(ch, delimiters)) {</span>
+<span class="fc" id="L553">                lastWasGap = true;</span>
+<span class="fc bfc" id="L554" title="All 2 branches covered.">            } else if (lastWasGap) {</span>
+<span class="fc" id="L555">                buf[count++] = ch;</span>
+<span class="fc" id="L556">                lastWasGap = false;</span>
+            } else {
+                // ignore ch
+            }
+        }
+<span class="fc" id="L561">        return new String(buf, 0, count);</span>
+    }
+
+    //-----------------------------------------------------------------------
+    /**
+     * Is the character a delimiter.
+     *
+     * @param ch  the character to check
+     * @param delimiters  the delimiters
+     * @return true if it is a delimiter
+     */
+    private static boolean isDelimiter(char ch, char[] delimiters) {
+<span class="fc bfc" id="L573" title="All 2 branches covered.">        if (delimiters == null) {</span>
+<span class="fc" id="L574">            return Character.isWhitespace(ch);</span>
+        }
+<span class="fc bfc" id="L576" title="All 2 branches covered.">        for (int i = 0, isize = delimiters.length; i &lt; isize; i++) {</span>
+<span class="fc bfc" id="L577" title="All 2 branches covered.">            if (ch == delimiters[i]) {</span>
+<span class="fc" id="L578">                return true;</span>
+            }
+        }
+<span class="fc" id="L581">        return false;</span>
+    }
+
+    //-----------------------------------------------------------------------
+    /**
+     * Abbreviates a string nicely.
+     * 
+     * This method searches for the first space after the lower limit and abbreviates
+     * the String there. It will also append any String passed as a parameter
+     * to the end of the String. The upper limit can be specified to forcibly
+     * abbreviate a String.
+     * 
+     * @param str         the string to be abbreviated. If null is passed, null is returned.
+     *                    If the empty String is passed, the empty string is returned.
+     * @param lower       the lower limit.
+     * @param upper       the upper limit; specify -1 if no limit is desired.
+     *                    If the upper limit is lower than the lower limit, it will be
+     *                    adjusted to be the same as the lower limit.
+     * @param appendToEnd String to be appended to the end of the abbreviated string.
+     *                    This is appended ONLY if the string was indeed abbreviated.
+     *                    The append does not count towards the lower or upper limits.
+     * @return the abbreviated String.
+     * @since 2.4
+     */
+    public static String abbreviate(String str, int lower, int upper, String appendToEnd) {
+        // initial parameter checks
+<span class="fc bfc" id="L607" title="All 2 branches covered.">        if (str == null) {</span>
+<span class="fc" id="L608">            return null;</span>
+        }
+<span class="fc bfc" id="L610" title="All 2 branches covered.">        if (str.length() == 0) {</span>
+<span class="fc" id="L611">            return StringUtils.EMPTY;</span>
+        }
+
+        // if the lower value is greater than the length of the string,
+        // set to the length of the string
+<span class="fc bfc" id="L616" title="All 2 branches covered.">        if (lower &gt; str.length()) {</span>
+<span class="fc" id="L617">            lower = str.length();    </span>
+        }
+        // if the upper value is -1 (i.e. no limit) or is greater
+        // than the length of the string, set to the length of the string
+<span class="fc bfc" id="L621" title="All 4 branches covered.">        if (upper == -1 || upper &gt; str.length()) {</span>
+<span class="fc" id="L622">            upper = str.length();</span>
+        }
+        // if upper is less than lower, raise it to lower
+<span class="fc bfc" id="L625" title="All 2 branches covered.">        if (upper &lt; lower) {</span>
+<span class="fc" id="L626">            upper = lower;</span>
+        }
+
+<span class="fc" id="L629">        StringBuilder result = new StringBuilder();</span>
+<span class="fc" id="L630">        int index = StringUtils.indexOf(str, &quot; &quot;, lower);</span>
+<span class="fc bfc" id="L631" title="All 2 branches covered.">        if (index == -1) {</span>
+<span class="fc" id="L632">            result.append(str.substring(0, upper));</span>
+            // only if abbreviation has occured do we append the appendToEnd value
+<span class="fc bfc" id="L634" title="All 2 branches covered.">            if (upper != str.length()) {</span>
+<span class="fc" id="L635">                result.append(StringUtils.defaultString(appendToEnd));</span>
+            }
+<span class="fc bfc" id="L637" title="All 2 branches covered.">        } else if (index &gt; upper) {</span>
+<span class="fc" id="L638">            result.append(str.substring(0, upper));</span>
+<span class="fc" id="L639">            result.append(StringUtils.defaultString(appendToEnd));</span>
+        } else {
+<span class="fc" id="L641">            result.append(str.substring(0, index));</span>
+<span class="fc" id="L642">            result.append(StringUtils.defaultString(appendToEnd));</span>
+        }
+<span class="fc" id="L644">        return result.toString();</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

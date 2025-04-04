@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MullerSolver2.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Commons Math</a> &gt; <a href="index.source.html" class="el_package">org.apache.commons.math.analysis.solvers</a> &gt; <span class="el_source">MullerSolver2.java</span></div><h1>MullerSolver2.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.commons.math.analysis.solvers;
+
+import org.apache.commons.math.exception.NoBracketingException;
+import org.apache.commons.math.util.FastMath;
+
+/**
+ * This class implements the &lt;a href=&quot;http://mathworld.wolfram.com/MullersMethod.html&quot;&gt;
+ * Muller's Method&lt;/a&gt; for root finding of real univariate functions. For
+ * reference, see &lt;b&gt;Elementary Numerical Analysis&lt;/b&gt;, ISBN 0070124477,
+ * chapter 3.
+ * &lt;p&gt;
+ * Muller's method applies to both real and complex functions, but here we
+ * restrict ourselves to real functions.
+ * This class differs from {@link MullerSolver} in the way it avoids complex
+ * operations.&lt;/p&gt;
+ * Except for the initial [min, max], it does not require bracketing
+ * condition, e.g. f(x0), f(x1), f(x2) can have the same sign. If complex
+ * number arises in the computation, we simply use its modulus as real
+ * approximation.&lt;/p&gt;
+ * &lt;p&gt;
+ * Because the interval may not be bracketing, bisection alternative is
+ * not applicable here. However in practice our treatment usually works
+ * well, especially near real zeroes where the imaginary part of complex
+ * approximation is often negligible.&lt;/p&gt;
+ * &lt;p&gt;
+ * The formulas here do not use divided differences directly.&lt;/p&gt;
+ *
+ * @version $Id$
+ * @since 1.2
+ * @see MullerSolver
+ */
+public class MullerSolver2 extends AbstractUnivariateRealSolver {
+
+    /** Default absolute accuracy. */
+    private static final double DEFAULT_ABSOLUTE_ACCURACY = 1e-6;
+
+    /**
+     * Construct a solver with default accuracy (1e-6).
+     */
+    public MullerSolver2() {
+<span class="fc" id="L57">        this(DEFAULT_ABSOLUTE_ACCURACY);</span>
+<span class="fc" id="L58">    }</span>
+    /**
+     * Construct a solver.
+     *
+     * @param absoluteAccuracy Absolute accuracy.
+     */
+    public MullerSolver2(double absoluteAccuracy) {
+<span class="fc" id="L65">        super(absoluteAccuracy);</span>
+<span class="fc" id="L66">    }</span>
+    /**
+     * Construct a solver.
+     *
+     * @param relativeAccuracy Relative accuracy.
+     * @param absoluteAccuracy Absolute accuracy.
+     */
+    public MullerSolver2(double relativeAccuracy,
+                        double absoluteAccuracy) {
+<span class="nc" id="L75">        super(relativeAccuracy, absoluteAccuracy);</span>
+<span class="nc" id="L76">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    protected double doSolve() {
+<span class="fc" id="L83">        final double min = getMin();</span>
+<span class="fc" id="L84">        final double max = getMax();</span>
+
+<span class="fc" id="L86">        verifyInterval(min, max);</span>
+
+<span class="fc" id="L88">        final double relativeAccuracy = getRelativeAccuracy();</span>
+<span class="fc" id="L89">        final double absoluteAccuracy = getAbsoluteAccuracy();</span>
+<span class="fc" id="L90">        final double functionValueAccuracy = getFunctionValueAccuracy();</span>
+
+        // x2 is the last root approximation
+        // x is the new approximation and new x2 for next round
+        // x0 &lt; x1 &lt; x2 does not hold here
+
+<span class="fc" id="L96">        double x0 = min;</span>
+<span class="fc" id="L97">        double y0 = computeObjectiveValue(x0);</span>
+<span class="pc bpc" id="L98" title="1 of 2 branches missed.">        if (FastMath.abs(y0) &lt; functionValueAccuracy) {</span>
+<span class="nc" id="L99">            return x0;</span>
+        }
+<span class="fc" id="L101">        double x1 = max;</span>
+<span class="fc" id="L102">        double y1 = computeObjectiveValue(x1);</span>
+<span class="pc bpc" id="L103" title="1 of 2 branches missed.">        if (FastMath.abs(y1) &lt; functionValueAccuracy) {</span>
+<span class="nc" id="L104">            return x1;</span>
+        }
+
+<span class="fc bfc" id="L107" title="All 2 branches covered.">        if(y0 * y1 &gt; 0) {</span>
+<span class="fc" id="L108">            throw new NoBracketingException(x0, x1, y0, y1);</span>
+        }
+
+<span class="fc" id="L111">        double x2 = 0.5 * (x0 + x1);</span>
+<span class="fc" id="L112">        double y2 = computeObjectiveValue(x2);</span>
+
+<span class="fc" id="L114">        double oldx = Double.POSITIVE_INFINITY;</span>
+        while (true) {
+            // quadratic interpolation through x0, x1, x2
+<span class="fc" id="L117">            final double q = (x2 - x1) / (x1 - x0);</span>
+<span class="fc" id="L118">            final double a = q * (y2 - (1 + q) * y1 + q * y0);</span>
+<span class="fc" id="L119">            final double b = (2 * q + 1) * y2 - (1 + q) * (1 + q) * y1 + q * q * y0;</span>
+<span class="fc" id="L120">            final double c = (1 + q) * y2;</span>
+<span class="fc" id="L121">            final double delta = b * b - 4 * a * c;</span>
+            double x;
+            final double denominator;
+<span class="fc bfc" id="L124" title="All 2 branches covered.">            if (delta &gt;= 0.0) {</span>
+                // choose a denominator larger in magnitude
+<span class="fc" id="L126">                double dplus = b + FastMath.sqrt(delta);</span>
+<span class="fc" id="L127">                double dminus = b - FastMath.sqrt(delta);</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">                denominator = FastMath.abs(dplus) &gt; FastMath.abs(dminus) ? dplus : dminus;</span>
+<span class="fc" id="L129">            } else {</span>
+                // take the modulus of (B +/- FastMath.sqrt(delta))
+<span class="fc" id="L131">                denominator = FastMath.sqrt(b * b - delta);</span>
+            }
+<span class="pc bpc" id="L133" title="1 of 2 branches missed.">            if (denominator != 0) {</span>
+<span class="fc" id="L134">                x = x2 - 2.0 * c * (x2 - x1) / denominator;</span>
+                // perturb x if it exactly coincides with x1 or x2
+                // the equality tests here are intentional
+<span class="pc bpc" id="L137" title="1 of 4 branches missed.">                while (x == x1 || x == x2) {</span>
+<span class="fc" id="L138">                    x += absoluteAccuracy;</span>
+                }
+            } else {
+                // extremely rare case, get a random number to skip it
+<span class="nc" id="L142">                x = min + FastMath.random() * (max - min);</span>
+<span class="nc" id="L143">                oldx = Double.POSITIVE_INFINITY;</span>
+            }
+<span class="fc" id="L145">            final double y = computeObjectiveValue(x);</span>
+
+            // check for convergence
+<span class="fc" id="L148">            final double tolerance = FastMath.max(relativeAccuracy * FastMath.abs(x), absoluteAccuracy);</span>
+<span class="fc bfc" id="L149" title="All 2 branches covered.">            if (FastMath.abs(x - oldx) &lt;= tolerance ||</span>
+<span class="pc bpc" id="L150" title="1 of 2 branches missed.">                FastMath.abs(y) &lt;= functionValueAccuracy) {</span>
+<span class="fc" id="L151">                return x;</span>
+            }
+
+            // prepare the next iteration
+<span class="fc" id="L155">            x0 = x1;</span>
+<span class="fc" id="L156">            y0 = y1;</span>
+<span class="fc" id="L157">            x1 = x2;</span>
+<span class="fc" id="L158">            y1 = y2;</span>
+<span class="fc" id="L159">            x2 = x;</span>
+<span class="fc" id="L160">            y2 = y;</span>
+<span class="fc" id="L161">            oldx = x;</span>
+<span class="fc" id="L162">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

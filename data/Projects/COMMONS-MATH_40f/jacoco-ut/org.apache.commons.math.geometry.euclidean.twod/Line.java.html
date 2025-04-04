@@ -1,0 +1,415 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Line.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Commons Math</a> &gt; <a href="index.source.html" class="el_package">org.apache.commons.math.geometry.euclidean.twod</a> &gt; <span class="el_source">Line.java</span></div><h1>Line.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.commons.math.geometry.euclidean.twod;
+
+import java.awt.geom.AffineTransform;
+
+import org.apache.commons.math.exception.MathIllegalArgumentException;
+import org.apache.commons.math.exception.util.LocalizedFormats;
+import org.apache.commons.math.geometry.Vector;
+import org.apache.commons.math.geometry.euclidean.oned.Euclidean1D;
+import org.apache.commons.math.geometry.euclidean.oned.IntervalsSet;
+import org.apache.commons.math.geometry.euclidean.oned.OrientedPoint;
+import org.apache.commons.math.geometry.euclidean.oned.Vector1D;
+import org.apache.commons.math.geometry.partitioning.Embedding;
+import org.apache.commons.math.geometry.partitioning.Hyperplane;
+import org.apache.commons.math.geometry.partitioning.SubHyperplane;
+import org.apache.commons.math.geometry.partitioning.Transform;
+import org.apache.commons.math.util.FastMath;
+import org.apache.commons.math.util.MathUtils;
+
+/** This class represents an oriented line in the 2D plane.
+
+ * &lt;p&gt;An oriented line can be defined either by prolongating a line
+ * segment between two points past these points, or by one point and
+ * an angular direction (in trigonometric orientation).&lt;/p&gt;
+
+ * &lt;p&gt;Since it is oriented the two half planes at its two sides are
+ * unambiguously identified as a left half plane and a right half
+ * plane. This can be used to identify the interior and the exterior
+ * in a simple way by local properties only when part of a line is
+ * used to define part of a polygon boundary.&lt;/p&gt;
+
+ * &lt;p&gt;A line can also be used to completely define a reference frame
+ * in the plane. It is sufficient to select one specific point in the
+ * line (the orthogonal projection of the original reference frame on
+ * the line) and to use the unit vector in the line direction and the
+ * orthogonal vector oriented from left half plane to right half
+ * plane. We define two coordinates by the process, the
+ * &lt;em&gt;abscissa&lt;/em&gt; along the line, and the &lt;em&gt;offset&lt;/em&gt; across
+ * the line. All points of the plane are uniquely identified by these
+ * two coordinates. The line is the set of points at zero offset, the
+ * left half plane is the set of points with negative offsets and the
+ * right half plane is the set of points with positive offsets.&lt;/p&gt;
+
+ * @version $Id$
+ * @since 3.0
+ */
+public class Line implements Hyperplane&lt;Euclidean2D&gt;, Embedding&lt;Euclidean2D, Euclidean1D&gt; {
+
+    /** Angle with respect to the abscissa axis. */
+    private double angle;
+
+    /** Cosine of the line angle. */
+    private double cos;
+
+    /** Sine of the line angle. */
+    private double sin;
+
+    /** Offset of the frame origin. */
+    private double originOffset;
+
+    /** Build a line from two points.
+     * &lt;p&gt;The line is oriented from p1 to p2&lt;/p&gt;
+     * @param p1 first point
+     * @param p2 second point
+     */
+<span class="fc" id="L81">    public Line(final Vector2D p1, final Vector2D p2) {</span>
+<span class="fc" id="L82">        reset(p1, p2);</span>
+<span class="fc" id="L83">    }</span>
+
+    /** Build a line from a point and an angle.
+     * @param p point belonging to the line
+     * @param angle angle of the line with respect to abscissa axis
+     */
+<span class="fc" id="L89">    public Line(final Vector2D p, final double angle) {</span>
+<span class="fc" id="L90">        reset(p, angle);</span>
+<span class="fc" id="L91">    }</span>
+
+    /** Build a line from its internal characteristics.
+     * @param angle angle of the line with respect to abscissa axis
+     * @param cos cosine of the angle
+     * @param sin sine of the angle
+     * @param originOffset offset of the origin
+     */
+<span class="fc" id="L99">    private Line(final double angle, final double cos, final double sin, final double originOffset) {</span>
+<span class="fc" id="L100">        this.angle        = angle;</span>
+<span class="fc" id="L101">        this.cos          = cos;</span>
+<span class="fc" id="L102">        this.sin          = sin;</span>
+<span class="fc" id="L103">        this.originOffset = originOffset;</span>
+<span class="fc" id="L104">    }</span>
+
+    /** Copy constructor.
+     * &lt;p&gt;The created instance is completely independent from the
+     * original instance, it is a deep copy.&lt;/p&gt;
+     * @param line line to copy
+     */
+<span class="fc" id="L111">    public Line(final Line line) {</span>
+<span class="fc" id="L112">        angle        = MathUtils.normalizeAngle(line.angle, FastMath.PI);</span>
+<span class="fc" id="L113">        cos          = FastMath.cos(angle);</span>
+<span class="fc" id="L114">        sin          = FastMath.sin(angle);</span>
+<span class="fc" id="L115">        originOffset = line.originOffset;</span>
+<span class="fc" id="L116">    }</span>
+
+    /** {@inheritDoc} */
+    public Line copySelf() {
+<span class="fc" id="L120">        return new Line(this);</span>
+    }
+
+    /** Reset the instance as if built from two points.
+     * &lt;p&gt;The line is oriented from p1 to p2&lt;/p&gt;
+     * @param p1 first point
+     * @param p2 second point
+     */
+    public void reset(final Vector2D p1, final Vector2D p2) {
+<span class="fc" id="L129">        final double dx = p2.getX() - p1.getX();</span>
+<span class="fc" id="L130">        final double dy = p2.getY() - p1.getY();</span>
+<span class="fc" id="L131">        final double d = FastMath.hypot(dx, dy);</span>
+<span class="pc bpc" id="L132" title="1 of 2 branches missed.">        if (d == 0.0) {</span>
+<span class="nc" id="L133">            angle        = 0.0;</span>
+<span class="nc" id="L134">            cos          = 1.0;</span>
+<span class="nc" id="L135">            sin          = 0.0;</span>
+<span class="nc" id="L136">            originOffset = p1.getY();</span>
+        } else {
+<span class="fc" id="L138">            angle        = FastMath.PI + FastMath.atan2(-dy, -dx);</span>
+<span class="fc" id="L139">            cos          = FastMath.cos(angle);</span>
+<span class="fc" id="L140">            sin          = FastMath.sin(angle);</span>
+<span class="fc" id="L141">            originOffset = (p2.getX() * p1.getY() - p1.getX() * p2.getY()) / d;</span>
+        }
+<span class="fc" id="L143">    }</span>
+
+    /** Reset the instance as if built from a line and an angle.
+     * @param p point belonging to the line
+     * @param alpha angle of the line with respect to abscissa axis
+     */
+    public void reset(final Vector2D p, final double alpha) {
+<span class="fc" id="L150">        this.angle   = MathUtils.normalizeAngle(alpha, FastMath.PI);</span>
+<span class="fc" id="L151">        cos          = FastMath.cos(this.angle);</span>
+<span class="fc" id="L152">        sin          = FastMath.sin(this.angle);</span>
+<span class="fc" id="L153">        originOffset = cos * p.getY() - sin * p.getX();</span>
+<span class="fc" id="L154">    }</span>
+
+    /** Revert the instance.
+     */
+    public void revertSelf() {
+<span class="nc bnc" id="L159" title="All 2 branches missed.">        if (angle &lt; FastMath.PI) {</span>
+<span class="nc" id="L160">            angle += FastMath.PI;</span>
+        } else {
+<span class="nc" id="L162">            angle -= FastMath.PI;</span>
+        }
+<span class="nc" id="L164">        cos          = -cos;</span>
+<span class="nc" id="L165">        sin          = -sin;</span>
+<span class="nc" id="L166">        originOffset = -originOffset;</span>
+<span class="nc" id="L167">    }</span>
+
+    /** Get the reverse of the instance.
+     * &lt;p&gt;Get a line with reversed orientation with respect to the
+     * instance. A new object is built, the instance is untouched.&lt;/p&gt;
+     * @return a new line, with orientation opposite to the instance orientation
+     */
+    public Line getReverse() {
+<span class="fc bfc" id="L175" title="All 2 branches covered.">        return new Line((angle &lt; FastMath.PI) ? (angle + FastMath.PI) : (angle - FastMath.PI),</span>
+                        -cos, -sin, -originOffset);
+    }
+
+    /** {@inheritDoc} */
+    public Vector1D toSubSpace(final Vector&lt;Euclidean2D&gt; point) {
+<span class="fc" id="L181">        Vector2D p2 = (Vector2D) point;</span>
+<span class="fc" id="L182">        return new Vector1D(cos * p2.getX() + sin * p2.getY());</span>
+    }
+
+    /** {@inheritDoc} */
+    public Vector2D toSpace(final Vector&lt;Euclidean1D&gt; point) {
+<span class="fc" id="L187">        final double abscissa = ((Vector1D) point).getX();</span>
+<span class="fc" id="L188">        return new Vector2D(abscissa * cos - originOffset * sin,</span>
+                            abscissa * sin + originOffset * cos);
+    }
+
+    /** Get the intersection point of the instance and another line.
+     * @param other other line
+     * @return intersection point of the instance and the other line
+     * or null if there are no intersection points
+     */
+    public Vector2D intersection(final Line other) {
+<span class="fc" id="L198">        final double d = sin * other.cos - other.sin * cos;</span>
+<span class="fc bfc" id="L199" title="All 2 branches covered.">        if (FastMath.abs(d) &lt; 1.0e-10) {</span>
+<span class="fc" id="L200">            return null;</span>
+        }
+<span class="fc" id="L202">        return new Vector2D((cos * other.originOffset - other.cos * originOffset) / d,</span>
+                            (sin * other.originOffset - other.sin * originOffset) / d);
+    }
+
+    /** {@inheritDoc} */
+    public SubLine wholeHyperplane() {
+<span class="fc" id="L208">        return new SubLine(this, new IntervalsSet());</span>
+    }
+
+    /** Build a region covering the whole space.
+     * @return a region containing the instance (really a {@link
+     * PolygonsSet PolygonsSet} instance)
+     */
+    public PolygonsSet wholeSpace() {
+<span class="nc" id="L216">        return new PolygonsSet();</span>
+    }
+
+    /** Get the offset (oriented distance) of a parallel line.
+     * &lt;p&gt;This method should be called only for parallel lines otherwise
+     * the result is not meaningful.&lt;/p&gt;
+     * &lt;p&gt;The offset is 0 if both lines are the same, it is
+     * positive if the line is on the right side of the instance and
+     * negative if it is on the left side, according to its natural
+     * orientation.&lt;/p&gt;
+     * @param line line to check
+     * @return offset of the line
+     */
+    public double getOffset(final Line line) {
+<span class="fc" id="L230">        return originOffset +</span>
+<span class="fc bfc" id="L231" title="All 2 branches covered.">               ((cos * line.cos + sin * line.sin &gt; 0) ? -line.originOffset : line.originOffset);</span>
+    }
+
+    /** {@inheritDoc} */
+    public double getOffset(final Vector&lt;Euclidean2D&gt; point) {
+<span class="fc" id="L236">        Vector2D p2 = (Vector2D) point;</span>
+<span class="fc" id="L237">        return sin * p2.getX() - cos * p2.getY() + originOffset;</span>
+    }
+
+    /** {@inheritDoc} */
+    public boolean sameOrientationAs(final Hyperplane&lt;Euclidean2D&gt; other) {
+<span class="fc" id="L242">        final Line otherL = (Line) other;</span>
+<span class="fc bfc" id="L243" title="All 2 branches covered.">        return (sin * otherL.sin + cos * otherL.cos) &gt;= 0.0;</span>
+    }
+
+    /** Get one point from the plane.
+     * @param abscissa desired abscissa for the point
+     * @param offset desired offset for the point
+     * @return one point in the plane, with given abscissa and offset
+     * relative to the line
+     */
+    public Vector2D getPointAt(final Vector1D abscissa, final double offset) {
+<span class="fc" id="L253">        final double x       = abscissa.getX();</span>
+<span class="fc" id="L254">        final double dOffset = offset - originOffset;</span>
+<span class="fc" id="L255">        return new Vector2D(x * cos + dOffset * sin, x * sin - dOffset * cos);</span>
+    }
+
+    /** Check if the line contains a point.
+     * @param p point to check
+     * @return true if p belongs to the line
+     */
+    public boolean contains(final Vector2D p) {
+<span class="fc bfc" id="L263" title="All 2 branches covered.">        return FastMath.abs(getOffset(p)) &lt; 1.0e-10;</span>
+    }
+
+    /** Check the instance is parallel to another line.
+     * @param line other line to check
+     * @return true if the instance is parallel to the other line
+     * (they can have either the same or opposite orientations)
+     */
+    public boolean isParallelTo(final Line line) {
+<span class="fc bfc" id="L272" title="All 2 branches covered.">        return FastMath.abs(sin * line.cos - cos * line.sin) &lt; 1.0e-10;</span>
+    }
+
+    /** Translate the line to force it passing by a point.
+     * @param p point by which the line should pass
+     */
+    public void translateToPoint(final Vector2D p) {
+<span class="nc" id="L279">        originOffset = cos * p.getY() - sin * p.getX();</span>
+<span class="nc" id="L280">    }</span>
+
+    /** Get the angle of the line.
+     * @return the angle of the line with respect to the abscissa axis
+     */
+    public double getAngle() {
+<span class="fc" id="L286">        return MathUtils.normalizeAngle(angle, FastMath.PI);</span>
+    }
+
+    /** Set the angle of the line.
+     * @param angle new angle of the line with respect to the abscissa axis
+     */
+    public void setAngle(final double angle) {
+<span class="nc" id="L293">        this.angle = MathUtils.normalizeAngle(angle, FastMath.PI);</span>
+<span class="nc" id="L294">        cos        = FastMath.cos(this.angle);</span>
+<span class="nc" id="L295">        sin        = FastMath.sin(this.angle);</span>
+<span class="nc" id="L296">    }</span>
+
+    /** Get the offset of the origin.
+     * @return the offset of the origin
+     */
+    public double getOriginOffset() {
+<span class="fc" id="L302">        return originOffset;</span>
+    }
+
+    /** Set the offset of the origin.
+     * @param offset offset of the origin
+     */
+    public void setOriginOffset(final double offset) {
+<span class="nc" id="L309">        originOffset = offset;</span>
+<span class="nc" id="L310">    }</span>
+
+    /** Get a {@link org.apache.commons.math.geometry.partitioning.Transform
+     * Transform} embedding an affine transform.
+     * @param transform affine transform to embed (must be inversible
+     * otherwise the {@link
+     * org.apache.commons.math.geometry.partitioning.Transform#apply(Hyperplane)
+     * apply(Hyperplane)} method would work only for some lines, and
+     * fail for other ones)
+     * @return a new transform that can be applied to either {@link
+     * Vector2D Vector2D}, {@link Line Line} or {@link
+     * org.apache.commons.math.geometry.partitioning.SubHyperplane
+     * SubHyperplane} instances
+     * @exception MathIllegalArgumentException if the transform is non invertible
+     */
+    public static Transform&lt;Euclidean2D, Euclidean1D&gt; getTransform(final AffineTransform transform)
+        throws MathIllegalArgumentException {
+<span class="fc" id="L327">        return new LineTransform(transform);</span>
+    }
+
+    /** Class embedding an affine transform.
+     * &lt;p&gt;This class is used in order to apply an affine transform to a
+     * line. Using a specific object allow to perform some computations
+     * on the transform only once even if the same transform is to be
+     * applied to a large number of lines (for example to a large
+     * polygon)./&lt;p&gt;
+     */
+    private static class LineTransform implements Transform&lt;Euclidean2D, Euclidean1D&gt; {
+
+        // CHECKSTYLE: stop JavadocVariable check
+        private double cXX;
+        private double cXY;
+        private double cX1;
+        private double cYX;
+        private double cYY;
+        private double cY1;
+
+        private double c1Y;
+        private double c1X;
+        private double c11;
+        // CHECKSTYLE: resume JavadocVariable check
+
+        /** Build an affine line transform from a n {@code AffineTransform}.
+         * @param transform transform to use (must be invertible otherwise
+         * the {@link LineTransform#apply(Hyperplane)} method would work
+         * only for some lines, and fail for other ones)
+         * @exception MathIllegalArgumentException if the transform is non invertible
+         */
+<span class="fc" id="L358">        public LineTransform(final AffineTransform transform) throws MathIllegalArgumentException {</span>
+
+<span class="fc" id="L360">            final double[] m = new double[6];</span>
+<span class="fc" id="L361">            transform.getMatrix(m);</span>
+<span class="fc" id="L362">            cXX = m[0];</span>
+<span class="fc" id="L363">            cXY = m[2];</span>
+<span class="fc" id="L364">            cX1 = m[4];</span>
+<span class="fc" id="L365">            cYX = m[1];</span>
+<span class="fc" id="L366">            cYY = m[3];</span>
+<span class="fc" id="L367">            cY1 = m[5];</span>
+
+<span class="fc" id="L369">            c1Y = cXY * cY1 - cYY * cX1;</span>
+<span class="fc" id="L370">            c1X = cXX * cY1 - cYX * cX1;</span>
+<span class="fc" id="L371">            c11 = cXX * cYY - cYX * cXY;</span>
+
+<span class="pc bpc" id="L373" title="1 of 2 branches missed.">            if (FastMath.abs(c11) &lt; 1.0e-20) {</span>
+<span class="nc" id="L374">                throw new MathIllegalArgumentException(LocalizedFormats.NON_INVERTIBLE_TRANSFORM);</span>
+            }
+
+<span class="fc" id="L377">        }</span>
+
+        /** {@inheritDoc} */
+        public Vector2D apply(final Vector&lt;Euclidean2D&gt; point) {
+<span class="fc" id="L381">            final Vector2D p2D = (Vector2D) point;</span>
+<span class="fc" id="L382">            final double  x   = p2D.getX();</span>
+<span class="fc" id="L383">            final double  y   = p2D.getY();</span>
+<span class="fc" id="L384">            return new Vector2D(cXX * x + cXY * y + cX1,</span>
+                               cYX * x + cYY * y + cY1);
+        }
+
+        /** {@inheritDoc} */
+        public Line apply(final Hyperplane&lt;Euclidean2D&gt; hyperplane) {
+<span class="fc" id="L390">            final Line   line    = (Line) hyperplane;</span>
+<span class="fc" id="L391">            final double rOffset = c1X * line.cos + c1Y * line.sin + c11 * line.originOffset;</span>
+<span class="fc" id="L392">            final double rCos    = cXX * line.cos + cXY * line.sin;</span>
+<span class="fc" id="L393">            final double rSin    = cYX * line.cos + cYY * line.sin;</span>
+<span class="fc" id="L394">            final double inv     = 1.0 / FastMath.sqrt(rSin * rSin + rCos * rCos);</span>
+<span class="fc" id="L395">            return new Line(FastMath.PI + FastMath.atan2(-rSin, -rCos),</span>
+                            inv * rCos, inv * rSin,
+                            inv * rOffset);
+        }
+
+        /** {@inheritDoc} */
+        public SubHyperplane&lt;Euclidean1D&gt; apply(final SubHyperplane&lt;Euclidean1D&gt; sub,
+                                                final Hyperplane&lt;Euclidean2D&gt; original,
+                                                final Hyperplane&lt;Euclidean2D&gt; transformed) {
+<span class="fc" id="L404">            final OrientedPoint op     = (OrientedPoint) sub.getHyperplane();</span>
+<span class="fc" id="L405">            final Line originalLine    = (Line) original;</span>
+<span class="fc" id="L406">            final Line transformedLine = (Line) transformed;</span>
+<span class="fc" id="L407">            final Vector1D newLoc =</span>
+<span class="fc" id="L408">                transformedLine.toSubSpace(apply(originalLine.toSpace(op.getLocation())));</span>
+<span class="fc" id="L409">            return new OrientedPoint(newLoc, op.isDirect()).wholeHyperplane();</span>
+        }
+
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

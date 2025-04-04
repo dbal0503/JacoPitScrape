@@ -1,0 +1,173 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SpearmansCorrelation.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Commons Math</a> &gt; <a href="index.source.html" class="el_package">org.apache.commons.math.stat.correlation</a> &gt; <span class="el_source">SpearmansCorrelation.java</span></div><h1>SpearmansCorrelation.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.commons.math.stat.correlation;
+
+import org.apache.commons.math.MathRuntimeException;
+import org.apache.commons.math.exception.util.LocalizedFormats;
+import org.apache.commons.math.linear.BlockRealMatrix;
+import org.apache.commons.math.linear.RealMatrix;
+import org.apache.commons.math.stat.ranking.NaturalRanking;
+import org.apache.commons.math.stat.ranking.RankingAlgorithm;
+
+/**
+ * &lt;p&gt;Spearman's rank correlation. This implementation performs a rank
+ * transformation on the input data and then computes {@link PearsonsCorrelation}
+ * on the ranked data.&lt;/p&gt;
+ *
+ * &lt;p&gt;By default, ranks are computed using {@link NaturalRanking} with default
+ * strategies for handling NaNs and ties in the data (NaNs maximal, ties averaged).
+ * The ranking algorithm can be set using a constructor argument.&lt;/p&gt;
+ *
+ * @since 2.0
+ * @version $Id$
+ */
+
+public class SpearmansCorrelation {
+
+    /** Input data */
+    private final RealMatrix data;
+
+    /** Ranking algorithm  */
+    private final RankingAlgorithm rankingAlgorithm;
+
+    /** Rank correlation */
+    private final PearsonsCorrelation rankCorrelation;
+
+    /**
+     * Create a SpearmansCorrelation with the given input data matrix
+     * and ranking algorithm.
+     *
+     * @param dataMatrix matrix of data with columns representing
+     * variables to correlate
+     * @param rankingAlgorithm ranking algorithm
+     */
+<span class="fc" id="L59">    public SpearmansCorrelation(final RealMatrix dataMatrix, final RankingAlgorithm rankingAlgorithm) {</span>
+<span class="fc" id="L60">        this.data = dataMatrix.copy();</span>
+<span class="fc" id="L61">        this.rankingAlgorithm = rankingAlgorithm;</span>
+<span class="fc" id="L62">        rankTransform(data);</span>
+<span class="fc" id="L63">        rankCorrelation = new PearsonsCorrelation(data);</span>
+<span class="fc" id="L64">    }</span>
+
+    /**
+     * Create a SpearmansCorrelation from the given data matrix.
+     *
+     * @param dataMatrix matrix of data with columns representing
+     * variables to correlate
+     */
+    public SpearmansCorrelation(final RealMatrix dataMatrix) {
+<span class="fc" id="L73">        this(dataMatrix, new NaturalRanking());</span>
+<span class="fc" id="L74">    }</span>
+
+    /**
+     * Create a SpearmansCorrelation without data.
+     */
+<span class="fc" id="L79">    public SpearmansCorrelation() {</span>
+<span class="fc" id="L80">        data = null;</span>
+<span class="fc" id="L81">        this.rankingAlgorithm = new NaturalRanking();</span>
+<span class="fc" id="L82">        rankCorrelation = null;</span>
+<span class="fc" id="L83">    }</span>
+
+    /**
+     * Calculate the Spearman Rank Correlation Matrix.
+     *
+     * @return Spearman Rank Correlation Matrix
+     */
+    public RealMatrix getCorrelationMatrix() {
+<span class="fc" id="L91">        return rankCorrelation.getCorrelationMatrix();</span>
+    }
+
+    /**
+     * Returns a {@link PearsonsCorrelation} instance constructed from the
+     * ranked input data. That is,
+     * &lt;code&gt;new SpearmansCorrelation(matrix).getRankCorrelation()&lt;/code&gt;
+     * is equivalent to
+     * &lt;code&gt;new PearsonsCorrelation(rankTransform(matrix))&lt;/code&gt; where
+     * &lt;code&gt;rankTransform(matrix)&lt;/code&gt; is the result of applying the
+     * configured &lt;code&gt;RankingAlgorithm&lt;/code&gt; to each of the columns of
+     * &lt;code&gt;matrix.&lt;/code&gt;
+     *
+     * @return PearsonsCorrelation among ranked column data
+     */
+    public PearsonsCorrelation getRankCorrelation() {
+<span class="nc" id="L107">        return rankCorrelation;</span>
+    }
+
+    /**
+     * Computes the Spearman's rank correlation matrix for the columns of the
+     * input matrix.
+     *
+     * @param matrix matrix with columns representing variables to correlate
+     * @return correlation matrix
+     */
+    public RealMatrix computeCorrelationMatrix(RealMatrix matrix) {
+<span class="fc" id="L118">        RealMatrix matrixCopy = matrix.copy();</span>
+<span class="fc" id="L119">        rankTransform(matrixCopy);</span>
+<span class="fc" id="L120">        return new PearsonsCorrelation().computeCorrelationMatrix(matrixCopy);</span>
+    }
+
+    /**
+     * Computes the Spearman's rank correlation matrix for the columns of the
+     * input rectangular array.  The columns of the array represent values
+     * of variables to be correlated.
+     *
+     * @param matrix matrix with columns representing variables to correlate
+     * @return correlation matrix
+     */
+    public RealMatrix computeCorrelationMatrix(double[][] matrix) {
+<span class="fc" id="L132">       return computeCorrelationMatrix(new BlockRealMatrix(matrix));</span>
+    }
+
+    /**
+     * Computes the Spearman's rank correlation coefficient between the two arrays.
+     *
+     * &lt;/p&gt;Throws IllegalArgumentException if the arrays do not have the same length
+     * or their common length is less than 2&lt;/p&gt;
+     *
+     * @param xArray first data array
+     * @param yArray second data array
+     * @return Returns Spearman's rank correlation coefficient for the two arrays
+     * @throws  IllegalArgumentException if the arrays lengths do not match or
+     * there is insufficient data
+     */
+    public double correlation(final double[] xArray, final double[] yArray)
+    throws IllegalArgumentException {
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">        if (xArray.length != yArray.length) {</span>
+<span class="nc" id="L150">            throw MathRuntimeException.createIllegalArgumentException(</span>
+<span class="nc" id="L151">                  LocalizedFormats.DIMENSIONS_MISMATCH_SIMPLE, xArray.length, yArray.length);</span>
+<span class="fc bfc" id="L152" title="All 2 branches covered.">        } else if (xArray.length &lt; 2) {</span>
+<span class="fc" id="L153">            throw MathRuntimeException.createIllegalArgumentException(</span>
+<span class="fc" id="L154">                  LocalizedFormats.INSUFFICIENT_DIMENSION, xArray.length, 2);</span>
+        } else {
+<span class="fc" id="L156">            return new PearsonsCorrelation().correlation(rankingAlgorithm.rank(xArray),</span>
+<span class="fc" id="L157">                    rankingAlgorithm.rank(yArray));</span>
+        }
+    }
+
+    /**
+     * Applies rank transform to each of the columns of &lt;code&gt;matrix&lt;/code&gt;
+     * using the current &lt;code&gt;rankingAlgorithm&lt;/code&gt;
+     *
+     * @param matrix matrix to transform
+     */
+    private void rankTransform(RealMatrix matrix) {
+<span class="fc bfc" id="L168" title="All 2 branches covered.">        for (int i = 0; i &lt; matrix.getColumnDimension(); i++) {</span>
+<span class="fc" id="L169">            matrix.setColumn(i, rankingAlgorithm.rank(matrix.getColumn(i)));</span>
+        }
+<span class="fc" id="L171">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

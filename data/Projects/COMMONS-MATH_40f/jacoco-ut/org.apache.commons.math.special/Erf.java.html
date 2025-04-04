@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Erf.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Commons Math</a> &gt; <a href="index.source.html" class="el_package">org.apache.commons.math.special</a> &gt; <span class="el_source">Erf.java</span></div><h1>Erf.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.commons.math.special;
+
+import org.apache.commons.math.util.FastMath;
+
+/**
+ * This is a utility class that provides computation methods related to the
+ * error functions.
+ *
+ * @version $Id$
+ */
+public class Erf {
+
+    /**
+     * The number {@code X_CRIT} is used by {@link #erf(double, double)} internally.
+     * This number solves {@code erf(x)=0.5} within 1ulp.
+     * More precisely, the current implementations of
+     * {@link #erf(double)} and {@link #erfc(double)} satisfy:&lt;br/&gt;
+     * {@code erf(X_CRIT) &lt; 0.5},&lt;br/&gt;
+     * {@code erf(Math.nextUp(X_CRIT) &gt; 0.5},&lt;br/&gt;
+     * {@code erfc(X_CRIT) = 0.5}, and&lt;br/&gt;
+     * {@code erfc(Math.nextUp(X_CRIT) &lt; 0.5}
+     */
+    private static final double X_CRIT = 0.4769362762044697;
+
+    /**
+     * Default constructor.  Prohibit instantiation.
+     */
+    private Erf() {}
+
+    /**
+     * Returns the error function.
+     *
+     * &lt;p&gt;erf(x) = 2/&amp;radic;&amp;pi; &lt;sub&gt;0&lt;/sub&gt;&amp;int;&lt;sup&gt;x&lt;/sup&gt; e&lt;sup&gt;-t&lt;sup&gt;2&lt;/sup&gt;&lt;/sup&gt;dt &lt;/p&gt;
+     *
+     * &lt;p&gt;This implementation computes erf(x) using the
+     * {@link Gamma#regularizedGammaP(double, double, double, int) regularized gamma function},
+     * following &lt;a href=&quot;http://mathworld.wolfram.com/Erf.html&quot;&gt; Erf&lt;/a&gt;, equation (3)&lt;/p&gt;
+     *
+     * &lt;p&gt;The value returned is always between -1 and 1 (inclusive).
+     * If {@code abs(x) &gt; 40}, then {@code erf(x)} is indistinguishable from
+     * either 1 or -1 as a double, so the appropriate extreme value is returned.
+     * &lt;/p&gt;
+     *
+     * @param x the value.
+     * @return the error function erf(x)
+     * @throws org.apache.commons.math.exception.MaxCountExceededException
+     * if the algorithm fails to converge.
+     * @see Gamma#regularizedGammaP(double, double, double, int)
+     */
+    public static double erf(double x) {
+<span class="fc bfc" id="L67" title="All 2 branches covered.">        if (FastMath.abs(x) &gt; 40) {</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">            return x &gt; 0 ? 1 : -1;</span>
+        }
+<span class="fc" id="L70">        final double ret = Gamma.regularizedGammaP(0.5, x * x, 1.0e-15, 10000);</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">        return x &lt; 0 ? -ret : ret;</span>
+    }
+
+    /**
+     * Returns the complementary error function.
+     *
+     * &lt;p&gt;erfc(x) = 2/&amp;radic;&amp;pi; &lt;sub&gt;x&lt;/sub&gt;&amp;int;&lt;sup&gt;&amp;infin;&lt;/sup&gt; e&lt;sup&gt;-t&lt;sup&gt;2&lt;/sup&gt;&lt;/sup&gt;dt
+     * &lt;br/&gt;
+     *    = 1 - {@link #erf(double) erf(x)} &lt;/p&gt;
+     *
+     * &lt;p&gt;This implementation computes erfc(x) using the
+     * {@link Gamma#regularizedGammaQ(double, double, double, int) regularized gamma function},
+     * following &lt;a href=&quot;http://mathworld.wolfram.com/Erf.html&quot;&gt; Erf&lt;/a&gt;, equation (3).&lt;/p&gt;
+     *
+     * &lt;p&gt;The value returned is always between 0 and 2 (inclusive).
+     * If {@code abs(x) &gt; 40}, then {@code erf(x)} is indistinguishable from
+     * either 0 or 2 as a double, so the appropriate extreme value is returned.
+     * &lt;/p&gt;
+     *
+     * @param x the value
+     * @return the complementary error function erfc(x)
+     * @throws org.apache.commons.math.exception.MaxCountExceededException
+     * if the algorithm fails to converge.
+     * @see Gamma#regularizedGammaQ(double, double, double, int)
+     * @since 2.2
+     */
+    public static double erfc(double x) {
+<span class="fc bfc" id="L98" title="All 2 branches covered.">        if (FastMath.abs(x) &gt; 40) {</span>
+<span class="fc bfc" id="L99" title="All 2 branches covered.">            return x &gt; 0 ? 0 : 2;</span>
+        }
+<span class="fc" id="L101">        final double ret = Gamma.regularizedGammaQ(0.5, x * x, 1.0e-15, 10000);</span>
+<span class="fc bfc" id="L102" title="All 2 branches covered.">        return x &lt; 0 ? 2 - ret : ret;</span>
+    }
+
+    /**
+     * Returns the difference between erf(x1) and erf(x2).
+     *
+     * The implementation uses either erf(double) or erfc(double)
+     * depending on which provides the most precise result.
+     *
+     * @param x1 the first value
+     * @param x2 the second value
+     * @return erf(x2) - erf(x1)
+     */
+    public static double erf(double x1, double x2) {
+<span class="fc bfc" id="L116" title="All 2 branches covered.">        if(x1 &gt; x2) {</span>
+<span class="fc" id="L117">            return -erf(x2, x1);</span>
+        }
+
+<span class="fc" id="L120">        return</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">        x1 &lt; -X_CRIT ?</span>
+<span class="fc bfc" id="L122" title="All 2 branches covered.">            x2 &lt; 0.0 ?</span>
+<span class="fc" id="L123">                erfc(-x2) - erfc(-x1) :</span>
+<span class="fc" id="L124">                erf(x2) - erf(x1) :</span>
+<span class="fc bfc" id="L125" title="All 4 branches covered.">            x2 &gt; X_CRIT &amp;&amp; x1 &gt; 0.0 ?</span>
+<span class="fc" id="L126">                erfc(x1) - erfc(x2) :</span>
+<span class="fc" id="L127">                erf(x2) - erf(x1);</span>
+    }
+}
+
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

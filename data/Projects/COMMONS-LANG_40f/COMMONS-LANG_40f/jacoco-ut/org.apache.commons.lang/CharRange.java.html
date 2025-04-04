@@ -1,0 +1,233 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CharRange.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Commons Lang</a> &gt; <a href="index.source.html" class="el_package">org.apache.commons.lang</a> &gt; <span class="el_source">CharRange.java</span></div><h1>CharRange.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ * 
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.commons.lang;
+
+import java.io.Serializable;
+
+/**
+ * &lt;p&gt;A contiguous range of characters, optionally negated.&lt;/p&gt;
+ * 
+ * &lt;p&gt;Instances are immutable.&lt;/p&gt;
+ *
+ * @author Stephen Colebourne
+ * @author Chris Feldhacker
+ * @author Gary Gregory
+ * @since 1.0
+ * @version $Id$
+ */
+public final class CharRange implements Serializable {
+
+    /**
+     * Required for serialization support. Lang version 2.0. 
+     * 
+     * @see java.io.Serializable
+     */
+    private static final long serialVersionUID = 8270183163158333422L;
+    
+    /** The first character, inclusive, in the range. */
+    private final char start;
+    /** The last character, inclusive, in the range. */
+    private final char end;
+    /** True if the range is everything except the characters specified. */
+    private final boolean negated;
+    
+    /** Cached toString. */
+    private transient String iToString;
+
+    //-----------------------------------------------------------------------
+    /**
+     * &lt;p&gt;Constructs a &lt;code&gt;CharRange&lt;/code&gt; over a single character.&lt;/p&gt;
+     *
+     * @param ch  only character in this range
+     */
+    public CharRange(char ch) {
+<span class="fc" id="L58">        this(ch, ch, false);</span>
+<span class="fc" id="L59">    }</span>
+
+    /**
+     * &lt;p&gt;Constructs a &lt;code&gt;CharRange&lt;/code&gt; over a single character,
+     * optionally negating the range.&lt;/p&gt;
+     *
+     * &lt;p&gt;A negated range includes everything except the specified char.&lt;/p&gt;
+     *
+     * @param ch  only character in this range
+     * @param negated  true to express everything except the range
+     */
+    public CharRange(char ch, boolean negated) {
+<span class="fc" id="L71">        this(ch, ch, negated);</span>
+<span class="fc" id="L72">    }</span>
+
+    /**
+     * &lt;p&gt;Constructs a &lt;code&gt;CharRange&lt;/code&gt; over a set of characters.&lt;/p&gt;
+     *
+     * @param start  first character, inclusive, in this range
+     * @param end  last character, inclusive, in this range
+     */
+    public CharRange(char start, char end) {
+<span class="fc" id="L81">        this(start, end, false);</span>
+<span class="fc" id="L82">    }</span>
+
+    /**
+     * &lt;p&gt;Constructs a &lt;code&gt;CharRange&lt;/code&gt; over a set of characters,
+     * optionally negating the range.&lt;/p&gt;
+     *
+     * &lt;p&gt;A negated range includes everything except that defined by the
+     * start and end characters.&lt;/p&gt;
+     * 
+     * &lt;p&gt;If start and end are in the wrong order, they are reversed.
+     * Thus &lt;code&gt;a-e&lt;/code&gt; is the same as &lt;code&gt;e-a&lt;/code&gt;.&lt;/p&gt;
+     *
+     * @param start  first character, inclusive, in this range
+     * @param end  last character, inclusive, in this range
+     * @param negated  true to express everything except the range
+     */
+    public CharRange(char start, char end, boolean negated) {
+<span class="fc" id="L99">        super();</span>
+<span class="fc bfc" id="L100" title="All 2 branches covered.">        if (start &gt; end) {</span>
+<span class="fc" id="L101">            char temp = start;</span>
+<span class="fc" id="L102">            start = end;</span>
+<span class="fc" id="L103">            end = temp;</span>
+        }
+        
+<span class="fc" id="L106">        this.start = start;</span>
+<span class="fc" id="L107">        this.end = end;</span>
+<span class="fc" id="L108">        this.negated = negated;</span>
+<span class="fc" id="L109">    }</span>
+
+    // Accessors
+    //-----------------------------------------------------------------------
+    /**
+     * &lt;p&gt;Gets the start character for this character range.&lt;/p&gt;
+     * 
+     * @return the start char (inclusive)
+     */
+    public char getStart() {
+<span class="fc" id="L119">        return this.start;</span>
+    }
+
+    /**
+     * &lt;p&gt;Gets the end character for this character range.&lt;/p&gt;
+     * 
+     * @return the end char (inclusive)
+     */
+    public char getEnd() {
+<span class="fc" id="L128">        return this.end;</span>
+    }
+
+    /**
+     * &lt;p&gt;Is this &lt;code&gt;CharRange&lt;/code&gt; negated.&lt;/p&gt;
+     * 
+     * &lt;p&gt;A negated range includes everything except that defined by the
+     * start and end characters.&lt;/p&gt;
+     *
+     * @return &lt;code&gt;true&lt;/code&gt; is negated
+     */
+    public boolean isNegated() {
+<span class="fc" id="L140">        return negated;</span>
+    }
+
+    // Contains
+    //-----------------------------------------------------------------------
+    /**
+     * &lt;p&gt;Is the character specified contained in this range.&lt;/p&gt;
+     *
+     * @param ch  the character to check
+     * @return &lt;code&gt;true&lt;/code&gt; if this range contains the input character
+     */
+    public boolean contains(char ch) {
+<span class="fc bfc" id="L152" title="All 6 branches covered.">        return (ch &gt;= start &amp;&amp; ch &lt;= end) != negated;</span>
+    }
+
+    /**
+     * &lt;p&gt;Are all the characters of the passed in range contained in
+     * this range.&lt;/p&gt;
+     *
+     * @param range  the range to check against
+     * @return &lt;code&gt;true&lt;/code&gt; if this range entirely contains the input range
+     * @throws IllegalArgumentException if &lt;code&gt;null&lt;/code&gt; input
+     */
+    public boolean contains(CharRange range) {
+<span class="fc bfc" id="L164" title="All 2 branches covered.">        if (range == null) {</span>
+<span class="fc" id="L165">            throw new IllegalArgumentException(&quot;The Range must not be null&quot;);</span>
+        }
+<span class="fc bfc" id="L167" title="All 2 branches covered.">        if (negated) {</span>
+<span class="fc bfc" id="L168" title="All 2 branches covered.">            if (range.negated) {</span>
+<span class="fc bfc" id="L169" title="All 4 branches covered.">                return start &gt;= range.start &amp;&amp; end &lt;= range.end;</span>
+            }
+<span class="fc bfc" id="L171" title="All 4 branches covered.">            return range.end &lt; start || range.start &gt; end;</span>
+        }
+<span class="fc bfc" id="L173" title="All 2 branches covered.">        if (range.negated) {</span>
+<span class="pc bpc" id="L174" title="1 of 4 branches missed.">            return start == 0 &amp;&amp; end == Character.MAX_VALUE;</span>
+        }
+<span class="fc bfc" id="L176" title="All 4 branches covered.">        return start &lt;= range.start &amp;&amp; end &gt;= range.end;</span>
+    }
+
+    // Basics
+    //-----------------------------------------------------------------------
+    /**
+     * &lt;p&gt;Compares two CharRange objects, returning true if they represent
+     * exactly the same range of characters defined in the same way.&lt;/p&gt;
+     * 
+     * @param obj  the object to compare to
+     * @return true if equal
+     */
+    @Override
+    public boolean equals(Object obj) {
+<span class="fc bfc" id="L190" title="All 2 branches covered.">        if (obj == this) {</span>
+<span class="fc" id="L191">            return true;</span>
+        }
+<span class="fc bfc" id="L193" title="All 2 branches covered.">        if (obj instanceof CharRange == false) {</span>
+<span class="fc" id="L194">            return false;</span>
+        }
+<span class="fc" id="L196">        CharRange other = (CharRange) obj;</span>
+<span class="fc bfc" id="L197" title="All 6 branches covered.">        return start == other.start &amp;&amp; end == other.end &amp;&amp; negated == other.negated;</span>
+    }
+
+    /**
+     * &lt;p&gt;Gets a hashCode compatible with the equals method.&lt;/p&gt;
+     * 
+     * @return a suitable hashCode
+     */
+    @Override
+    public int hashCode() {
+<span class="fc bfc" id="L207" title="All 2 branches covered.">        return 83 + start + 7 * end + (negated ? 1 : 0);</span>
+    }
+    
+    /**
+     * &lt;p&gt;Gets a string representation of the character range.&lt;/p&gt;
+     * 
+     * @return string representation of this range
+     */
+    @Override
+    public String toString() {
+<span class="fc bfc" id="L217" title="All 2 branches covered.">        if (iToString == null) {</span>
+<span class="fc" id="L218">            StringBuilder buf = new StringBuilder(4);</span>
+<span class="fc bfc" id="L219" title="All 2 branches covered.">            if (isNegated()) {</span>
+<span class="fc" id="L220">                buf.append('^');</span>
+            }
+<span class="fc" id="L222">            buf.append(start);</span>
+<span class="fc bfc" id="L223" title="All 2 branches covered.">            if (start != end) {</span>
+<span class="fc" id="L224">                buf.append('-');</span>
+<span class="fc" id="L225">                buf.append(end);</span>
+            }
+<span class="fc" id="L227">            iToString = buf.toString();</span>
+        }
+<span class="fc" id="L229">        return iToString;</span>
+    }
+    
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

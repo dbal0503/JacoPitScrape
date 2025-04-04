@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BaseAbstractVectorialOptimizer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Commons Math</a> &gt; <a href="index.source.html" class="el_package">org.apache.commons.math.optimization.direct</a> &gt; <span class="el_source">BaseAbstractVectorialOptimizer.java</span></div><h1>BaseAbstractVectorialOptimizer.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.commons.math.optimization.direct;
+
+import org.apache.commons.math.util.Incrementor;
+import org.apache.commons.math.exception.MaxCountExceededException;
+import org.apache.commons.math.exception.TooManyEvaluationsException;
+import org.apache.commons.math.exception.DimensionMismatchException;
+import org.apache.commons.math.exception.NullArgumentException;
+import org.apache.commons.math.analysis.MultivariateVectorFunction;
+import org.apache.commons.math.optimization.BaseMultivariateVectorialOptimizer;
+import org.apache.commons.math.optimization.ConvergenceChecker;
+import org.apache.commons.math.optimization.VectorialPointValuePair;
+import org.apache.commons.math.optimization.SimpleVectorialValueChecker;
+
+/**
+ * Base class for implementing optimizers for multivariate scalar functions.
+ * This base class handles the boiler-plate methods associated to thresholds
+ * settings, iterations and evaluations counting.
+ *
+ * @param &lt;FUNC&gt; the type of the objective function to be optimized
+ *
+ * @version $Id$
+ * @since 3.0
+ */
+public abstract class BaseAbstractVectorialOptimizer&lt;FUNC extends MultivariateVectorFunction&gt;
+    implements BaseMultivariateVectorialOptimizer&lt;FUNC&gt; {
+    /** Evaluations counter. */
+<span class="fc" id="L44">    protected final Incrementor evaluations = new Incrementor();</span>
+    /** Convergence checker. */
+    private ConvergenceChecker&lt;VectorialPointValuePair&gt; checker;
+    /** Target value for the objective functions at optimum. */
+    private double[] target;
+    /** Weight for the least squares cost computation. */
+    private double[] weight;
+    /** Initial guess. */
+    private double[] start;
+    /** Objective function. */
+    private MultivariateVectorFunction function;
+
+    /**
+     * Simple constructor with default settings.
+     * The convergence check is set to a {@link SimpleVectorialValueChecker} and
+     * the allowed number of evaluations is set to {@link Integer#MAX_VALUE}.
+     */
+    protected BaseAbstractVectorialOptimizer() {
+<span class="fc" id="L62">        this(new SimpleVectorialValueChecker());</span>
+<span class="fc" id="L63">    }</span>
+    /**
+     * @param checker Convergence checker.
+     */
+<span class="fc" id="L67">    protected BaseAbstractVectorialOptimizer(ConvergenceChecker&lt;VectorialPointValuePair&gt; checker) {</span>
+<span class="fc" id="L68">        this.checker = checker;</span>
+<span class="fc" id="L69">    }</span>
+
+    /** {@inheritDoc} */
+    public int getMaxEvaluations() {
+<span class="nc" id="L73">        return evaluations.getMaximalCount();</span>
+    }
+
+    /** {@inheritDoc} */
+    public int getEvaluations() {
+<span class="fc" id="L78">        return evaluations.getCount();</span>
+    }
+
+    /** {@inheritDoc} */
+    public ConvergenceChecker&lt;VectorialPointValuePair&gt; getConvergenceChecker() {
+<span class="fc" id="L83">        return checker;</span>
+    }
+
+    /**
+     * Compute the objective function value.
+     *
+     * @param point Point at which the objective function must be evaluated.
+     * @return the objective function value at the specified point.
+     * @throws TooManyEvaluationsException if the maximal number of evaluations is
+     * exceeded.
+     */
+    protected double[] computeObjectiveValue(double[] point) {
+        try {
+<span class="fc" id="L96">            evaluations.incrementCount();</span>
+<span class="fc" id="L97">        } catch (MaxCountExceededException e) {</span>
+<span class="fc" id="L98">            throw new TooManyEvaluationsException(e.getMax());</span>
+<span class="fc" id="L99">        }</span>
+<span class="fc" id="L100">        return function.value(point);</span>
+    }
+
+    /** {@inheritDoc} */
+    public VectorialPointValuePair optimize(int maxEval, FUNC f, double[] t, double[] w,
+                                            double[] startPoint) {
+        // Checks.
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">        if (f == null) {</span>
+<span class="nc" id="L108">            throw new NullArgumentException();</span>
+        }
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">        if (t == null) {</span>
+<span class="nc" id="L111">            throw new NullArgumentException();</span>
+        }
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">        if (w == null) {</span>
+<span class="nc" id="L114">            throw new NullArgumentException();</span>
+        }
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">        if (startPoint == null) {</span>
+<span class="nc" id="L117">            throw new NullArgumentException();</span>
+        }
+<span class="fc bfc" id="L119" title="All 2 branches covered.">        if (t.length != w.length) {</span>
+<span class="fc" id="L120">            throw new DimensionMismatchException(t.length, w.length);</span>
+        }
+
+        // Reset.
+<span class="fc" id="L124">        evaluations.setMaximalCount(maxEval);</span>
+<span class="fc" id="L125">        evaluations.resetCount();</span>
+
+        // Store optimization problem characteristics.
+<span class="fc" id="L128">        function = f;</span>
+<span class="fc" id="L129">        target = t.clone();</span>
+<span class="fc" id="L130">        weight = w.clone();</span>
+<span class="fc" id="L131">        start = startPoint.clone();</span>
+
+        // Perform computation.
+<span class="fc" id="L134">        return doOptimize();</span>
+    }
+
+    /**
+     * @return the initial guess.
+     */
+    public double[] getStartPoint() {
+<span class="nc" id="L141">        return start.clone();</span>
+    }
+
+    /**
+     * Perform the bulk of the optimization algorithm.
+     *
+     * @return the point/value pair giving the optimal value for the
+     * objective function.
+     */
+    protected abstract VectorialPointValuePair doOptimize();
+
+    /**
+     * @return a reference to the {@link #target array}.
+     */
+    protected double[] getTargetRef() {
+<span class="fc" id="L156">        return target;</span>
+    }
+    /**
+     * @return a reference to the {@link #weight array}.
+     */
+    protected double[] getWeightRef() {
+<span class="fc" id="L162">        return weight;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

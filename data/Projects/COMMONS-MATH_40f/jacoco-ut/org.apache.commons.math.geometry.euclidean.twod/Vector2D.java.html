@@ -1,0 +1,391 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Vector2D.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Commons Math</a> &gt; <a href="index.source.html" class="el_package">org.apache.commons.math.geometry.euclidean.twod</a> &gt; <span class="el_source">Vector2D.java</span></div><h1>Vector2D.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.commons.math.geometry.euclidean.twod;
+
+import java.text.NumberFormat;
+
+import org.apache.commons.math.exception.DimensionMismatchException;
+import org.apache.commons.math.exception.MathArithmeticException;
+import org.apache.commons.math.exception.util.LocalizedFormats;
+import org.apache.commons.math.geometry.Space;
+import org.apache.commons.math.geometry.Vector;
+import org.apache.commons.math.util.FastMath;
+import org.apache.commons.math.util.MathUtils;
+
+/** This class represents a 2D vector.
+ * &lt;p&gt;Instances of this class are guaranteed to be immutable.&lt;/p&gt;
+ * @version $Id$
+ * @since 3.0
+ */
+public class Vector2D implements Vector&lt;Euclidean2D&gt; {
+
+    /** Origin (coordinates: 0, 0). */
+<span class="fc" id="L37">    public static final Vector2D ZERO   = new Vector2D(0, 0);</span>
+
+    // CHECKSTYLE: stop ConstantName
+    /** A vector with all coordinates set to NaN. */
+<span class="fc" id="L41">    public static final Vector2D NaN = new Vector2D(Double.NaN, Double.NaN);</span>
+    // CHECKSTYLE: resume ConstantName
+
+    /** A vector with all coordinates set to positive infinity. */
+<span class="fc" id="L45">    public static final Vector2D POSITIVE_INFINITY =</span>
+        new Vector2D(Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY);
+
+    /** A vector with all coordinates set to negative infinity. */
+<span class="fc" id="L49">    public static final Vector2D NEGATIVE_INFINITY =</span>
+        new Vector2D(Double.NEGATIVE_INFINITY, Double.NEGATIVE_INFINITY);
+
+    /** Serializable UID. */
+    private static final long serialVersionUID = 266938651998679754L;
+
+    /** Abscissa. */
+    private final double x;
+
+    /** Ordinate. */
+    private final double y;
+
+    /** Simple constructor.
+     * Build a vector from its coordinates
+     * @param x abscissa
+     * @param y ordinate
+     * @see #getX()
+     * @see #getY()
+     */
+<span class="fc" id="L68">    public Vector2D(double x, double y) {</span>
+<span class="fc" id="L69">        this.x = x;</span>
+<span class="fc" id="L70">        this.y = y;</span>
+<span class="fc" id="L71">    }</span>
+
+    /** Simple constructor.
+     * Build a vector from its coordinates
+     * @param v coordinates array
+     * @exception DimensionMismatchException if array does not have 2 elements
+     * @see #toArray()
+     */
+<span class="nc" id="L79">    public Vector2D(double[] v) throws DimensionMismatchException {</span>
+<span class="nc bnc" id="L80" title="All 2 branches missed.">        if (v.length != 2) {</span>
+<span class="nc" id="L81">            throw new DimensionMismatchException(v.length, 2);</span>
+        }
+<span class="nc" id="L83">        this.x = v[0];</span>
+<span class="nc" id="L84">        this.y = v[1];</span>
+<span class="nc" id="L85">    }</span>
+
+    /** Multiplicative constructor
+     * Build a vector from another one and a scale factor.
+     * The vector built will be a * u
+     * @param a scale factor
+     * @param u base (unscaled) vector
+     */
+<span class="nc" id="L93">    public Vector2D(double a, Vector2D u) {</span>
+<span class="nc" id="L94">        this.x = a * u.x;</span>
+<span class="nc" id="L95">        this.y = a * u.y;</span>
+<span class="nc" id="L96">    }</span>
+
+    /** Linear constructor
+     * Build a vector from two other ones and corresponding scale factors.
+     * The vector built will be a1 * u1 + a2 * u2
+     * @param a1 first scale factor
+     * @param u1 first base (unscaled) vector
+     * @param a2 second scale factor
+     * @param u2 second base (unscaled) vector
+     */
+<span class="nc" id="L106">    public Vector2D(double a1, Vector2D u1, double a2, Vector2D u2) {</span>
+<span class="nc" id="L107">        this.x = a1 * u1.x + a2 * u2.x;</span>
+<span class="nc" id="L108">        this.y = a1 * u1.y + a2 * u2.y;</span>
+<span class="nc" id="L109">    }</span>
+
+    /** Linear constructor
+     * Build a vector from three other ones and corresponding scale factors.
+     * The vector built will be a1 * u1 + a2 * u2 + a3 * u3
+     * @param a1 first scale factor
+     * @param u1 first base (unscaled) vector
+     * @param a2 second scale factor
+     * @param u2 second base (unscaled) vector
+     * @param a3 third scale factor
+     * @param u3 third base (unscaled) vector
+     */
+    public Vector2D(double a1, Vector2D u1, double a2, Vector2D u2,
+<span class="nc" id="L122">                   double a3, Vector2D u3) {</span>
+<span class="nc" id="L123">        this.x = a1 * u1.x + a2 * u2.x + a3 * u3.x;</span>
+<span class="nc" id="L124">        this.y = a1 * u1.y + a2 * u2.y + a3 * u3.y;</span>
+<span class="nc" id="L125">    }</span>
+
+    /** Linear constructor
+     * Build a vector from four other ones and corresponding scale factors.
+     * The vector built will be a1 * u1 + a2 * u2 + a3 * u3 + a4 * u4
+     * @param a1 first scale factor
+     * @param u1 first base (unscaled) vector
+     * @param a2 second scale factor
+     * @param u2 second base (unscaled) vector
+     * @param a3 third scale factor
+     * @param u3 third base (unscaled) vector
+     * @param a4 fourth scale factor
+     * @param u4 fourth base (unscaled) vector
+     */
+    public Vector2D(double a1, Vector2D u1, double a2, Vector2D u2,
+<span class="nc" id="L140">                   double a3, Vector2D u3, double a4, Vector2D u4) {</span>
+<span class="nc" id="L141">        this.x = a1 * u1.x + a2 * u2.x + a3 * u3.x + a4 * u4.x;</span>
+<span class="nc" id="L142">        this.y = a1 * u1.y + a2 * u2.y + a3 * u3.y + a4 * u4.y;</span>
+<span class="nc" id="L143">    }</span>
+
+    /** Get the abscissa of the vector.
+     * @return abscissa of the vector
+     * @see #Vector2D(double, double)
+     */
+    public double getX() {
+<span class="fc" id="L150">        return x;</span>
+    }
+
+    /** Get the ordinate of the vector.
+     * @return ordinate of the vector
+     * @see #Vector2D(double, double)
+     */
+    public double getY() {
+<span class="fc" id="L158">        return y;</span>
+    }
+
+    /** Get the vector coordinates as a dimension 2 array.
+     * @return vector coordinates
+     * @see #Vector2D(double[])
+     */
+    public double[] toArray() {
+<span class="nc" id="L166">        return new double[] { x, y };</span>
+    }
+
+    /** {@inheritDoc} */
+    public Space getSpace() {
+<span class="nc" id="L171">        return Euclidean2D.getInstance();</span>
+    }
+
+    /** {@inheritDoc} */
+    public Vector2D getZero() {
+<span class="nc" id="L176">        return ZERO;</span>
+    }
+
+    /** {@inheritDoc} */
+    public double getNorm1() {
+<span class="nc" id="L181">        return FastMath.abs(x) + FastMath.abs(y);</span>
+    }
+
+    /** {@inheritDoc} */
+    public double getNorm() {
+<span class="nc" id="L186">        return FastMath.sqrt (x * x + y * y);</span>
+    }
+
+    /** {@inheritDoc} */
+    public double getNormSq() {
+<span class="nc" id="L191">        return x * x + y * y;</span>
+    }
+
+    /** {@inheritDoc} */
+    public double getNormInf() {
+<span class="nc" id="L196">        return FastMath.max(FastMath.abs(x), FastMath.abs(y));</span>
+    }
+
+    /** {@inheritDoc} */
+    public Vector2D add(Vector&lt;Euclidean2D&gt; v) {
+<span class="nc" id="L201">        Vector2D v2 = (Vector2D) v;</span>
+<span class="nc" id="L202">        return new Vector2D(x + v2.getX(), y + v2.getY());</span>
+    }
+
+    /** {@inheritDoc} */
+    public Vector2D add(double factor, Vector&lt;Euclidean2D&gt; v) {
+<span class="nc" id="L207">        Vector2D v2 = (Vector2D) v;</span>
+<span class="nc" id="L208">        return new Vector2D(x + factor * v2.getX(), y + factor * v2.getY());</span>
+    }
+
+    /** {@inheritDoc} */
+    public Vector2D subtract(Vector&lt;Euclidean2D&gt; p) {
+<span class="nc" id="L213">        Vector2D p3 = (Vector2D) p;</span>
+<span class="nc" id="L214">        return new Vector2D(x - p3.x, y - p3.y);</span>
+    }
+
+    /** {@inheritDoc} */
+    public Vector2D subtract(double factor, Vector&lt;Euclidean2D&gt; v) {
+<span class="nc" id="L219">        Vector2D v2 = (Vector2D) v;</span>
+<span class="nc" id="L220">        return new Vector2D(x - factor * v2.getX(), y - factor * v2.getY());</span>
+    }
+
+    /** {@inheritDoc} */
+    public Vector2D normalize() {
+<span class="nc" id="L225">        double s = getNorm();</span>
+<span class="nc bnc" id="L226" title="All 2 branches missed.">        if (s == 0) {</span>
+<span class="nc" id="L227">            throw new MathArithmeticException(LocalizedFormats.CANNOT_NORMALIZE_A_ZERO_NORM_VECTOR);</span>
+        }
+<span class="nc" id="L229">        return scalarMultiply(1 / s);</span>
+    }
+    /** {@inheritDoc} */
+    public Vector2D negate() {
+<span class="nc" id="L233">        return new Vector2D(-x, -y);</span>
+    }
+
+    /** {@inheritDoc} */
+    public Vector2D scalarMultiply(double a) {
+<span class="nc" id="L238">        return new Vector2D(a * x, a * y);</span>
+    }
+
+    /** {@inheritDoc} */
+    public boolean isNaN() {
+<span class="nc bnc" id="L243" title="All 4 branches missed.">        return Double.isNaN(x) || Double.isNaN(y);</span>
+    }
+
+    /** {@inheritDoc} */
+    public boolean isInfinite() {
+<span class="nc bnc" id="L248" title="All 6 branches missed.">        return !isNaN() &amp;&amp; (Double.isInfinite(x) || Double.isInfinite(y));</span>
+    }
+
+    /** {@inheritDoc} */
+    public double distance1(Vector&lt;Euclidean2D&gt; p) {
+<span class="nc" id="L253">        Vector2D p3 = (Vector2D) p;</span>
+<span class="nc" id="L254">        final double dx = FastMath.abs(p3.x - x);</span>
+<span class="nc" id="L255">        final double dy = FastMath.abs(p3.y - y);</span>
+<span class="nc" id="L256">        return dx + dy;</span>
+    }
+
+    /** {@inheritDoc} */
+    public double distance(Vector&lt;Euclidean2D&gt; p) {
+<span class="fc" id="L261">        Vector2D p3 = (Vector2D) p;</span>
+<span class="fc" id="L262">        final double dx = p3.x - x;</span>
+<span class="fc" id="L263">        final double dy = p3.y - y;</span>
+<span class="fc" id="L264">        return FastMath.sqrt(dx * dx + dy * dy);</span>
+    }
+
+    /** {@inheritDoc} */
+    public double distanceInf(Vector&lt;Euclidean2D&gt; p) {
+<span class="nc" id="L269">        Vector2D p3 = (Vector2D) p;</span>
+<span class="nc" id="L270">        final double dx = FastMath.abs(p3.x - x);</span>
+<span class="nc" id="L271">        final double dy = FastMath.abs(p3.y - y);</span>
+<span class="nc" id="L272">        return FastMath.max(dx, dy);</span>
+    }
+
+    /** {@inheritDoc} */
+    public double distanceSq(Vector&lt;Euclidean2D&gt; p) {
+<span class="nc" id="L277">        Vector2D p3 = (Vector2D) p;</span>
+<span class="nc" id="L278">        final double dx = p3.x - x;</span>
+<span class="nc" id="L279">        final double dy = p3.y - y;</span>
+<span class="nc" id="L280">        return dx * dx + dy * dy;</span>
+    }
+
+    /** {@inheritDoc} */
+    public double dotProduct(final Vector&lt;Euclidean2D&gt; v) {
+<span class="nc" id="L285">        final Vector2D v2 = (Vector2D) v;</span>
+<span class="nc" id="L286">        return x * v2.x + y * v2.y;</span>
+    }
+
+    /** Compute the distance between two vectors according to the L&lt;sub&gt;2&lt;/sub&gt; norm.
+     * &lt;p&gt;Calling this method is equivalent to calling:
+     * &lt;code&gt;p1.subtract(p2).getNorm()&lt;/code&gt; except that no intermediate
+     * vector is built&lt;/p&gt;
+     * @param p1 first vector
+     * @param p2 second vector
+     * @return the distance between p1 and p2 according to the L&lt;sub&gt;2&lt;/sub&gt; norm
+     */
+    public static double distance(Vector2D p1, Vector2D p2) {
+<span class="nc" id="L298">        return p1.distance(p2);</span>
+    }
+
+    /** Compute the distance between two vectors according to the L&lt;sub&gt;&amp;infin;&lt;/sub&gt; norm.
+     * &lt;p&gt;Calling this method is equivalent to calling:
+     * &lt;code&gt;p1.subtract(p2).getNormInf()&lt;/code&gt; except that no intermediate
+     * vector is built&lt;/p&gt;
+     * @param p1 first vector
+     * @param p2 second vector
+     * @return the distance between p1 and p2 according to the L&lt;sub&gt;&amp;infin;&lt;/sub&gt; norm
+     */
+    public static double distanceInf(Vector2D p1, Vector2D p2) {
+<span class="nc" id="L310">        return p1.distanceInf(p2);</span>
+    }
+
+    /** Compute the square of the distance between two vectors.
+     * &lt;p&gt;Calling this method is equivalent to calling:
+     * &lt;code&gt;p1.subtract(p2).getNormSq()&lt;/code&gt; except that no intermediate
+     * vector is built&lt;/p&gt;
+     * @param p1 first vector
+     * @param p2 second vector
+     * @return the square of the distance between p1 and p2
+     */
+    public static double distanceSq(Vector2D p1, Vector2D p2) {
+<span class="nc" id="L322">        return p1.distanceSq(p2);</span>
+    }
+
+    /**
+     * Test for the equality of two 2D vectors.
+     * &lt;p&gt;
+     * If all coordinates of two 2D vectors are exactly the same, and none are
+     * &lt;code&gt;Double.NaN&lt;/code&gt;, the two 2D vectors are considered to be equal.
+     * &lt;/p&gt;
+     * &lt;p&gt;
+     * &lt;code&gt;NaN&lt;/code&gt; coordinates are considered to affect globally the vector
+     * and be equals to each other - i.e, if either (or all) coordinates of the
+     * 2D vector are equal to &lt;code&gt;Double.NaN&lt;/code&gt;, the 2D vector is equal to
+     * {@link #NaN}.
+     * &lt;/p&gt;
+     *
+     * @param other Object to test for equality to this
+     * @return true if two 2D vector objects are equal, false if
+     *         object is null, not an instance of Vector2D, or
+     *         not equal to this Vector2D instance
+     *
+     */
+    @Override
+    public boolean equals(Object other) {
+
+<span class="nc bnc" id="L347" title="All 2 branches missed.">        if (this == other) {</span>
+<span class="nc" id="L348">            return true;</span>
+        }
+
+<span class="nc bnc" id="L351" title="All 2 branches missed.">        if (other instanceof Vector2D) {</span>
+<span class="nc" id="L352">            final Vector2D rhs = (Vector2D)other;</span>
+<span class="nc bnc" id="L353" title="All 2 branches missed.">            if (rhs.isNaN()) {</span>
+<span class="nc" id="L354">                return this.isNaN();</span>
+            }
+
+<span class="nc bnc" id="L357" title="All 4 branches missed.">            return (x == rhs.x) &amp;&amp; (y == rhs.y);</span>
+        }
+<span class="nc" id="L359">        return false;</span>
+    }
+
+    /**
+     * Get a hashCode for the 2D vector.
+     * &lt;p&gt;
+     * All NaN values have the same hash code.&lt;/p&gt;
+     *
+     * @return a hash code value for this object
+     */
+    @Override
+    public int hashCode() {
+<span class="nc bnc" id="L371" title="All 2 branches missed.">        if (isNaN()) {</span>
+<span class="nc" id="L372">            return 542;</span>
+        }
+<span class="nc" id="L374">        return 122 * (76 * MathUtils.hash(x) +  MathUtils.hash(y));</span>
+    }
+
+    /** Get a string representation of this vector.
+     * @return a string representation of this vector
+     */
+    @Override
+    public String toString() {
+<span class="nc" id="L382">        return Vector2DFormat.getInstance().format(this);</span>
+    }
+
+    /** {@inheritDoc} */
+    public String toString(final NumberFormat format) {
+<span class="nc" id="L387">        return new Vector2DFormat(format).format(this);</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

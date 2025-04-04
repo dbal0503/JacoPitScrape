@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>StorelessCovariance.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Commons Math</a> &gt; <a href="index.source.html" class="el_package">org.apache.commons.math.stat.correlation</a> &gt; <span class="el_source">StorelessCovariance.java</span></div><h1>StorelessCovariance.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.commons.math.stat.correlation;
+
+import org.apache.commons.math.exception.MathIllegalArgumentException;
+import org.apache.commons.math.exception.MathUnsupportedOperationException;
+import org.apache.commons.math.exception.util.LocalizedFormats;
+import org.apache.commons.math.linear.Array2DRowRealMatrix;
+import org.apache.commons.math.linear.RealMatrix;
+
+/**
+ * Covariance implementation that does not require input data to be
+ * stored in memory.
+ *
+ * @version $Id$
+ * @since 3.0
+ */
+public class StorelessCovariance extends Covariance {
+
+<span class="fc" id="L34">    private StorelessBivariateCovariance[][] covMatrix = null;</span>
+
+<span class="fc" id="L36">    private int rowDimension = 1;</span>
+
+<span class="fc" id="L38">    private int colDimension = 1;</span>
+
+<span class="fc" id="L40">    private boolean biasCorrected = true;</span>
+
+    public StorelessCovariance(int rowDimension, int colDimension){
+<span class="fc" id="L43">        this(rowDimension, colDimension, true);</span>
+<span class="fc" id="L44">    }</span>
+
+<span class="fc" id="L46">    public StorelessCovariance(int rowDimension, int colDimension, boolean biasCorrected){</span>
+<span class="fc" id="L47">        this.rowDimension = rowDimension;</span>
+<span class="fc" id="L48">        this.colDimension = colDimension;</span>
+<span class="fc" id="L49">        this.biasCorrected = biasCorrected;</span>
+<span class="fc" id="L50">        covMatrix = new StorelessBivariateCovariance[rowDimension][colDimension];</span>
+<span class="fc" id="L51">        initializeMatrix();</span>
+<span class="fc" id="L52">    }</span>
+
+    private void initializeMatrix(){
+<span class="fc bfc" id="L55" title="All 2 branches covered.">        for(int i=0;i&lt;rowDimension;i++){</span>
+<span class="fc bfc" id="L56" title="All 2 branches covered.">            for(int j=0;j&lt;colDimension;j++){</span>
+<span class="fc" id="L57">                covMatrix[i][j] = new StorelessBivariateCovariance(biasCorrected);</span>
+            }
+        }
+<span class="fc" id="L60">    }</span>
+
+    public StorelessBivariateCovariance getCovariance(int xIndex, int yIndex){
+<span class="nc" id="L63">        return covMatrix[xIndex][yIndex];</span>
+    }
+
+    public void setCovariance(int xIndex, int yIndex, StorelessBivariateCovariance cov){
+<span class="nc" id="L67">        covMatrix[xIndex][yIndex] = cov;</span>
+<span class="nc" id="L68">    }</span>
+
+    public void incrementCovariance(int xIndex, int yIndex, double x, double y){
+<span class="fc" id="L71">        covMatrix[xIndex][yIndex].increment(x, y);</span>
+<span class="fc" id="L72">    }</span>
+
+    public void incrementRow(double[] rowData)throws IllegalArgumentException{
+<span class="fc" id="L75">        int length = rowData.length;</span>
+<span class="pc bpc" id="L76" title="1 of 2 branches missed.">        if (length != colDimension) {</span>
+<span class="nc" id="L77">            throw new MathIllegalArgumentException(</span>
+<span class="nc" id="L78">                  LocalizedFormats.DIMENSIONS_MISMATCH_SIMPLE, length, colDimension);</span>
+        }
+<span class="fc bfc" id="L80" title="All 2 branches covered.">        for(int i=0;i&lt;length;i++){</span>
+<span class="fc bfc" id="L81" title="All 2 branches covered.">            for(int j=0;j&lt;length;j++){</span>
+<span class="fc" id="L82">                covMatrix[i][j].increment(rowData[i], rowData[j]);</span>
+            }
+        }
+<span class="fc" id="L85">    }</span>
+
+    @Override
+    public RealMatrix getCovarianceMatrix() throws IllegalArgumentException {
+<span class="fc" id="L89">        RealMatrix matrix = new Array2DRowRealMatrix(rowDimension, colDimension);</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">        for(int i=0;i&lt;rowDimension;i++){</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">            for(int j=0;j&lt;colDimension;j++){</span>
+<span class="fc" id="L92">                matrix.setEntry(i, j, covMatrix[i][j].getResult());</span>
+            }
+        }
+<span class="fc" id="L95">        return matrix;</span>
+    }
+
+    public double[][] getData() throws IllegalArgumentException {
+<span class="nc" id="L99">        double[][] data = new double[rowDimension][rowDimension];</span>
+<span class="nc bnc" id="L100" title="All 2 branches missed.">        for(int i=0;i&lt;rowDimension;i++){</span>
+<span class="nc bnc" id="L101" title="All 2 branches missed.">            for(int j=0;j&lt;colDimension;j++){</span>
+<span class="nc" id="L102">                data[i][j] = covMatrix[i][j].getResult();</span>
+            }
+        }
+<span class="nc" id="L105">        return data;</span>
+    }
+
+    /**
+     * This {@link Covariance} method is not supported by StorelessCovariance, since
+     * the number of bivariate observations does not have to be the same for different
+     * pairs of covariates - i.e., N as defined in {@link Covariance#getN()} is undefined.
+     * @return nothing as this implementation always throws a {@link MathUnsupportedOperationException}
+     * @throws MathUnsupportedOperationException in all cases
+     */
+    @Override
+    public int getN()
+        throws MathUnsupportedOperationException {
+<span class="nc" id="L118">        throw new MathUnsupportedOperationException();</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

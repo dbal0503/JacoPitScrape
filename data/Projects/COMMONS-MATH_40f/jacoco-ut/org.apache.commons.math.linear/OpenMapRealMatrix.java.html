@@ -1,0 +1,279 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OpenMapRealMatrix.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Commons Math</a> &gt; <a href="index.source.html" class="el_package">org.apache.commons.math.linear</a> &gt; <span class="el_source">OpenMapRealMatrix.java</span></div><h1>OpenMapRealMatrix.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.commons.math.linear;
+
+import java.io.Serializable;
+
+import org.apache.commons.math.exception.NumberIsTooLargeException;
+import org.apache.commons.math.util.OpenIntToDoubleHashMap;
+
+/**
+ * Sparse matrix implementation based on an open addressed map.
+ *
+ * @version $Id$
+ * @since 2.0
+ */
+public class OpenMapRealMatrix extends AbstractRealMatrix
+    implements SparseRealMatrix, Serializable {
+    /** Serializable version identifier. */
+    private static final long serialVersionUID = -5962461716457143437L;
+    /** Number of rows of the matrix. */
+    private final int rows;
+    /** Number of columns of the matrix. */
+    private final int columns;
+    /** Storage for (sparse) matrix elements. */
+    private final OpenIntToDoubleHashMap entries;
+
+    /**
+     * Build a sparse matrix with the supplied row and column dimensions.
+     *
+     * @param rowDimension Number of rows of the matrix.
+     * @param columnDimension Number of columns of the matrix.
+     */
+    public OpenMapRealMatrix(int rowDimension, int columnDimension) {
+<span class="fc" id="L49">        super(rowDimension, columnDimension);</span>
+<span class="fc" id="L50">        long lRow = rowDimension;</span>
+<span class="fc" id="L51">        long lCol = columnDimension;</span>
+<span class="fc bfc" id="L52" title="All 2 branches covered.">        if (lRow * lCol &gt;= Integer.MAX_VALUE) {</span>
+<span class="fc" id="L53">            throw new NumberIsTooLargeException(lRow * lCol, Integer.MAX_VALUE, false);</span>
+        }
+<span class="fc" id="L55">        this.rows = rowDimension;</span>
+<span class="fc" id="L56">        this.columns = columnDimension;</span>
+<span class="fc" id="L57">        this.entries = new OpenIntToDoubleHashMap(0.0);</span>
+<span class="fc" id="L58">    }</span>
+
+    /**
+     * Build a matrix by copying another one.
+     *
+     * @param matrix matrix to copy.
+     */
+<span class="fc" id="L65">    public OpenMapRealMatrix(OpenMapRealMatrix matrix) {</span>
+<span class="fc" id="L66">        this.rows = matrix.rows;</span>
+<span class="fc" id="L67">        this.columns = matrix.columns;</span>
+<span class="fc" id="L68">        this.entries = new OpenIntToDoubleHashMap(matrix.entries);</span>
+<span class="fc" id="L69">    }</span>
+
+    /** {@inheritDoc} */
+    @Override
+    public OpenMapRealMatrix copy() {
+<span class="fc" id="L74">        return new OpenMapRealMatrix(this);</span>
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public OpenMapRealMatrix createMatrix(int rowDimension, int columnDimension) {
+<span class="fc" id="L80">        return new OpenMapRealMatrix(rowDimension, columnDimension);</span>
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public int getColumnDimension() {
+<span class="fc" id="L86">        return columns;</span>
+    }
+
+    /**
+     * Compute the sum of this matrix and {@code m}.
+     *
+     * @param m Matrix to be added.
+     * @return {@code this} + {@code m}.
+     * @throws org.apache.commons.math.exception.DimensionMismatchException
+     * if {@code m} is not the same size as this matrix.
+     */
+    public OpenMapRealMatrix add(OpenMapRealMatrix m) {
+
+        // safety check
+<span class="fc" id="L100">        MatrixUtils.checkAdditionCompatible(this, m);</span>
+
+<span class="fc" id="L102">        final OpenMapRealMatrix out = new OpenMapRealMatrix(this);</span>
+<span class="fc bfc" id="L103" title="All 2 branches covered.">        for (OpenIntToDoubleHashMap.Iterator iterator = m.entries.iterator(); iterator.hasNext();) {</span>
+<span class="fc" id="L104">            iterator.advance();</span>
+<span class="fc" id="L105">            final int row = iterator.key() / columns;</span>
+<span class="fc" id="L106">            final int col = iterator.key() - row * columns;</span>
+<span class="fc" id="L107">            out.setEntry(row, col, getEntry(row, col) + iterator.value());</span>
+<span class="fc" id="L108">        }</span>
+
+<span class="fc" id="L110">        return out;</span>
+
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public OpenMapRealMatrix subtract(final RealMatrix m) {
+        try {
+<span class="fc" id="L118">            return subtract((OpenMapRealMatrix) m);</span>
+<span class="nc" id="L119">        } catch (ClassCastException cce) {</span>
+<span class="nc" id="L120">            return (OpenMapRealMatrix) super.subtract(m);</span>
+        }
+    }
+
+    /**
+     * Subtract {@code m} from this matrix.
+     *
+     * @param m Matrix to be subtracted.
+     * @return {@code this} - {@code m}.
+     * @throws org.apache.commons.math.exception.DimensionMismatchException
+     * if {@code m} is not the same size as this matrix.
+     */
+    public OpenMapRealMatrix subtract(OpenMapRealMatrix m) {
+        // Safety check.
+<span class="fc" id="L134">        MatrixUtils.checkAdditionCompatible(this, m);</span>
+
+<span class="fc" id="L136">        final OpenMapRealMatrix out = new OpenMapRealMatrix(this);</span>
+<span class="fc bfc" id="L137" title="All 2 branches covered.">        for (OpenIntToDoubleHashMap.Iterator iterator = m.entries.iterator(); iterator.hasNext();) {</span>
+<span class="fc" id="L138">            iterator.advance();</span>
+<span class="fc" id="L139">            final int row = iterator.key() / columns;</span>
+<span class="fc" id="L140">            final int col = iterator.key() - row * columns;</span>
+<span class="fc" id="L141">            out.setEntry(row, col, getEntry(row, col) - iterator.value());</span>
+<span class="fc" id="L142">        }</span>
+
+<span class="fc" id="L144">        return out;</span>
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public RealMatrix multiply(final RealMatrix m) {
+        try {
+<span class="fc" id="L151">            return multiply((OpenMapRealMatrix) m);</span>
+<span class="fc" id="L152">        } catch (ClassCastException cce) {</span>
+
+            // safety check
+<span class="fc" id="L155">            MatrixUtils.checkMultiplicationCompatible(this, m);</span>
+
+<span class="fc" id="L157">            final int outCols = m.getColumnDimension();</span>
+<span class="fc" id="L158">            final BlockRealMatrix out = new BlockRealMatrix(rows, outCols);</span>
+<span class="fc bfc" id="L159" title="All 2 branches covered.">            for (OpenIntToDoubleHashMap.Iterator iterator = entries.iterator(); iterator.hasNext();) {</span>
+<span class="fc" id="L160">                iterator.advance();</span>
+<span class="fc" id="L161">                final double value = iterator.value();</span>
+<span class="fc" id="L162">                final int key      = iterator.key();</span>
+<span class="fc" id="L163">                final int i        = key / columns;</span>
+<span class="fc" id="L164">                final int k        = key % columns;</span>
+<span class="fc bfc" id="L165" title="All 2 branches covered.">                for (int j = 0; j &lt; outCols; ++j) {</span>
+<span class="fc" id="L166">                    out.addToEntry(i, j, value * m.getEntry(k, j));</span>
+                }
+<span class="fc" id="L168">            }</span>
+
+<span class="fc" id="L170">            return out;</span>
+        }
+    }
+
+    /**
+     * Postmultiply this matrix by {@code m}.
+     *
+     * @param m Matrix to postmultiply by.
+     * @return {@code this} * {@code m}.
+     * @throws MatrixDimensionMismatchException
+     * if the number of rows of {@code m} differ from the number of columns
+     * of this matrix.
+     */
+    public OpenMapRealMatrix multiply(OpenMapRealMatrix m) {
+        // Safety check.
+<span class="fc" id="L185">        MatrixUtils.checkMultiplicationCompatible(this, m);</span>
+
+<span class="fc" id="L187">        final int outCols = m.getColumnDimension();</span>
+<span class="fc" id="L188">        OpenMapRealMatrix out = new OpenMapRealMatrix(rows, outCols);</span>
+<span class="fc bfc" id="L189" title="All 2 branches covered.">        for (OpenIntToDoubleHashMap.Iterator iterator = entries.iterator(); iterator.hasNext();) {</span>
+<span class="fc" id="L190">            iterator.advance();</span>
+<span class="fc" id="L191">            final double value = iterator.value();</span>
+<span class="fc" id="L192">            final int key      = iterator.key();</span>
+<span class="fc" id="L193">            final int i        = key / columns;</span>
+<span class="fc" id="L194">            final int k        = key % columns;</span>
+<span class="fc bfc" id="L195" title="All 2 branches covered.">            for (int j = 0; j &lt; outCols; ++j) {</span>
+<span class="fc" id="L196">                final int rightKey = m.computeKey(k, j);</span>
+<span class="fc bfc" id="L197" title="All 2 branches covered.">                if (m.entries.containsKey(rightKey)) {</span>
+<span class="fc" id="L198">                    final int outKey = out.computeKey(i, j);</span>
+<span class="fc" id="L199">                    final double outValue =</span>
+<span class="fc" id="L200">                        out.entries.get(outKey) + value * m.entries.get(rightKey);</span>
+<span class="fc bfc" id="L201" title="All 2 branches covered.">                    if (outValue == 0.0) {</span>
+<span class="fc" id="L202">                        out.entries.remove(outKey);</span>
+                    } else {
+<span class="fc" id="L204">                        out.entries.put(outKey, outValue);</span>
+                    }
+                }
+            }
+<span class="fc" id="L208">        }</span>
+
+<span class="fc" id="L210">        return out;</span>
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public double getEntry(int row, int column) {
+<span class="fc" id="L216">        MatrixUtils.checkRowIndex(this, row);</span>
+<span class="fc" id="L217">        MatrixUtils.checkColumnIndex(this, column);</span>
+<span class="fc" id="L218">        return entries.get(computeKey(row, column));</span>
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public int getRowDimension() {
+<span class="fc" id="L224">        return rows;</span>
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public void setEntry(int row, int column, double value) {
+<span class="fc" id="L230">        MatrixUtils.checkRowIndex(this, row);</span>
+<span class="fc" id="L231">        MatrixUtils.checkColumnIndex(this, column);</span>
+<span class="fc bfc" id="L232" title="All 2 branches covered.">        if (value == 0.0) {</span>
+<span class="fc" id="L233">            entries.remove(computeKey(row, column));</span>
+        } else {
+<span class="fc" id="L235">            entries.put(computeKey(row, column), value);</span>
+        }
+<span class="fc" id="L237">    }</span>
+
+    /** {@inheritDoc} */
+    @Override
+    public void addToEntry(int row, int column, double increment) {
+<span class="nc" id="L242">        MatrixUtils.checkRowIndex(this, row);</span>
+<span class="nc" id="L243">        MatrixUtils.checkColumnIndex(this, column);</span>
+<span class="nc" id="L244">        final int key = computeKey(row, column);</span>
+<span class="nc" id="L245">        final double value = entries.get(key) + increment;</span>
+<span class="nc bnc" id="L246" title="All 2 branches missed.">        if (value == 0.0) {</span>
+<span class="nc" id="L247">            entries.remove(key);</span>
+        } else {
+<span class="nc" id="L249">            entries.put(key, value);</span>
+        }
+<span class="nc" id="L251">    }</span>
+
+    /** {@inheritDoc} */
+    @Override
+    public void multiplyEntry(int row, int column, double factor) {
+<span class="nc" id="L256">        MatrixUtils.checkRowIndex(this, row);</span>
+<span class="nc" id="L257">        MatrixUtils.checkColumnIndex(this, column);</span>
+<span class="nc" id="L258">        final int key = computeKey(row, column);</span>
+<span class="nc" id="L259">        final double value = entries.get(key) * factor;</span>
+<span class="nc bnc" id="L260" title="All 2 branches missed.">        if (value == 0.0) {</span>
+<span class="nc" id="L261">            entries.remove(key);</span>
+        } else {
+<span class="nc" id="L263">            entries.put(key, value);</span>
+        }
+<span class="nc" id="L265">    }</span>
+
+    /**
+     * Compute the key to access a matrix element
+     * @param row row index of the matrix element
+     * @param column column index of the matrix element
+     * @return key within the map to access the matrix element
+     */
+    private int computeKey(int row, int column) {
+<span class="fc" id="L274">        return row * columns + column;</span>
+    }
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

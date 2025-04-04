@@ -1,0 +1,207 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>JacksonXmlAnnotationIntrospector.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Jackson-dataformat-XML</a> &gt; <a href="index.source.html" class="el_package">com.fasterxml.jackson.dataformat.xml</a> &gt; <span class="el_source">JacksonXmlAnnotationIntrospector.java</span></div><h1>JacksonXmlAnnotationIntrospector.java</h1><pre class="source lang-java linenums">package com.fasterxml.jackson.dataformat.xml;
+
+import com.fasterxml.jackson.databind.PropertyName;
+import com.fasterxml.jackson.databind.introspect.*;
+import com.fasterxml.jackson.databind.jsontype.impl.StdTypeResolverBuilder;
+import com.fasterxml.jackson.dataformat.xml.annotation.*;
+
+/**
+ * Extension of {@link JacksonAnnotationIntrospector} that is needed to support
+ * additional xml-specific annotation that Jackson provides. Note, however, that
+ * there is no JAXB annotation support here; that is provided with
+ * separate introspector (see
+ * {@link com.fasterxml.jackson.module.jaxb.JaxbAnnotationIntrospector}).
+ */
+public class JacksonXmlAnnotationIntrospector
+    extends JacksonAnnotationIntrospector
+    implements XmlAnnotationIntrospector
+{
+    private static final long serialVersionUID = 1L;
+
+    /**
+     * For backwards compatibility with 2.0, the default behavior is
+     * to assume use of List wrapper if no annotations are used.
+     */
+    public final static boolean DEFAULT_USE_WRAPPER = true;
+
+    // non-final from 2.7 on, to allow mapper to change
+    protected boolean _cfgDefaultUseWrapper;
+    
+    public JacksonXmlAnnotationIntrospector() {
+<span class="nc" id="L31">        this(DEFAULT_USE_WRAPPER);</span>
+<span class="nc" id="L32">    }</span>
+
+<span class="fc" id="L34">    public JacksonXmlAnnotationIntrospector(boolean defaultUseWrapper) {</span>
+<span class="fc" id="L35">        _cfgDefaultUseWrapper = defaultUseWrapper;</span>
+<span class="fc" id="L36">    }</span>
+
+    /*
+    /**********************************************************************
+    /* Overrides of JacksonAnnotationIntrospector impls
+    /**********************************************************************
+     */
+
+    @Override
+    public PropertyName findWrapperName(Annotated ann)
+    {
+<span class="fc" id="L47">        JacksonXmlElementWrapper w = ann.getAnnotation(JacksonXmlElementWrapper.class);</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">        if (w != null) {</span>
+            // Special case: wrapping explicitly blocked?
+<span class="fc bfc" id="L50" title="All 2 branches covered.">            if (!w.useWrapping()) {</span>
+<span class="fc" id="L51">                return PropertyName.NO_NAME;</span>
+            }
+            // also: need to ensure we use marker:
+<span class="fc" id="L54">            String localName = w.localName();</span>
+<span class="pc bpc" id="L55" title="1 of 4 branches missed.">            if (localName == null || localName.length() == 0) {</span>
+<span class="fc" id="L56">                return PropertyName.USE_DEFAULT;</span>
+            }
+<span class="fc" id="L58">            return PropertyName.construct(w.localName(), w.namespace());</span>
+        }
+        /* 09-Sep-2012, tatu: In absence of configurating we need to use our
+         *   default settings...
+         */
+<span class="fc bfc" id="L63" title="All 2 branches covered.">        if (_cfgDefaultUseWrapper) {</span>
+<span class="fc" id="L64">            return PropertyName.USE_DEFAULT;</span>
+        }
+<span class="fc" id="L66">        return null;</span>
+    }
+    
+    @Override
+    public PropertyName findRootName(AnnotatedClass ac)
+    {
+<span class="fc" id="L72">        JacksonXmlRootElement root = ac.getAnnotation(JacksonXmlRootElement.class);</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">        if (root != null) {</span>
+<span class="fc" id="L74">            String local = root.localName();</span>
+<span class="fc" id="L75">            String ns = root.namespace();</span>
+            
+<span class="pc bpc" id="L77" title="3 of 4 branches missed.">            if (local.length() == 0 &amp;&amp; ns.length() == 0) {</span>
+<span class="nc" id="L78">                return PropertyName.USE_DEFAULT;</span>
+            }
+<span class="fc" id="L80">            return new PropertyName(local, ns);</span>
+        }
+<span class="fc" id="L82">        return super.findRootName(ac);</span>
+    }
+    
+    /*
+    /**********************************************************************
+    /* XmlAnnotationIntrospector, findXxx
+    /**********************************************************************
+     */
+
+    @Override
+    public String findNamespace(Annotated ann)
+    {
+<span class="fc" id="L94">        JacksonXmlProperty prop = ann.getAnnotation(JacksonXmlProperty.class);</span>
+<span class="fc bfc" id="L95" title="All 2 branches covered.">        if (prop != null) {</span>
+<span class="fc" id="L96">            return prop.namespace();</span>
+        }
+<span class="fc" id="L98">        return null;</span>
+    }
+
+    /*
+    /**********************************************************************
+    /* XmlAnnotationIntrospector, isXxx methods
+    /**********************************************************************
+     */
+    
+    @Override
+    public Boolean isOutputAsAttribute(Annotated ann)
+    {
+<span class="fc" id="L110">        JacksonXmlProperty prop = ann.getAnnotation(JacksonXmlProperty.class);</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">        if (prop != null) {</span>
+<span class="fc bfc" id="L112" title="All 2 branches covered.">            return prop.isAttribute() ? Boolean.TRUE : Boolean.FALSE;</span>
+        }
+<span class="fc" id="L114">        return null;</span>
+    }
+    
+    @Override
+    public Boolean isOutputAsText(Annotated ann)
+    {
+<span class="fc" id="L120">        JacksonXmlText prop = ann.getAnnotation(JacksonXmlText.class);</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">        if (prop != null) {</span>
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">            return prop.value() ? Boolean.TRUE : Boolean.FALSE;</span>
+        }
+<span class="fc" id="L124">        return null;</span>
+    }
+
+    @Override
+    public Boolean isOutputAsCData(Annotated ann) {
+<span class="fc" id="L129">        JacksonXmlCData prop = ann.getAnnotation(JacksonXmlCData.class);</span>
+<span class="fc bfc" id="L130" title="All 2 branches covered.">        if (prop != null) {</span>
+<span class="pc bpc" id="L131" title="1 of 2 branches missed.">            return prop.value() ? Boolean.TRUE : Boolean.FALSE;</span>
+        }
+<span class="fc" id="L133">        return null;</span>
+    }
+
+    @Override
+    public void setDefaultUseWrapper(boolean b) {
+<span class="fc" id="L138">        _cfgDefaultUseWrapper = b;</span>
+<span class="fc" id="L139">    }</span>
+
+    /*
+    /**********************************************************************
+    /* Overrides for name, property detection
+    /**********************************************************************
+     */
+
+    @Override
+    public PropertyName findNameForSerialization(Annotated a)
+    {
+<span class="fc" id="L150">        PropertyName name = _findXmlName(a);</span>
+<span class="fc bfc" id="L151" title="All 2 branches covered.">        if (name == null) {</span>
+<span class="fc" id="L152">            name = super.findNameForSerialization(a);</span>
+<span class="fc bfc" id="L153" title="All 2 branches covered.">            if (name == null) {</span>
+<span class="fc bfc" id="L154" title="All 2 branches covered.">                if (a.hasAnnotation(JacksonXmlText.class)) {</span>
+<span class="fc" id="L155">                    return PropertyName.USE_DEFAULT;</span>
+                }
+            }
+        }
+<span class="fc" id="L159">        return name;</span>
+    }
+
+    @Override
+    public PropertyName findNameForDeserialization(Annotated a)
+    {
+<span class="fc" id="L165">        PropertyName name = _findXmlName(a);</span>
+<span class="fc bfc" id="L166" title="All 2 branches covered.">        if (name == null) {</span>
+<span class="fc" id="L167">            name = super.findNameForDeserialization(a);</span>
+<span class="fc bfc" id="L168" title="All 2 branches covered.">            if (name == null) {</span>
+<span class="fc bfc" id="L169" title="All 2 branches covered.">                if (a.hasAnnotation(JacksonXmlText.class)) {</span>
+<span class="fc" id="L170">                    return PropertyName.USE_DEFAULT;</span>
+                }
+            }
+        }
+<span class="fc" id="L174">        return name;</span>
+    }
+    
+    /*
+    /**********************************************************************
+    /* Overrides for non-public helper methods
+    /**********************************************************************
+     */
+
+    /**
+     * We will override this method so that we can return instance
+     * that cleans up type id property name to be a valid xml name.
+     */
+    @Override
+    protected StdTypeResolverBuilder _constructStdTypeResolverBuilder() {
+<span class="fc" id="L189">        return new XmlTypeResolverBuilder();</span>
+    }
+
+    /*
+    /**********************************************************************
+    /* Internal methods
+    /**********************************************************************
+     */
+
+    protected PropertyName _findXmlName(Annotated a)
+    {
+<span class="fc" id="L200">        JacksonXmlProperty pann = a.getAnnotation(JacksonXmlProperty.class);</span>
+<span class="fc bfc" id="L201" title="All 2 branches covered.">        if (pann != null) {</span>
+<span class="fc" id="L202">            return PropertyName.construct(pann.localName(), pann.namespace());</span>
+        }
+<span class="fc" id="L204">        return null;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Incrementor.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Commons Math</a> &gt; <a href="index.source.html" class="el_package">org.apache.commons.math.util</a> &gt; <span class="el_source">Incrementor.java</span></div><h1>Incrementor.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.commons.math.util;
+
+import org.apache.commons.math.exception.MaxCountExceededException;
+
+/**
+ * Utility that increments a counter until a maximum is reached, at
+ * which point, the instance will by default throw a
+ * {@link MaxCountExceededException}.
+ * However, the user is able to override this behaviour by defining a
+ * custom {@link MaxCountExceededCallback callback}, in order to e.g.
+ * select which exception must be thrown.
+ *
+ * @version $Id$
+ * @since 3.0
+ */
+public class Incrementor {
+    /**
+     * Upper limit for the counter.
+     */
+    private int maximalCount;
+    /**
+     * Current count.
+     */
+<span class="fc" id="L40">    private int count = 0;</span>
+    /**
+     * Function called at counter exhaustion.
+     */
+    private final MaxCountExceededCallback maxCountCallback;
+
+    /**
+     * Default constructor.
+     * For the new instance to be useful, the maximal count must be set
+     * by calling {@link #setMaximalCount(int) setMaximalCount}.
+     */
+    public Incrementor() {
+<span class="fc" id="L52">        this(0);</span>
+<span class="fc" id="L53">    }</span>
+
+    /**
+     * Defines a maximal count.
+     *
+     * @param max Maximal count.
+     */
+    public Incrementor(int max) {
+<span class="fc" id="L61">        this(max,</span>
+<span class="fc" id="L62">             new MaxCountExceededCallback() {</span>
+                 /** {@inheritDoc} */
+                 public void trigger(int max) {
+<span class="fc" id="L65">                     throw new MaxCountExceededException(max);</span>
+                 }
+             });
+<span class="fc" id="L68">    }</span>
+
+    /**
+     * Defines a maximal count and a callback method to be triggered at
+     * counter exhaustion.
+     *
+     * @param max Maximal count.
+     * @param cb Function to be called when the maximal count has been reached.
+     */
+    public Incrementor(int max,
+<span class="fc" id="L78">                       MaxCountExceededCallback cb) {</span>
+<span class="fc" id="L79">        maximalCount = max;</span>
+<span class="fc" id="L80">        maxCountCallback = cb;</span>
+<span class="fc" id="L81">    }</span>
+
+    /**
+     * Sets the upper limit for the counter.
+     * This does not automatically reset the current count to zero (see
+     * {@link #resetCount()}).
+     *
+     * @param max Upper limit of the counter.
+     */
+    public void setMaximalCount(int max) {
+<span class="fc" id="L91">        maximalCount = max;</span>
+<span class="fc" id="L92">    }</span>
+
+    /**
+     * Gets the upper limit of the counter.
+     *
+     * @return the counter upper limit.
+     */
+    public int getMaximalCount() {
+<span class="fc" id="L100">        return maximalCount;</span>
+    }
+
+    /**
+     * Gets the current count.
+     *
+     * @return the current count.
+     */
+    public int getCount() {
+<span class="fc" id="L109">        return count;</span>
+    }
+
+    /**
+     * Checks whether a single increment is allowed.
+     *
+     * @return {@code false} if the next call to {@link #incrementCount(int)
+     * incrementCount} will trigger a {@code MaxCountExceededException},
+     * {@code true} otherwise.
+     */
+    public boolean canIncrement() {
+<span class="fc bfc" id="L120" title="All 2 branches covered.">        return count &lt; maximalCount;</span>
+    }
+
+    /**
+     * Performs multiple increments.
+     * See the other {@link #incrementCount() incrementCount} method).
+     *
+     * @param value Number of increments.
+     * @throws MaxCountExceededException at counter exhaustion.
+     */
+    public void incrementCount(int value) {
+<span class="fc bfc" id="L131" title="All 2 branches covered.">        for (int i = 0; i &lt; value; i++) {</span>
+<span class="fc" id="L132">            incrementCount();</span>
+        }
+<span class="fc" id="L134">    }</span>
+
+    /**
+     * Adds one to the current iteration count.
+     * At counter exhaustion, this method will call the
+     * {@link MaxCountExceededCallback#trigger(int) trigger} method of the
+     * callback object passed to the
+     * {@link #Incrementor(int,MaxCountExceededCallback) constructor}.
+     * If not explictly set, a default callback is used that will throw
+     * a {@code MaxCountExceededException}.
+     *
+     * @throws MaxCountExceededException at counter exhaustion, unless a
+     * custom {@link MaxCountExceededCallback callback} has been set at
+     * construction.
+     */
+    public void incrementCount() {
+<span class="fc bfc" id="L150" title="All 2 branches covered.">        if (++count &gt; maximalCount) {</span>
+<span class="nc" id="L151">            maxCountCallback.trigger(maximalCount);</span>
+        }
+<span class="fc" id="L153">    }</span>
+
+    /**
+     * Resets the counter to 0.
+     */
+    public void resetCount() {
+<span class="fc" id="L159">        count = 0;</span>
+<span class="fc" id="L160">    }</span>
+
+    /**
+     * Defines a method to be called at counter exhaustion.
+     * The {@link #trigger(int) trigger} method should usually throw an exception.
+     */
+    public interface MaxCountExceededCallback {
+        /**
+         * Function called when the maximal count has been reached.
+         *
+         * @param maximalCount Maximal count.
+         */
+        void trigger(int maximalCount);
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

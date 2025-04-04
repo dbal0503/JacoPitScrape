@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>StaxUtil.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Jackson-dataformat-XML</a> &gt; <a href="index.source.html" class="el_package">com.fasterxml.jackson.dataformat.xml.util</a> &gt; <span class="el_source">StaxUtil.java</span></div><h1>StaxUtil.java</h1><pre class="source lang-java linenums">package com.fasterxml.jackson.dataformat.xml.util;
+
+import java.io.IOException;
+
+import javax.xml.stream.*;
+
+import com.fasterxml.jackson.core.JsonGenerationException;
+import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.core.JsonParseException;
+import com.fasterxml.jackson.core.JsonParser;
+
+<span class="nc" id="L12">public class StaxUtil</span>
+{
+    /**
+     * Adapter method used when only IOExceptions are declared to be thrown, but
+     * a {@link XMLStreamException} was caught.
+     *&lt;p&gt;
+     * Note: dummy type variable is used for convenience, to allow caller to claim
+     * that this method returns result of any necessary type.
+     *
+     * @deprecated Since 2.9
+     */
+    @Deprecated
+    public static &lt;T&gt; T throwXmlAsIOException(XMLStreamException e) throws IOException
+    {
+<span class="nc" id="L26">        Throwable t = _unwrap(e);</span>
+<span class="nc" id="L27">        throw new IOException(t);</span>
+    }
+
+    /**
+     * @since 2.9
+     */
+    public static &lt;T&gt; T throwAsParseException(XMLStreamException e,
+            JsonParser p) throws IOException
+    {
+<span class="fc" id="L36">        Throwable t = _unwrap(e);</span>
+<span class="fc" id="L37">        throw new JsonParseException(p, _message(t, e), t);</span>
+    }
+
+    /**
+     * @since 2.9
+     */
+    public static &lt;T&gt; T throwAsGenerationException(XMLStreamException e,
+            JsonGenerator g) throws IOException
+    {
+<span class="nc" id="L46">        Throwable t = _unwrap(e);</span>
+<span class="nc" id="L47">        throw new JsonGenerationException(_message(t, e), t, g);</span>
+    }
+
+    private static Throwable _unwrap(Throwable t) {
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">        while (t.getCause() != null) {</span>
+<span class="nc" id="L52">            t = t.getCause();</span>
+        }
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">        if (t instanceof Error) throw (Error) t;</span>
+<span class="pc bpc" id="L55" title="1 of 2 branches missed.">        if (t instanceof RuntimeException) throw (RuntimeException) t;</span>
+<span class="fc" id="L56">        return t;</span>
+    }
+
+    private static String _message(Throwable t1, Throwable t2) {
+<span class="fc" id="L60">        String msg = t1.getMessage();</span>
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">        if (msg == null) {</span>
+<span class="nc" id="L62">            msg = t2.getMessage();</span>
+        }
+<span class="fc" id="L64">        return msg;</span>
+    }
+
+    /**
+     * Since XML names can not contain all characters JSON names can, we may
+     * need to replace characters. Let's start with trivial replacement of
+     * ASCII characters that can not be included.
+     */
+    public static String sanitizeXmlTypeName(String name)
+    {
+        StringBuilder sb;
+<span class="fc" id="L75">        int changes = 0;</span>
+        // First things first: remove array types' trailing[]...
+<span class="fc bfc" id="L77" title="All 2 branches covered.">        if (name.endsWith(&quot;[]&quot;)) {</span>
+            do {
+<span class="fc" id="L79">                name = name.substring(0, name.length() - 2);</span>
+<span class="fc" id="L80">                ++changes;</span>
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">            } while (name.endsWith(&quot;[]&quot;));</span>
+<span class="fc" id="L82">            sb = new StringBuilder(name);</span>
+            // do trivial pluralization attempt
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">            if (name.endsWith(&quot;s&quot;)) {</span>
+<span class="nc" id="L85">                sb.append(&quot;es&quot;);</span>
+            } else {
+<span class="fc" id="L87">                sb.append('s');</span>
+            }
+        } else {
+<span class="fc" id="L90">            sb = new StringBuilder(name);</span>
+        }
+<span class="fc bfc" id="L92" title="All 2 branches covered.">        for (int i = 0, len = name.length(); i &lt; len; ++i) {</span>
+<span class="fc" id="L93">            char c = name.charAt(i);</span>
+<span class="pc bpc" id="L94" title="1 of 2 branches missed.">            if (c &gt; 127) continue;</span>
+<span class="pc bpc" id="L95" title="1 of 4 branches missed.">            if (c &gt;= 'a' &amp;&amp; c &lt;= 'z') continue;</span>
+<span class="pc bpc" id="L96" title="1 of 4 branches missed.">            if (c &gt;= 'A' &amp;&amp; c &lt;= 'Z') continue;</span>
+<span class="pc bpc" id="L97" title="1 of 4 branches missed.">            if (c &gt;= '0' &amp;&amp; c &lt;= '9') continue;</span>
+<span class="pc bpc" id="L98" title="3 of 6 branches missed.">            if (c == '_' || c == '.' || c == '-') continue;</span>
+            // Ok, need to replace
+<span class="fc" id="L100">            ++changes;</span>
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">            if (c == '$') {</span>
+<span class="nc" id="L102">                sb.setCharAt(i, '.');</span>
+            } else {
+<span class="fc" id="L104">                sb.setCharAt(i, '_');</span>
+            }
+        }
+<span class="fc bfc" id="L107" title="All 2 branches covered.">        if (changes == 0) {</span>
+<span class="fc" id="L108">            return name;</span>
+        }
+<span class="fc" id="L110">        return sb.toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

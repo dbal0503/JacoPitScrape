@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BaseAbstractSimpleBoundsScalarOptimizer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Commons Math</a> &gt; <a href="index.source.html" class="el_package">org.apache.commons.math.optimization.direct</a> &gt; <span class="el_source">BaseAbstractSimpleBoundsScalarOptimizer.java</span></div><h1>BaseAbstractSimpleBoundsScalarOptimizer.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.commons.math.optimization.direct;
+
+import org.apache.commons.math.analysis.MultivariateFunction;
+import org.apache.commons.math.optimization.BaseMultivariateRealOptimizer;
+import org.apache.commons.math.optimization.BaseSimpleBoundsMultivariateRealOptimizer;
+import org.apache.commons.math.optimization.GoalType;
+import org.apache.commons.math.optimization.RealPointValuePair;
+import org.apache.commons.math.optimization.ConvergenceChecker;
+import org.apache.commons.math.exception.DimensionMismatchException;
+import org.apache.commons.math.exception.NumberIsTooSmallException;
+import org.apache.commons.math.exception.NumberIsTooLargeException;
+
+/**
+ * Base class for implementing optimizers for multivariate scalar functions,
+ * subject to simple bounds: The valid range of the parameters is an interval.
+ * The interval can possibly be infinite (in one or both directions).
+ * This base class handles the boiler-plate methods associated to thresholds
+ * settings, iterations and evaluations counting.
+ *
+ * @param &lt;FUNC&gt; Type of the objective function to be optimized.
+ *
+ * @version $Id$
+ * @since 3.0
+ */
+public abstract class BaseAbstractSimpleBoundsScalarOptimizer&lt;FUNC extends MultivariateFunction&gt;
+    extends BaseAbstractScalarOptimizer&lt;FUNC&gt;
+    implements BaseMultivariateRealOptimizer&lt;FUNC&gt;,
+               BaseSimpleBoundsMultivariateRealOptimizer&lt;FUNC&gt; {
+    /** Lower bounds. */
+    private double[] lowerBound;
+    /** Upper bounds. */
+    private double[] upperBound;
+
+    /**
+     * Simple constructor with default settings.
+     * The convergence checker is set to a
+     * {@link org.apache.commons.math.optimization.SimpleScalarValueChecker} and
+     * the allowed number of evaluations is set to {@link Integer#MAX_VALUE}.
+     *
+     * @see BaseAbstractScalarOptimizer#BaseAbstractScalarOptimizer()
+     */
+<span class="fc" id="L59">    protected BaseAbstractSimpleBoundsScalarOptimizer() {}</span>
+
+    /**
+     * @param checker Convergence checker.
+     */
+    protected BaseAbstractSimpleBoundsScalarOptimizer(ConvergenceChecker&lt;RealPointValuePair&gt; checker) {
+<span class="nc" id="L65">        super(checker);</span>
+<span class="nc" id="L66">    }</span>
+
+    /**
+     * @return the lower bounds.
+     */
+    public double[] getLowerBound() {
+<span class="fc" id="L72">        return lowerBound.clone();</span>
+    }
+
+    /**
+     * @return the upper bounds.
+     */
+    public double[] getUpperBound() {
+<span class="fc" id="L79">        return upperBound.clone();</span>
+    }
+
+    /** {@inheritDoc} */
+    public RealPointValuePair optimize(int maxEval, FUNC f, GoalType goalType,
+                                       double[] startPoint) {
+<span class="nc" id="L85">        return optimize(maxEval, f, goalType, startPoint, null, null);</span>
+    }
+
+    /** {@inheritDoc} */
+    public RealPointValuePair optimize(int maxEval, FUNC f, GoalType goalType,
+                                       double[] startPoint,
+                                       double[] lower, double[] upper) {
+        // Checks.
+<span class="fc" id="L93">        final int dim = startPoint.length;</span>
+<span class="fc bfc" id="L94" title="All 2 branches covered.">        if (lower != null) {</span>
+<span class="fc bfc" id="L95" title="All 2 branches covered.">            if (lower.length != dim) {</span>
+<span class="fc" id="L96">                throw new DimensionMismatchException(lower.length, dim);</span>
+            }
+<span class="fc bfc" id="L98" title="All 2 branches covered.">            for (int i = 0; i &lt; dim; i++) {</span>
+<span class="fc" id="L99">                final double v = startPoint[i];</span>
+<span class="fc" id="L100">                final double lo = lower[i];</span>
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">                if (v &lt; lo) {</span>
+<span class="nc" id="L102">                    throw new NumberIsTooSmallException(v, lo, true);</span>
+                }
+            }
+        }
+<span class="fc bfc" id="L106" title="All 2 branches covered.">        if (upper != null) {</span>
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">            if (upper.length != dim) {</span>
+<span class="nc" id="L108">                throw new DimensionMismatchException(upper.length, dim);</span>
+            }
+<span class="fc bfc" id="L110" title="All 2 branches covered.">            for (int i = 0; i &lt; dim; i++) {</span>
+<span class="fc" id="L111">                final double v = startPoint[i];</span>
+<span class="fc" id="L112">                final double hi = upper[i];</span>
+<span class="fc bfc" id="L113" title="All 2 branches covered.">                if (v &gt; hi) {</span>
+<span class="fc" id="L114">                    throw new NumberIsTooLargeException(v, hi, true);</span>
+                }
+            }
+        }
+
+        // Initialization.
+<span class="fc bfc" id="L120" title="All 2 branches covered.">        if (lower == null) {</span>
+<span class="fc" id="L121">            lowerBound = new double[dim];</span>
+<span class="fc bfc" id="L122" title="All 2 branches covered.">            for (int i = 0; i &lt; dim; i++) {</span>
+<span class="fc" id="L123">                lowerBound[i] = Double.NEGATIVE_INFINITY;</span>
+            }
+        } else {
+<span class="fc" id="L126">            lowerBound = lower.clone();</span>
+        }
+<span class="fc bfc" id="L128" title="All 2 branches covered.">        if (upper == null) {</span>
+<span class="fc" id="L129">            upperBound = new double[dim];</span>
+<span class="fc bfc" id="L130" title="All 2 branches covered.">            for (int i = 0; i &lt; dim; i++) {</span>
+<span class="fc" id="L131">                upperBound[i] = Double.POSITIVE_INFINITY;</span>
+            }
+        } else {
+<span class="fc" id="L134">            upperBound = upper.clone();</span>
+        }
+
+        // Base class method performs the non bound-specific initializations.
+<span class="fc" id="L138">        return super.optimize(maxEval, f, goalType, startPoint);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

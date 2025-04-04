@@ -1,0 +1,341 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ConstructorUtils.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Commons Lang</a> &gt; <a href="index.source.html" class="el_package">org.apache.commons.lang.reflect</a> &gt; <span class="el_source">ConstructorUtils.java</span></div><h1>ConstructorUtils.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.commons.lang.reflect;
+
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Modifier;
+
+import org.apache.commons.lang.ArrayUtils;
+import org.apache.commons.lang.ClassUtils;
+
+/**
+ * &lt;p&gt; Utility reflection methods focussed on constructors, modelled after {@link MethodUtils}. &lt;/p&gt;
+ *
+ * &lt;h3&gt;Known Limitations&lt;/h3&gt;
+ * &lt;h4&gt;Accessing Public Constructors In A Default Access Superclass&lt;/h4&gt;
+ * &lt;p&gt;There is an issue when invoking public constructors contained in a default access superclass.
+ * Reflection locates these constructors fine and correctly assigns them as public.
+ * However, an &lt;code&gt;IllegalAccessException&lt;/code&gt; is thrown if the constructors is invoked.&lt;/p&gt;
+ *
+ * &lt;p&gt;&lt;code&gt;ConstructorUtils&lt;/code&gt; contains a workaround for this situation.
+ * It will attempt to call &lt;code&gt;setAccessible&lt;/code&gt; on this constructor.
+ * If this call succeeds, then the method can be invoked as normal.
+ * This call will only succeed when the application has sufficient security privilages.
+ * If this call fails then a warning will be logged and the method may fail.&lt;/p&gt;
+ *
+ * @author Craig R. McClanahan
+ * @author Ralph Schaer
+ * @author Chris Audley
+ * @author Rey Francois
+ * @author Gregor Rayman
+ * @author Jan Sorensen
+ * @author Robert Burrell Donkin
+ * @author Rodney Waldhoff
+ * @since 3.0
+ * @version $Id$
+ */
+public class ConstructorUtils {
+
+    /**
+     * &lt;p&gt;ConstructorUtils instances should NOT be constructed in standard programming.
+     * Instead, the class should be used as
+     * &lt;code&gt;ConstructorUtils.invokeConstructor(cls, args)&lt;/code&gt;.&lt;/p&gt;
+     *
+     * &lt;p&gt;This constructor is public to permit tools that require a JavaBean
+     * instance to operate.&lt;/p&gt;
+     */
+    public ConstructorUtils() {
+<span class="nc" id="L63">        super();</span>
+<span class="nc" id="L64">    }</span>
+
+    /**
+     * &lt;p&gt;Convenience method returning new instance of &lt;code&gt;klazz&lt;/code&gt; using a single argument constructor.
+     * The formal parameter type is inferred from the actual values of &lt;code&gt;arg&lt;/code&gt;.
+     * See {@link #invokeExactConstructor(Class, Object[], Class[])} for more details.&lt;/p&gt;
+     *
+     * &lt;p&gt;The signatures should be assignment compatible.&lt;/p&gt;
+     *
+     * @param cls the class to be constructed.
+     * @param arg the actual argument
+     * @return new instance of &lt;code&gt;klazz&lt;/code&gt;
+     *
+     * @throws NoSuchMethodException If the constructor cannot be found
+     * @throws IllegalAccessException If an error occurs accessing the constructor
+     * @throws InvocationTargetException If an error occurs invoking the constructor
+     * @throws InstantiationException If an error occurs instantiating the class
+     *
+     * @see #invokeConstructor(java.lang.Class, java.lang.Object[], java.lang.Class[])
+     */
+    public static Object invokeConstructor(Class&lt;?&gt; cls, Object arg)
+            throws NoSuchMethodException, IllegalAccessException,
+            InvocationTargetException, InstantiationException {
+<span class="fc" id="L87">        return invokeConstructor(cls, new Object[] { arg });</span>
+    }
+
+    /**
+     * &lt;p&gt;Returns new instance of &lt;code&gt;klazz&lt;/code&gt; created using the actual arguments &lt;code&gt;args&lt;/code&gt;.
+     * The formal parameter types are inferred from the actual values of &lt;code&gt;args&lt;/code&gt;.
+     * See {@link #invokeExactConstructor(Class, Object[], Class[])} for more details.&lt;/p&gt;
+     *
+     * &lt;p&gt;The signatures should be assignment compatible.&lt;/p&gt;
+     *
+     * @param cls the class to be constructed.
+     * @param args actual argument array
+     * @return new instance of &lt;code&gt;klazz&lt;/code&gt;
+     *
+     * @throws NoSuchMethodException If the constructor cannot be found
+     * @throws IllegalAccessException If an error occurs accessing the constructor
+     * @throws InvocationTargetException If an error occurs invoking the constructor
+     * @throws InstantiationException If an error occurs instantiating the class
+     *
+     * @see #invokeConstructor(java.lang.Class, java.lang.Object[], java.lang.Class[])
+     */
+    public static Object invokeConstructor(Class&lt;?&gt; cls, Object[] args)
+            throws NoSuchMethodException, IllegalAccessException,
+            InvocationTargetException, InstantiationException {
+<span class="fc bfc" id="L111" title="All 2 branches covered.">        if (null == args) {</span>
+<span class="fc" id="L112">            args = ArrayUtils.EMPTY_OBJECT_ARRAY;</span>
+        }
+<span class="fc" id="L114">        Class&lt;?&gt; parameterTypes[] = new Class[args.length];</span>
+<span class="fc bfc" id="L115" title="All 2 branches covered.">        for (int i = 0; i &lt; args.length; i++) {</span>
+<span class="fc" id="L116">            parameterTypes[i] = args[i].getClass();</span>
+        }
+<span class="fc" id="L118">        return invokeConstructor(cls, args, parameterTypes);</span>
+    }
+
+    /**
+     * &lt;p&gt;Returns new instance of &lt;code&gt;klazz&lt;/code&gt; created using constructor
+     * with signature &lt;code&gt;parameterTypes&lt;/code&gt; and actual arguments &lt;code&gt;args&lt;/code&gt;.&lt;/p&gt;
+     *
+     * &lt;p&gt;The signatures should be assignment compatible.&lt;/p&gt;
+     *
+     * @param cls the class to be constructed.
+     * @param args actual argument array
+     * @param parameterTypes parameter types array
+     * @return new instance of &lt;code&gt;klazz&lt;/code&gt;
+     *
+     * @throws NoSuchMethodException if matching constructor cannot be found
+     * @throws IllegalAccessException thrown on the constructor's invocation
+     * @throws InvocationTargetException thrown on the constructor's invocation
+     * @throws InstantiationException thrown on the constructor's invocation
+     * @see Constructor#newInstance
+     */
+    public static Object invokeConstructor(Class&lt;?&gt; cls, Object[] args,
+            Class&lt;?&gt;[] parameterTypes) throws NoSuchMethodException,
+            IllegalAccessException, InvocationTargetException,
+            InstantiationException {
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">        if (parameterTypes == null) {</span>
+<span class="nc" id="L143">            parameterTypes = ArrayUtils.EMPTY_CLASS_ARRAY;</span>
+        }
+<span class="pc bpc" id="L145" title="1 of 2 branches missed.">        if (args == null) {</span>
+<span class="nc" id="L146">            args = ArrayUtils.EMPTY_OBJECT_ARRAY;</span>
+        }
+<span class="fc" id="L148">        Constructor ctor = getMatchingAccessibleConstructor(cls, parameterTypes);</span>
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">        if (null == ctor) {</span>
+<span class="nc" id="L150">            throw new NoSuchMethodException(</span>
+                    &quot;No such accessible constructor on object: &quot;
+<span class="nc" id="L152">                            + cls.getName());</span>
+        }
+<span class="fc" id="L154">        return ctor.newInstance(args);</span>
+    }
+
+    /**
+     * &lt;p&gt;Convenience method returning new instance of &lt;code&gt;klazz&lt;/code&gt; using a single argument constructor.
+     * The formal parameter type is inferred from the actual values of &lt;code&gt;arg&lt;/code&gt;.
+     * See {@link #invokeExactConstructor(Class, Object[], Class[])} for more details.&lt;/p&gt;
+     *
+     * &lt;p&gt;The signatures should match exactly.&lt;/p&gt;
+     *
+     * @param cls the class to be constructed.
+     * @param arg the actual argument
+     * @return new instance of &lt;code&gt;klazz&lt;/code&gt;
+     *
+     * @throws NoSuchMethodException If the constructor cannot be found
+     * @throws IllegalAccessException If an error occurs accessing the constructor
+     * @throws InvocationTargetException If an error occurs invoking the constructor
+     * @throws InstantiationException If an error occurs instantiating the class
+     *
+     * @see #invokeExactConstructor(java.lang.Class, java.lang.Object[], java.lang.Class[])
+     */
+    public static Object invokeExactConstructor(Class&lt;?&gt; cls, Object arg)
+            throws NoSuchMethodException, IllegalAccessException,
+            InvocationTargetException, InstantiationException {
+<span class="fc" id="L178">        return invokeExactConstructor(cls, new Object[] { arg });</span>
+    }
+
+    /**
+     * &lt;p&gt;Returns new instance of &lt;code&gt;klazz&lt;/code&gt; created using the actual arguments &lt;code&gt;args&lt;/code&gt;.
+     * The formal parameter types are inferred from the actual values of &lt;code&gt;args&lt;/code&gt;.
+     * See {@link #invokeExactConstructor(Class, Object[], Class[])} for more details.&lt;/p&gt;
+     *
+     * &lt;p&gt;The signatures should match exactly.&lt;/p&gt;
+     *
+     * @param cls the class to be constructed.
+     * @param args actual argument array
+     * @return new instance of &lt;code&gt;klazz&lt;/code&gt;
+     *
+     * @throws NoSuchMethodException If the constructor cannot be found
+     * @throws IllegalAccessException If an error occurs accessing the constructor
+     * @throws InvocationTargetException If an error occurs invoking the constructor
+     * @throws InstantiationException If an error occurs instantiating the class
+     *
+     * @see #invokeExactConstructor(java.lang.Class, java.lang.Object[], java.lang.Class[])
+     */
+    public static Object invokeExactConstructor(Class&lt;?&gt; cls, Object[] args)
+            throws NoSuchMethodException, IllegalAccessException,
+            InvocationTargetException, InstantiationException {
+<span class="fc bfc" id="L202" title="All 2 branches covered.">        if (null == args) {</span>
+<span class="fc" id="L203">            args = ArrayUtils.EMPTY_OBJECT_ARRAY;</span>
+        }
+<span class="fc" id="L205">        int arguments = args.length;</span>
+<span class="fc" id="L206">        Class&lt;?&gt; parameterTypes[] = new Class[arguments];</span>
+<span class="fc bfc" id="L207" title="All 2 branches covered.">        for (int i = 0; i &lt; arguments; i++) {</span>
+<span class="fc" id="L208">            parameterTypes[i] = args[i].getClass();</span>
+        }
+<span class="fc" id="L210">        return invokeExactConstructor(cls, args, parameterTypes);</span>
+    }
+
+    /**
+     * &lt;p&gt;Returns new instance of &lt;code&gt;klazz&lt;/code&gt; created using constructor
+     * with signature &lt;code&gt;parameterTypes&lt;/code&gt; and actual arguments
+     * &lt;code&gt;args&lt;/code&gt;.&lt;/p&gt;
+     *
+     * &lt;p&gt;The signatures should match exactly.&lt;/p&gt;
+     *
+     * @param cls the class to be constructed.
+     * @param args actual argument array
+     * @param parameterTypes parameter types array
+     * @return new instance of &lt;code&gt;klazz&lt;/code&gt;
+     *
+     * @throws NoSuchMethodException if matching constructor cannot be found
+     * @throws IllegalAccessException thrown on the constructor's invocation
+     * @throws InvocationTargetException thrown on the constructor's invocation
+     * @throws InstantiationException thrown on the constructor's invocation
+     * @see Constructor#newInstance
+     */
+    public static Object invokeExactConstructor(Class&lt;?&gt; cls, Object[] args,
+            Class&lt;?&gt;[] parameterTypes) throws NoSuchMethodException,
+            IllegalAccessException, InvocationTargetException,
+            InstantiationException {
+<span class="pc bpc" id="L235" title="1 of 2 branches missed.">        if (args == null) {</span>
+<span class="nc" id="L236">            args = ArrayUtils.EMPTY_OBJECT_ARRAY;</span>
+        }
+<span class="pc bpc" id="L238" title="1 of 2 branches missed.">        if (parameterTypes == null) {</span>
+<span class="nc" id="L239">            parameterTypes = ArrayUtils.EMPTY_CLASS_ARRAY;</span>
+        }
+<span class="fc" id="L241">        Constructor ctor = getAccessibleConstructor(cls, parameterTypes);</span>
+<span class="fc bfc" id="L242" title="All 2 branches covered.">        if (null == ctor) {</span>
+<span class="fc" id="L243">            throw new NoSuchMethodException(</span>
+                    &quot;No such accessible constructor on object: &quot;
+<span class="fc" id="L245">                            + cls.getName());</span>
+        }
+<span class="fc" id="L247">        return ctor.newInstance(args);</span>
+    }
+
+    /**
+     * Returns a constructor with single argument.
+     * @param cls the class to be constructed
+     * @param parameterType The constructor parameter type
+     * @return null if matching accessible constructor can not be found.
+     * @see Class#getConstructor
+     * @see #getAccessibleConstructor(java.lang.reflect.Constructor)
+     */
+    public static Constructor getAccessibleConstructor(Class&lt;?&gt; cls,
+            Class&lt;?&gt; parameterType) {
+<span class="nc" id="L260">        return getAccessibleConstructor(cls, new Class[] { parameterType });</span>
+    }
+
+    /**
+     * Returns a constructor given a class and signature.
+     * @param cls the class to be constructed
+     * @param parameterTypes the parameter array
+     * @return null if matching accessible constructor can not be found
+     * @see Class#getConstructor
+     * @see #getAccessibleConstructor(java.lang.reflect.Constructor)
+     */
+    public static Constructor getAccessibleConstructor(Class&lt;?&gt; cls,
+            Class&lt;?&gt;[] parameterTypes) {
+        try {
+<span class="fc" id="L274">            return getAccessibleConstructor(cls.getConstructor(parameterTypes));</span>
+<span class="fc" id="L275">        } catch (NoSuchMethodException e) {</span>
+<span class="fc" id="L276">            return (null);</span>
+        }
+    }
+
+    /**
+     * Returns accessible version of the given constructor.
+     * @param ctor prototype constructor object.
+     * @return &lt;code&gt;null&lt;/code&gt; if accessible constructor can not be found.
+     * @see java.lang.SecurityManager
+     */
+    public static Constructor getAccessibleConstructor(Constructor ctor) {
+<span class="pc bpc" id="L287" title="1 of 2 branches missed.">        return MemberUtils.isAccessible(ctor)</span>
+<span class="fc bfc" id="L288" title="All 2 branches covered.">                &amp;&amp; Modifier.isPublic(ctor.getDeclaringClass().getModifiers()) ? ctor</span>
+<span class="fc" id="L289">                : null;</span>
+    }
+
+    /**
+     * &lt;p&gt;Find an accessible constructor with compatible parameters.
+     * Compatible parameters mean that every method parameter is assignable from
+     * the given parameters. In other words, it finds constructor that will take
+     * the parameters given.&lt;/p&gt;
+     *
+     * &lt;p&gt;First it checks if there is constructor matching the exact signature.
+     * If no such, all the constructors of the class are tested if their signatures
+     * are assignment compatible with the parameter types.
+     * The first matching constructor is returned.&lt;/p&gt;
+     *
+     * @param cls find constructor for this class
+     * @param parameterTypes find method with compatible parameters
+     * @return a valid Constructor object. If there's no matching constructor, returns &lt;code&gt;null&lt;/code&gt;.
+     */
+    public static Constructor getMatchingAccessibleConstructor(Class&lt;?&gt; cls,
+            Class&lt;?&gt;[] parameterTypes) {
+        // see if we can find the constructor directly
+        // most of the time this works and it's much faster
+        try {
+<span class="fc" id="L312">            Constructor ctor = cls.getConstructor(parameterTypes);</span>
+<span class="fc" id="L313">            MemberUtils.setAccessibleWorkaround(ctor);</span>
+<span class="fc" id="L314">            return ctor;</span>
+<span class="fc" id="L315">        } catch (NoSuchMethodException e) { /* SWALLOW */</span>
+        }
+<span class="fc" id="L317">        Constructor result = null;</span>
+        // search through all constructors
+<span class="fc" id="L319">        Constructor[] ctors = cls.getConstructors();</span>
+<span class="fc bfc" id="L320" title="All 2 branches covered.">        for (int i = 0; i &lt; ctors.length; i++) {</span>
+            // compare parameters
+<span class="fc bfc" id="L322" title="All 2 branches covered.">            if (ClassUtils.isAssignable(parameterTypes, ctors[i]</span>
+<span class="fc" id="L323">                    .getParameterTypes(), true)) {</span>
+                // get accessible version of method
+<span class="fc" id="L325">                Constructor ctor = getAccessibleConstructor(ctors[i]);</span>
+<span class="pc bpc" id="L326" title="1 of 2 branches missed.">                if (ctor != null) {</span>
+<span class="fc" id="L327">                    MemberUtils.setAccessibleWorkaround(ctor);</span>
+<span class="fc bfc" id="L328" title="All 2 branches covered.">                    if (result == null</span>
+<span class="pc bpc" id="L329" title="1 of 2 branches missed.">                            || MemberUtils.compareParameterTypes(ctor</span>
+<span class="fc" id="L330">                                    .getParameterTypes(), result</span>
+<span class="fc" id="L331">                                    .getParameterTypes(), parameterTypes) &lt; 0) {</span>
+<span class="fc" id="L332">                        result = ctor;</span>
+                    }
+                }
+            }
+        }
+<span class="fc" id="L337">        return result;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

@@ -1,0 +1,1031 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FromXmlParser.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Jackson-dataformat-XML</a> &gt; <a href="index.source.html" class="el_package">com.fasterxml.jackson.dataformat.xml.deser</a> &gt; <span class="el_source">FromXmlParser.java</span></div><h1>FromXmlParser.java</h1><pre class="source lang-java linenums">package com.fasterxml.jackson.dataformat.xml.deser;
+
+import java.io.IOException;
+import java.io.Writer;
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.util.Set;
+
+import javax.xml.stream.XMLStreamException;
+import javax.xml.stream.XMLStreamReader;
+import javax.xml.stream.XMLStreamWriter;
+
+import com.fasterxml.jackson.core.*;
+import com.fasterxml.jackson.core.base.ParserMinimalBase;
+import com.fasterxml.jackson.core.io.IOContext;
+import com.fasterxml.jackson.core.util.ByteArrayBuilder;
+import com.fasterxml.jackson.dataformat.xml.PackageVersion;
+import com.fasterxml.jackson.dataformat.xml.XmlMapper;
+import com.fasterxml.jackson.dataformat.xml.util.StaxUtil;
+
+/**
+ * {@link JsonParser} implementation that exposes XML structure as
+ * set of JSON events that can be used for data binding.
+ */
+public class FromXmlParser
+    extends ParserMinimalBase
+{
+    /**
+     * The default name placeholder for XML text segments is empty
+     * String (&quot;&quot;).
+     */
+    public final static String DEFAULT_UNNAMED_TEXT_PROPERTY = &quot;&quot;;
+
+    /**
+     * Enumeration that defines all togglable features for XML parsers.
+     */
+<span class="fc" id="L37">    public enum Feature implements FormatFeature</span>
+    {
+        /**
+         * Feature that indicates whether XML Empty elements (ones where there are
+         * no separate start and end tages, but just one tag that ends with &quot;/&gt;&quot;)
+         * are exposed as {@link JsonToken#VALUE_NULL}) or not. If they are not
+         * returned as `null` tokens, they will be returned as {@link JsonToken#VALUE_STRING}
+         * tokens with textual value of &quot;&quot; (empty String).
+         *&lt;p&gt;
+         * Default setting is `true` for backwards compatibility.
+         *
+         * @since 2.9
+         */
+<span class="fc" id="L50">        EMPTY_ELEMENT_AS_NULL(true)</span>
+        ;
+
+        final boolean _defaultState;
+        final int _mask;
+        
+        /**
+         * Method that calculates bit set (flags) of all features that
+         * are enabled by default.
+         */
+        public static int collectDefaults()
+        {
+<span class="fc" id="L62">            int flags = 0;</span>
+<span class="fc bfc" id="L63" title="All 2 branches covered.">            for (Feature f : values()) {</span>
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">                if (f.enabledByDefault()) {</span>
+<span class="fc" id="L65">                    flags |= f.getMask();</span>
+                }
+            }
+<span class="fc" id="L68">            return flags;</span>
+        }
+        
+<span class="fc" id="L71">        private Feature(boolean defaultState) {</span>
+<span class="fc" id="L72">            _defaultState = defaultState;</span>
+<span class="fc" id="L73">            _mask = (1 &lt;&lt; ordinal());</span>
+<span class="fc" id="L74">        }</span>
+
+<span class="fc" id="L76">        @Override public boolean enabledByDefault() { return _defaultState; }</span>
+<span class="fc" id="L77">        @Override public int getMask() { return _mask; }</span>
+<span class="fc bfc" id="L78" title="All 2 branches covered.">        @Override public boolean enabledIn(int flags) { return (flags &amp; getMask()) != 0; }</span>
+    }
+
+    /**
+     * In cases where a start element has both attributes and non-empty textual
+     * value, we have to create a bogus property; we will use this as
+     * the property name.
+     *&lt;p&gt;
+     * Name used for pseudo-property used for returning XML Text value (which does
+     * not have actual element name to use). Defaults to empty String, but
+     * may be changed for interoperability reasons: JAXB, for example, uses
+     * &quot;value&quot; as name.
+     * 
+     * @since 2.1
+     */
+<span class="fc" id="L93">    protected String _cfgNameForTextElement = DEFAULT_UNNAMED_TEXT_PROPERTY;</span>
+
+    /*
+    /**********************************************************
+    /* Configuration
+    /**********************************************************
+     */
+
+    /**
+     * Bit flag composed of bits that indicate which
+     * {@link FromXmlParser.Feature}s
+     * are enabled.
+     */
+    protected int _formatFeatures;
+
+    protected ObjectCodec _objectCodec;
+
+    /*
+    /**********************************************************
+    /* I/O state
+    /**********************************************************
+     */
+
+    /**
+     * Flag that indicates whether parser is closed or not. Gets
+     * set when parser is either closed by explicit call
+     * ({@link #close}) or when end-of-input is reached.
+     */
+    protected boolean _closed;
+
+    final protected IOContext _ioContext;
+
+    /*
+    /**********************************************************
+    /* Parsing state
+    /**********************************************************
+     */
+
+    /**
+     * Information about parser context, context in which
+     * the next token is to be parsed (root, array, object).
+     */
+    protected XmlReadContext _parsingContext;
+
+    protected final XmlTokenStream _xmlTokens;
+    /**
+     * 
+     * We need special handling to keep track of whether a value
+     * may be exposed as simple leaf value.
+     */
+    protected boolean _mayBeLeaf;
+
+    protected JsonToken _nextToken;
+
+    protected String _currText;
+
+    protected Set&lt;String&gt; _namesToWrap;
+
+    /*
+    /**********************************************************
+    /* Parsing state, parsed values
+    /**********************************************************
+     */
+
+    /**
+     * ByteArrayBuilder is needed if 'getBinaryValue' is called. If so,
+     * we better reuse it for remainder of content.
+     */
+<span class="fc" id="L161">    protected ByteArrayBuilder _byteArrayBuilder = null;</span>
+
+    /**
+     * We will hold on to decoded binary data, for duration of
+     * current event, so that multiple calls to
+     * {@link #getBinaryValue} will not need to decode data more
+     * than once.
+     */
+    protected byte[] _binaryValue;
+
+    /*
+    /**********************************************************
+    /* Life-cycle
+    /**********************************************************
+     */
+
+    public FromXmlParser(IOContext ctxt, int genericParserFeatures, int xmlFeatures,
+            ObjectCodec codec, XMLStreamReader xmlReader)
+    {
+<span class="fc" id="L180">        super(genericParserFeatures);</span>
+<span class="fc" id="L181">        _formatFeatures = xmlFeatures;</span>
+<span class="fc" id="L182">        _ioContext = ctxt;</span>
+<span class="fc" id="L183">        _objectCodec = codec;</span>
+<span class="fc" id="L184">        _parsingContext = XmlReadContext.createRootContext(-1, -1);</span>
+        // and thereby start a scope
+<span class="fc" id="L186">        _nextToken = JsonToken.START_OBJECT;</span>
+<span class="fc" id="L187">        _xmlTokens = new XmlTokenStream(xmlReader, ctxt.getSourceReference(),</span>
+                _formatFeatures);
+<span class="fc" id="L189">    }</span>
+
+    @Override
+    public Version version() {
+<span class="nc" id="L193">        return PackageVersion.VERSION;</span>
+    }
+    
+    @Override
+    public ObjectCodec getCodec() {
+<span class="fc" id="L198">        return _objectCodec;</span>
+    }
+
+    @Override
+    public void setCodec(ObjectCodec c) {
+<span class="nc" id="L203">        _objectCodec = c;</span>
+<span class="nc" id="L204">    }</span>
+
+    /**
+     * @since 2.1
+     */
+    public void setXMLTextElementName(String name) {
+<span class="nc" id="L210">        _cfgNameForTextElement = name;</span>
+<span class="nc" id="L211">    }</span>
+    
+    /**
+     * XML format does require support from custom {@link ObjectCodec}
+     * (that is, {@link XmlMapper}), so need to return true here.
+     * 
+     * @return True since XML format does require support from codec
+     */
+    @Override
+    public boolean requiresCustomCodec() {
+<span class="fc" id="L221">        return true;</span>
+    }
+    
+    /*
+    /**********************************************************
+    /* Extended API, configuration
+    /**********************************************************
+     */
+
+    public FromXmlParser enable(Feature f) {
+<span class="nc" id="L231">        _formatFeatures |= f.getMask();</span>
+<span class="nc" id="L232">        _xmlTokens.setFormatFeatures(_formatFeatures);</span>
+<span class="nc" id="L233">        return this;</span>
+    }
+
+    public FromXmlParser disable(Feature f) {
+<span class="nc" id="L237">        _formatFeatures &amp;= ~f.getMask();</span>
+<span class="nc" id="L238">        _xmlTokens.setFormatFeatures(_formatFeatures);</span>
+<span class="nc" id="L239">        return this;</span>
+    }
+
+    public final boolean isEnabled(Feature f) {
+<span class="nc bnc" id="L243" title="All 2 branches missed.">        return (_formatFeatures &amp; f.getMask()) != 0;</span>
+    }
+
+    public FromXmlParser configure(Feature f, boolean state) {
+<span class="nc bnc" id="L247" title="All 2 branches missed.">        if (state) {</span>
+<span class="nc" id="L248">            enable(f);</span>
+        } else {
+<span class="nc" id="L250">            disable(f);</span>
+        }
+<span class="nc" id="L252">        return this;</span>
+    }
+
+    /*                                                                                       
+    /**********************************************************                              
+    /* FormatFeature support                                                                             
+    /**********************************************************                              
+     */
+
+    @Override
+    public int getFormatFeatures() {
+<span class="nc" id="L263">        return _formatFeatures;</span>
+    }
+
+    @Override
+    public JsonParser overrideFormatFeatures(int values, int mask) {
+<span class="nc" id="L268">        _formatFeatures = (_formatFeatures &amp; ~mask) | (values &amp; mask);</span>
+<span class="nc" id="L269">        return this;</span>
+    }
+
+    /*
+    /**********************************************************
+    /* Extended API, access to some internal components
+    /**********************************************************
+     */
+
+    /**
+     * Method that allows application direct access to underlying
+     * Stax {@link XMLStreamWriter}. Note that use of writer is
+     * discouraged, and may interfere with processing of this writer;
+     * however, occasionally it may be necessary.
+     *&lt;p&gt;
+     * Note: writer instance will always be of type
+     * {@link org.codehaus.stax2.XMLStreamWriter2} (including
+     * Typed Access API) so upcasts are safe.
+     */
+    public XMLStreamReader getStaxReader() {
+<span class="nc" id="L289">        return _xmlTokens.getXmlReader();</span>
+    }
+
+    /*
+    /**********************************************************
+    /* Internal API
+    /**********************************************************
+     */
+
+    /**
+     * Method that may be called to indicate that specified names
+     * (only local parts retained currently: this may be changed in
+     * future) should be considered &quot;auto-wrapping&quot;, meaning that
+     * they will be doubled to contain two opening elements, two
+     * matching closing elements. This is needed for supporting
+     * handling of so-called &quot;unwrapped&quot; array types, something
+     * XML mappings like JAXB often use.
+     *&lt;p&gt;
+     * NOTE: this method is considered part of internal implementation
+     * interface, and it is &lt;b&gt;NOT&lt;/b&gt; guaranteed to remain unchanged
+     * between minor versions (it is however expected not to change in
+     * patch versions). So if you have to use it, be prepared for
+     * possible additional work.
+     * 
+     * @since 2.1
+     */
+    public void addVirtualWrapping(Set&lt;String&gt; namesToWrap)
+    {
+        /* 17-Sep-2012, tatu: Not 100% sure why, but this is necessary to avoid
+         *   problems with Lists-in-Lists properties
+         */
+<span class="fc" id="L320">        String name = _xmlTokens.getLocalName();</span>
+<span class="pc bpc" id="L321" title="1 of 4 branches missed.">        if (name != null &amp;&amp; namesToWrap.contains(name)) {</span>
+<span class="fc" id="L322">            _xmlTokens.repeatStartElement();</span>
+        }
+<span class="fc" id="L324">        _namesToWrap = namesToWrap;</span>
+<span class="fc" id="L325">        _parsingContext.setNamesToWrap(namesToWrap);</span>
+<span class="fc" id="L326">    }</span>
+
+    /*
+    /**********************************************************
+    /* JsonParser impl
+    /**********************************************************
+     */
+    
+    /**
+     * Method that can be called to get the name associated with
+     * the current event.
+     */
+    @Override
+    public String getCurrentName() throws IOException
+    {
+        // start markers require information from parent
+        String name;
+<span class="pc bpc" id="L343" title="2 of 4 branches missed.">        if (_currToken == JsonToken.START_OBJECT || _currToken == JsonToken.START_ARRAY) {</span>
+<span class="nc" id="L344">            XmlReadContext parent = _parsingContext.getParent();</span>
+<span class="nc" id="L345">            name = parent.getCurrentName();</span>
+<span class="nc" id="L346">        } else {</span>
+<span class="fc" id="L347">            name = _parsingContext.getCurrentName();</span>
+        }
+        // sanity check
+<span class="pc bpc" id="L350" title="1 of 2 branches missed.">        if (name == null) {</span>
+<span class="nc" id="L351">            throw new IllegalStateException(&quot;Missing name, in state: &quot;+_currToken);</span>
+        }
+<span class="fc" id="L353">        return name;</span>
+    }
+
+    @Override
+    public void overrideCurrentName(String name)
+    {
+        // Simple, but need to look for START_OBJECT/ARRAY's &quot;off-by-one&quot; thing:
+<span class="nc" id="L360">        XmlReadContext ctxt = _parsingContext;</span>
+<span class="nc bnc" id="L361" title="All 4 branches missed.">        if (_currToken == JsonToken.START_OBJECT || _currToken == JsonToken.START_ARRAY) {</span>
+<span class="nc" id="L362">            ctxt = ctxt.getParent();</span>
+        }
+<span class="nc" id="L364">        ctxt.setCurrentName(name);</span>
+<span class="nc" id="L365">    }</span>
+    
+    @Override
+    public void close() throws IOException
+    {
+<span class="pc bpc" id="L370" title="1 of 2 branches missed.">        if (!_closed) {</span>
+<span class="fc" id="L371">            _closed = true;</span>
+            try {
+<span class="pc bpc" id="L373" title="1 of 4 branches missed.">                if (_ioContext.isResourceManaged() || isEnabled(JsonParser.Feature.AUTO_CLOSE_SOURCE)) {</span>
+<span class="fc" id="L374">                    _xmlTokens.closeCompletely();</span>
+                } else {
+<span class="nc" id="L376">                    _xmlTokens.close();</span>
+                }
+<span class="nc" id="L378">            } catch (XMLStreamException e) {</span>
+<span class="nc" id="L379">                StaxUtil.throwAsParseException(e, this);</span>
+            } finally {
+                // Also, internal buffer(s) can now be released as well
+<span class="fc" id="L382">                _releaseBuffers();</span>
+            }
+        }
+<span class="fc" id="L385">    }</span>
+
+    @Override
+<span class="nc" id="L388">    public boolean isClosed() { return _closed; }</span>
+
+    @Override
+    public XmlReadContext getParsingContext() {
+<span class="fc" id="L392">        return _parsingContext;</span>
+    }
+
+    /**
+     * Method that return the &lt;b&gt;starting&lt;/b&gt; location of the current
+     * token; that is, position of the first character from input
+     * that starts the current token.
+     */
+    @Override
+    public JsonLocation getTokenLocation() {
+<span class="fc" id="L402">        return _xmlTokens.getTokenLocation();</span>
+    }
+
+    /**
+     * Method that returns location of the last processed character;
+     * usually for error reporting purposes
+     */
+    @Override
+    public JsonLocation getCurrentLocation() {
+<span class="fc" id="L411">        return _xmlTokens.getCurrentLocation();</span>
+    }
+
+    /**
+     * Since xml representation can not really distinguish between array
+     * and object starts (both are represented with elements), this method
+     * is overridden and taken to mean that expecation is that the current
+     * start element is to mean 'start array', instead of default of
+     * 'start object'.
+     */
+    @Override
+    public boolean isExpectedStartArrayToken()
+    {
+<span class="fc" id="L424">        JsonToken t = _currToken;</span>
+<span class="fc bfc" id="L425" title="All 2 branches covered.">        if (t == JsonToken.START_OBJECT) {        	</span>
+<span class="fc" id="L426">            _currToken = JsonToken.START_ARRAY;</span>
+            // Ok: must replace current context with array as well
+<span class="fc" id="L428">            _parsingContext.convertToArray();</span>
+//System.out.println(&quot; isExpectedArrayStart: OBJ-&gt;Array, wraps now: &quot;+_parsingContext.getNamesToWrap());
+            // And just in case a field name was to be returned, wipe it
+            // 06-Jan-2015, tatu: Actually, could also be empty Object buffered; if so, convert...
+<span class="pc bpc" id="L432" title="1 of 2 branches missed.">            if (_nextToken == JsonToken.END_OBJECT) {</span>
+<span class="nc" id="L433">                _nextToken = JsonToken.END_ARRAY;</span>
+            } else {
+<span class="fc" id="L435">                _nextToken = null;</span>
+            }
+            // and last thing, [dataformat-xml#33], better ignore attributes
+<span class="fc" id="L438">            _xmlTokens.skipAttributes();</span>
+<span class="fc" id="L439">            return true;</span>
+        }
+//System.out.println(&quot; isExpectedArrayStart?: t=&quot;+t);
+<span class="pc bpc" id="L442" title="1 of 2 branches missed.">        return (t == JsonToken.START_ARRAY);</span>
+    }
+
+    // DEBUGGING
+    /*
+    @Override
+    public JsonToken nextToken() throws IOException
+    {
+        JsonToken t = nextToken0();
+        if (t != null) {
+            switch (t) {
+            case FIELD_NAME:
+                System.out.println(&quot;JsonToken: FIELD_NAME '&quot;+_parsingContext.getCurrentName()+&quot;'&quot;);
+                break;
+            case VALUE_STRING:
+                System.out.println(&quot;JsonToken: VALUE_STRING '&quot;+getText()+&quot;'&quot;);
+                break;
+            default:
+                System.out.println(&quot;JsonToken: &quot;+t);
+            }
+        }
+        return t;
+    }
+
+//    public JsonToken nextToken0() throws IOException
+ */
+
+    
+    @Override
+    public JsonToken nextToken() throws IOException
+    {
+<span class="fc" id="L473">        _binaryValue = null;</span>
+<span class="fc bfc" id="L474" title="All 2 branches covered.">        if (_nextToken != null) {</span>
+<span class="fc" id="L475">            JsonToken t = _nextToken;</span>
+<span class="fc" id="L476">            _currToken = t;</span>
+<span class="fc" id="L477">            _nextToken = null;</span>
+<span class="pc bpc" id="L478" title="1 of 5 branches missed.">            switch (t) {</span>
+            case START_OBJECT:
+<span class="fc" id="L480">                _parsingContext = _parsingContext.createChildObjectContext(-1, -1);</span>
+<span class="fc" id="L481">                break;</span>
+            case START_ARRAY:
+<span class="nc" id="L483">                _parsingContext = _parsingContext.createChildArrayContext(-1, -1);</span>
+<span class="nc" id="L484">                break;</span>
+            case END_OBJECT:
+            case END_ARRAY:
+<span class="fc" id="L487">                _parsingContext = _parsingContext.getParent();</span>
+<span class="fc" id="L488">                _namesToWrap = _parsingContext.getNamesToWrap();</span>
+<span class="fc" id="L489">                break;</span>
+            case FIELD_NAME:
+<span class="fc" id="L491">                _parsingContext.setCurrentName(_xmlTokens.getLocalName());</span>
+<span class="fc" id="L492">                break;</span>
+            default: // VALUE_STRING, VALUE_NULL
+                // should be fine as is?
+            }
+<span class="fc" id="L496">            return t;</span>
+        }
+        int token;
+        try {
+<span class="fc" id="L500">            token = _xmlTokens.next();</span>
+<span class="fc" id="L501">        } catch (XMLStreamException e) {</span>
+<span class="nc" id="L502">            token = StaxUtil.throwAsParseException(e, this);</span>
+<span class="fc" id="L503">        }</span>
+        // Need to have a loop just because we may have to eat/convert
+        // a start-element that indicates an array element.
+<span class="fc bfc" id="L506" title="All 2 branches covered.">        while (token == XmlTokenStream.XML_START_ELEMENT) {</span>
+            // If we thought we might get leaf, no such luck
+<span class="fc bfc" id="L508" title="All 2 branches covered.">            if (_mayBeLeaf) {</span>
+                // leave _mayBeLeaf set, as we start a new context
+<span class="fc" id="L510">                _nextToken = JsonToken.FIELD_NAME;</span>
+<span class="fc" id="L511">                _parsingContext = _parsingContext.createChildObjectContext(-1, -1);</span>
+<span class="fc" id="L512">                return (_currToken = JsonToken.START_OBJECT);</span>
+            }
+<span class="fc bfc" id="L514" title="All 2 branches covered.">            if (_parsingContext.inArray()) {</span>
+                // Yup: in array, so this element could be verified; but it won't be
+                // reported anyway, and we need to process following event.
+                try {
+<span class="fc" id="L518">                    token = _xmlTokens.next();</span>
+<span class="nc" id="L519">                } catch (XMLStreamException e) {</span>
+<span class="nc" id="L520">                    StaxUtil.throwAsParseException(e, this);</span>
+<span class="fc" id="L521">                }</span>
+<span class="fc" id="L522">                _mayBeLeaf = true;</span>
+<span class="fc" id="L523">                continue;</span>
+            }
+<span class="fc" id="L525">            String name = _xmlTokens.getLocalName();</span>
+<span class="fc" id="L526">            _parsingContext.setCurrentName(name);</span>
+
+            // Ok: virtual wrapping can be done by simply repeating current START_ELEMENT.
+            // Couple of ways to do it; but start by making _xmlTokens replay the thing...
+<span class="fc bfc" id="L530" title="All 4 branches covered.">            if (_namesToWrap != null &amp;&amp; _namesToWrap.contains(name)) {</span>
+<span class="fc" id="L531">                _xmlTokens.repeatStartElement();</span>
+            }
+
+<span class="fc" id="L534">            _mayBeLeaf = true;</span>
+            // Ok: in array context we need to skip reporting field names.
+            // But what's the best way to find next token?
+<span class="fc" id="L537">            return (_currToken = JsonToken.FIELD_NAME);</span>
+        }
+
+        // Ok; beyond start element, what do we get?
+        while (true) {
+<span class="pc bpc" id="L542" title="1 of 6 branches missed.">            switch (token) {</span>
+            case XmlTokenStream.XML_END_ELEMENT:
+                // Simple, except that if this is a leaf, need to suppress end:
+<span class="fc bfc" id="L545" title="All 2 branches covered.">                if (_mayBeLeaf) {</span>
+<span class="fc" id="L546">                    _mayBeLeaf = false;</span>
+<span class="pc bpc" id="L547" title="1 of 2 branches missed.">                    if (_parsingContext.inArray()) {</span>
+                        // 06-Jan-2015, tatu: as per [dataformat-xml#180], need to
+                        //    expose as empty Object, not null
+<span class="nc" id="L550">                        _nextToken = JsonToken.END_OBJECT;</span>
+<span class="nc" id="L551">                        _parsingContext = _parsingContext.createChildObjectContext(-1, -1);</span>
+<span class="nc" id="L552">                        return (_currToken = JsonToken.START_OBJECT);</span>
+                    }
+<span class="fc" id="L554">                    return (_currToken = JsonToken.VALUE_NULL);</span>
+                }
+<span class="fc bfc" id="L556" title="All 2 branches covered.">                _currToken = _parsingContext.inArray() ? JsonToken.END_ARRAY : JsonToken.END_OBJECT;</span>
+<span class="fc" id="L557">                _parsingContext = _parsingContext.getParent();</span>
+<span class="fc" id="L558">                _namesToWrap = _parsingContext.getNamesToWrap();</span>
+<span class="fc" id="L559">                return _currToken;</span>
+                
+            case XmlTokenStream.XML_ATTRIBUTE_NAME:
+                // If there was a chance of leaf node, no more...
+<span class="fc bfc" id="L563" title="All 2 branches covered.">                if (_mayBeLeaf) {</span>
+<span class="fc" id="L564">                    _mayBeLeaf = false;</span>
+<span class="fc" id="L565">                    _nextToken = JsonToken.FIELD_NAME;</span>
+<span class="fc" id="L566">                    _currText = _xmlTokens.getText();</span>
+<span class="fc" id="L567">                    _parsingContext = _parsingContext.createChildObjectContext(-1, -1);</span>
+<span class="fc" id="L568">                    return (_currToken = JsonToken.START_OBJECT);</span>
+                }
+<span class="fc" id="L570">                _parsingContext.setCurrentName(_xmlTokens.getLocalName());</span>
+<span class="fc" id="L571">                return (_currToken = JsonToken.FIELD_NAME);</span>
+            case XmlTokenStream.XML_ATTRIBUTE_VALUE:
+<span class="fc" id="L573">                _currText = _xmlTokens.getText();</span>
+<span class="fc" id="L574">                return (_currToken = JsonToken.VALUE_STRING);</span>
+            case XmlTokenStream.XML_TEXT:
+<span class="fc" id="L576">                _currText = _xmlTokens.getText();</span>
+<span class="fc bfc" id="L577" title="All 2 branches covered.">                if (_mayBeLeaf) {</span>
+<span class="fc" id="L578">                    _mayBeLeaf = false;</span>
+                    // One more refinement (pronunced like &quot;hack&quot;) is that if
+                    // we had an empty String (or all white space), and we are
+                    // deserializing an array, we better hide the empty text.
+                    // Also: must skip following END_ELEMENT
+                    try {
+<span class="fc" id="L584">                        _xmlTokens.skipEndElement();</span>
+<span class="nc" id="L585">                    } catch (XMLStreamException e) {</span>
+<span class="nc" id="L586">                        StaxUtil.throwAsParseException(e, this);</span>
+<span class="fc" id="L587">                    }</span>
+<span class="fc bfc" id="L588" title="All 2 branches covered.">                    if (_parsingContext.inArray()) {</span>
+<span class="fc bfc" id="L589" title="All 2 branches covered.">                        if (_isEmpty(_currText)) {</span>
+                            // 06-Jan-2015, tatu: as per [dataformat-xml#180], need to
+                            //    expose as empty Object, not null (or, worse, as used to
+                            //    be done, by swallowing the token)
+<span class="fc" id="L593">                            _nextToken = JsonToken.END_OBJECT;</span>
+<span class="fc" id="L594">                            _parsingContext = _parsingContext.createChildObjectContext(-1, -1);</span>
+<span class="fc" id="L595">                            return (_currToken = JsonToken.START_OBJECT);</span>
+                        }
+                    }
+<span class="fc" id="L598">                    return (_currToken = JsonToken.VALUE_STRING);</span>
+                } else {
+                    // [dataformat-xml#177]: empty text may also need to be skipped
+                    // but... [dataformat-xml#191]: looks like we can't short-cut, must
+                    // loop over again
+<span class="pc bpc" id="L603" title="1 of 2 branches missed.">                    if (_parsingContext.inObject()) {</span>
+<span class="pc bpc" id="L604" title="1 of 4 branches missed.">                        if ((_currToken != JsonToken.FIELD_NAME) &amp;&amp; _isEmpty(_currText)) {</span>
+                            try {
+<span class="fc" id="L606">                                token = _xmlTokens.next();</span>
+<span class="nc" id="L607">                            } catch (XMLStreamException e) {</span>
+<span class="nc" id="L608">                                StaxUtil.throwAsParseException(e, this);</span>
+<span class="fc" id="L609">                            }</span>
+<span class="nc" id="L610">                            continue;</span>
+                        }
+                    }
+                }
+                // If not a leaf (or otherwise ignorable), need to transform into property...
+<span class="fc" id="L615">                _parsingContext.setCurrentName(_cfgNameForTextElement);</span>
+<span class="fc" id="L616">                _nextToken = JsonToken.VALUE_STRING;</span>
+<span class="fc" id="L617">                return (_currToken = JsonToken.FIELD_NAME);</span>
+            case XmlTokenStream.XML_END:
+<span class="pc" id="L619">                return (_currToken = null);</span>
+            }
+        }
+    }
+
+    /*
+    /**********************************************************
+    /* Overrides of specialized nextXxx() methods
+    /**********************************************************
+     */
+
+    /**
+     * Method overridden to support more reliable deserialization of
+     * String collections.
+     */
+    @Override
+    public String nextTextValue() throws IOException
+    {
+<span class="fc" id="L637">        _binaryValue = null;</span>
+<span class="pc bpc" id="L638" title="1 of 2 branches missed.">        if (_nextToken != null) {</span>
+<span class="nc" id="L639">            JsonToken t = _nextToken;</span>
+<span class="nc" id="L640">            _currToken = t;</span>
+<span class="nc" id="L641">            _nextToken = null;</span>
+
+            // expected case; yes, got a String
+<span class="nc bnc" id="L644" title="All 2 branches missed.">            if (t == JsonToken.VALUE_STRING) {</span>
+<span class="nc" id="L645">                return _currText;</span>
+            }
+<span class="nc" id="L647">            _updateState(t);</span>
+<span class="nc" id="L648">            return null;</span>
+        }
+
+        int token;
+
+        try {
+<span class="fc" id="L654">            token = _xmlTokens.next();</span>
+<span class="nc" id="L655">        } catch (XMLStreamException e) {</span>
+<span class="nc" id="L656">            token = StaxUtil.throwAsParseException(e, this);</span>
+<span class="fc" id="L657">        }</span>
+
+        // mostly copied from 'nextToken()'
+<span class="fc bfc" id="L660" title="All 2 branches covered.">        while (token == XmlTokenStream.XML_START_ELEMENT) {</span>
+<span class="pc bpc" id="L661" title="1 of 2 branches missed.">            if (_mayBeLeaf) {</span>
+<span class="nc" id="L662">                _nextToken = JsonToken.FIELD_NAME;</span>
+<span class="nc" id="L663">                _parsingContext = _parsingContext.createChildObjectContext(-1, -1);</span>
+<span class="nc" id="L664">                _currToken = JsonToken.START_OBJECT;</span>
+<span class="nc" id="L665">                return null;</span>
+            }
+<span class="pc bpc" id="L667" title="1 of 2 branches missed.">            if (_parsingContext.inArray()) {</span>
+                try {
+<span class="fc" id="L669">                    token = _xmlTokens.next();</span>
+<span class="nc" id="L670">                } catch (XMLStreamException e) {</span>
+<span class="nc" id="L671">                    StaxUtil.throwAsParseException(e, this);</span>
+<span class="fc" id="L672">                }</span>
+<span class="fc" id="L673">                _mayBeLeaf = true;</span>
+<span class="fc" id="L674">                continue;</span>
+            }
+<span class="nc" id="L676">            String name = _xmlTokens.getLocalName();</span>
+<span class="nc" id="L677">            _parsingContext.setCurrentName(name);</span>
+<span class="nc bnc" id="L678" title="All 4 branches missed.">            if (_namesToWrap != null &amp;&amp; _namesToWrap.contains(name)) {</span>
+<span class="nc" id="L679">                _xmlTokens.repeatStartElement();</span>
+            }
+<span class="nc" id="L681">            _mayBeLeaf = true;</span>
+<span class="nc" id="L682">            _currToken = JsonToken.FIELD_NAME;</span>
+<span class="nc" id="L683">            return null;</span>
+        }
+
+        // Ok; beyond start element, what do we get?
+<span class="pc bpc" id="L687" title="3 of 6 branches missed.">        switch (token) {</span>
+        case XmlTokenStream.XML_END_ELEMENT:
+<span class="pc bpc" id="L689" title="1 of 2 branches missed.">            if (_mayBeLeaf) {</span>
+                // NOTE: this is different from nextToken() -- produce &quot;&quot;, NOT null
+<span class="nc" id="L691">                _mayBeLeaf = false;</span>
+<span class="nc" id="L692">                _currToken = JsonToken.VALUE_STRING;</span>
+<span class="nc" id="L693">                return (_currText = &quot;&quot;);</span>
+            }
+<span class="pc bpc" id="L695" title="1 of 2 branches missed.">            _currToken = _parsingContext.inArray() ? JsonToken.END_ARRAY : JsonToken.END_OBJECT;</span>
+<span class="fc" id="L696">            _parsingContext = _parsingContext.getParent();</span>
+<span class="fc" id="L697">            _namesToWrap = _parsingContext.getNamesToWrap();</span>
+<span class="fc" id="L698">            break;</span>
+        case XmlTokenStream.XML_ATTRIBUTE_NAME:
+            // If there was a chance of leaf node, no more...
+<span class="nc bnc" id="L701" title="All 2 branches missed.">            if (_mayBeLeaf) {</span>
+<span class="nc" id="L702">                _mayBeLeaf = false;</span>
+<span class="nc" id="L703">                _nextToken = JsonToken.FIELD_NAME;</span>
+<span class="nc" id="L704">                _currText = _xmlTokens.getText();</span>
+<span class="nc" id="L705">                _parsingContext = _parsingContext.createChildObjectContext(-1, -1);</span>
+<span class="nc" id="L706">                _currToken = JsonToken.START_OBJECT;</span>
+            } else {
+<span class="nc" id="L708">                _parsingContext.setCurrentName(_xmlTokens.getLocalName());</span>
+<span class="nc" id="L709">                _currToken = JsonToken.FIELD_NAME;</span>
+            }
+<span class="nc" id="L711">            break;</span>
+        case XmlTokenStream.XML_ATTRIBUTE_VALUE:
+<span class="fc" id="L713">            _currToken = JsonToken.VALUE_STRING;</span>
+<span class="fc" id="L714">            return (_currText = _xmlTokens.getText());</span>
+        case XmlTokenStream.XML_TEXT:
+<span class="fc" id="L716">            _currText = _xmlTokens.getText();</span>
+<span class="pc bpc" id="L717" title="1 of 2 branches missed.">            if (_mayBeLeaf) {</span>
+<span class="fc" id="L718">                _mayBeLeaf = false;</span>
+                // Also: must skip following END_ELEMENT
+                try {
+<span class="fc" id="L721">                    _xmlTokens.skipEndElement();</span>
+<span class="nc" id="L722">                } catch (XMLStreamException e) {</span>
+<span class="nc" id="L723">                    StaxUtil.throwAsParseException(e, this);</span>
+<span class="fc" id="L724">                }</span>
+                // NOTE: this is different from nextToken() -- NO work-around
+                // for otherwise empty List/array
+<span class="fc" id="L727">                _currToken = JsonToken.VALUE_STRING;</span>
+<span class="fc" id="L728">                return _currText;</span>
+            }
+            // If not a leaf, need to transform into property...
+<span class="nc" id="L731">            _parsingContext.setCurrentName(_cfgNameForTextElement);</span>
+<span class="nc" id="L732">            _nextToken = JsonToken.VALUE_STRING;</span>
+<span class="nc" id="L733">            _currToken = JsonToken.FIELD_NAME;</span>
+<span class="nc" id="L734">            break;</span>
+        case XmlTokenStream.XML_END:
+<span class="nc" id="L736">            _currToken = null;</span>
+        }
+<span class="fc" id="L738">        return null;</span>
+    }
+
+
+    private void _updateState(JsonToken t)
+    {
+<span class="nc bnc" id="L744" title="All 5 branches missed.">        switch (t) {</span>
+        case START_OBJECT:
+<span class="nc" id="L746">            _parsingContext = _parsingContext.createChildObjectContext(-1, -1);</span>
+<span class="nc" id="L747">            break;</span>
+        case START_ARRAY:
+<span class="nc" id="L749">            _parsingContext = _parsingContext.createChildArrayContext(-1, -1);</span>
+<span class="nc" id="L750">            break;</span>
+        case END_OBJECT:
+        case END_ARRAY:
+<span class="nc" id="L753">            _parsingContext = _parsingContext.getParent();</span>
+<span class="nc" id="L754">            _namesToWrap = _parsingContext.getNamesToWrap();</span>
+<span class="nc" id="L755">            break;</span>
+        case FIELD_NAME:
+<span class="nc" id="L757">            _parsingContext.setCurrentName(_xmlTokens.getLocalName());</span>
+<span class="nc" id="L758">            break;</span>
+        default:
+        }
+<span class="nc" id="L761">    }</span>
+
+    /*
+    /**********************************************************
+    /* Public API, access to token information, text
+    /**********************************************************
+     */
+
+    @Override
+    public String getText() throws IOException
+    {
+<span class="pc bpc" id="L772" title="1 of 2 branches missed.">        if (_currToken == null) {</span>
+<span class="nc" id="L773">            return null;</span>
+        }
+<span class="fc bfc" id="L775" title="All 3 branches covered.">        switch (_currToken) {</span>
+        case FIELD_NAME:
+<span class="fc" id="L777">            return getCurrentName();</span>
+        case VALUE_STRING:
+<span class="fc" id="L779">            return _currText;</span>
+        default:
+<span class="fc" id="L781">            return _currToken.asString();</span>
+        }
+    }
+
+    // @since 2.1
+    @Override
+    public final String getValueAsString() throws IOException {
+<span class="fc" id="L788">        return getValueAsString(null);</span>
+    }
+
+    @Override
+    public String getValueAsString(String defValue) throws IOException
+    {
+<span class="fc" id="L794">        JsonToken t = _currToken;</span>
+<span class="pc bpc" id="L795" title="1 of 2 branches missed.">        if (t == null) {</span>
+<span class="nc" id="L796">            return null;</span>
+        }
+<span class="pc bpc" id="L798" title="2 of 4 branches missed.">        switch (t) {</span>
+        case FIELD_NAME:
+<span class="nc" id="L800">            return getCurrentName();</span>
+        case VALUE_STRING:
+<span class="fc" id="L802">            return _currText;</span>
+        case START_OBJECT:
+            // the interesting case; may be able to convert certain kinds of
+            // elements (specifically, ones with attributes, CDATA only content)
+            // into VALUE_STRING
+            try {
+<span class="fc" id="L808">                String str = _xmlTokens.convertToString();</span>
+<span class="pc bpc" id="L809" title="1 of 2 branches missed.">                if (str != null) {</span>
+                    // need to convert token, as well as &quot;undo&quot; START_OBJECT
+                    // note: Should NOT update context, because we will still be getting
+                    // matching END_OBJECT, which will undo contexts properly
+<span class="fc" id="L813">                    _parsingContext = _parsingContext.getParent();</span>
+<span class="fc" id="L814">                    _namesToWrap = _parsingContext.getNamesToWrap();</span>
+<span class="fc" id="L815">                    _currToken = JsonToken.VALUE_STRING;</span>
+<span class="fc" id="L816">                    _nextToken = null;</span>
+                    // One more thing: must explicitly skip the END_OBJECT that would follow
+                    try {
+<span class="fc" id="L819">                        _xmlTokens.skipEndElement();</span>
+<span class="nc" id="L820">                    } catch (XMLStreamException e) {</span>
+<span class="nc" id="L821">                        StaxUtil.throwAsParseException(e, this);</span>
+<span class="fc" id="L822">                    }</span>
+<span class="fc" id="L823">                    return (_currText = str);</span>
+                }
+<span class="nc" id="L825">            } catch (XMLStreamException e) {</span>
+<span class="nc" id="L826">                StaxUtil.throwAsParseException(e, this);</span>
+<span class="nc" id="L827">            }</span>
+<span class="nc" id="L828">            return null;</span>
+        default:
+<span class="nc bnc" id="L830" title="All 2 branches missed.">            if (_currToken.isScalarValue()) {</span>
+<span class="nc" id="L831">                return _currToken.asString();</span>
+            }
+        }
+<span class="nc" id="L834">        return defValue;</span>
+    }
+    
+    @Override
+    public char[] getTextCharacters() throws IOException {
+<span class="fc" id="L839">        String text = getText();</span>
+<span class="pc bpc" id="L840" title="1 of 2 branches missed.">        return (text == null)  ? null : text.toCharArray();</span>
+    }
+
+    @Override
+    public int getTextLength() throws IOException {
+<span class="fc" id="L845">        String text = getText();</span>
+<span class="pc bpc" id="L846" title="1 of 2 branches missed.">        return (text == null)  ? 0 : text.length();</span>
+    }
+
+    @Override
+    public int getTextOffset() throws IOException {
+<span class="fc" id="L851">        return 0;</span>
+    }
+
+    /**
+     * XML input actually would offer access to character arrays; but since
+     * we must coalesce things it cannot really be exposed.
+     */
+    @Override
+    public boolean hasTextCharacters()
+    {
+<span class="fc" id="L861">        return false;</span>
+    }
+
+    @Override // since 2.8
+    public int getText(Writer writer) throws IOException
+    {
+<span class="fc" id="L867">        String str = getText();</span>
+<span class="pc bpc" id="L868" title="1 of 2 branches missed.">        if (str == null) {</span>
+<span class="nc" id="L869">            return 0;</span>
+        }
+<span class="fc" id="L871">        writer.write(str);</span>
+<span class="fc" id="L872">        return str.length();</span>
+    }
+    
+    /*
+    /**********************************************************
+    /* Public API, access to token information, binary
+    /**********************************************************
+     */
+
+    @Override
+    public Object getEmbeddedObject() throws IOException {
+        // no way to embed POJOs for now...
+<span class="nc" id="L884">        return null;</span>
+    }
+
+    @Override
+    public byte[] getBinaryValue(Base64Variant b64variant) throws IOException
+    {
+<span class="pc bpc" id="L890" title="5 of 6 branches missed.">        if (_currToken != JsonToken.VALUE_STRING &amp;&amp;</span>
+                (_currToken != JsonToken.VALUE_EMBEDDED_OBJECT || _binaryValue == null)) {
+<span class="nc" id="L892">            _reportError(&quot;Current token (&quot;+_currToken+&quot;) not VALUE_STRING or VALUE_EMBEDDED_OBJECT, can not access as binary&quot;);</span>
+        }
+        /* To ensure that we won't see inconsistent data, better clear up
+         * state...
+         */
+<span class="pc bpc" id="L897" title="1 of 2 branches missed.">        if (_binaryValue == null) {</span>
+            try {
+<span class="fc" id="L899">                _binaryValue = _decodeBase64(b64variant);</span>
+<span class="nc" id="L900">            } catch (IllegalArgumentException iae) {</span>
+<span class="nc" id="L901">                throw _constructError(&quot;Failed to decode VALUE_STRING as base64 (&quot;+b64variant+&quot;): &quot;+iae.getMessage());</span>
+<span class="fc" id="L902">            }</span>
+        }        
+<span class="fc" id="L904">        return _binaryValue;</span>
+    }
+
+    @SuppressWarnings(&quot;resource&quot;)
+    protected byte[] _decodeBase64(Base64Variant b64variant) throws IOException
+    {
+<span class="fc" id="L910">        ByteArrayBuilder builder = _getByteArrayBuilder();</span>
+<span class="fc" id="L911">        final String str = getText();</span>
+<span class="fc" id="L912">        _decodeBase64(str, builder, b64variant);</span>
+<span class="fc" id="L913">        return builder.toByteArray();</span>
+    }
+    
+    /*
+    /**********************************************************
+    /* Numeric accessors
+    /**********************************************************
+     */
+
+    @Override
+    public BigInteger getBigIntegerValue() throws IOException {
+        // TODO Auto-generated method stub
+<span class="nc" id="L925">        return null;</span>
+    }
+
+    @Override
+    public BigDecimal getDecimalValue() throws IOException {
+        // TODO Auto-generated method stub
+<span class="nc" id="L931">        return null;</span>
+    }
+
+    @Override
+    public double getDoubleValue() throws IOException {
+        // TODO Auto-generated method stub
+<span class="nc" id="L937">        return 0;</span>
+    }
+
+    @Override
+    public float getFloatValue() throws IOException {
+        // TODO Auto-generated method stub
+<span class="nc" id="L943">        return 0;</span>
+    }
+
+    @Override
+    public int getIntValue() throws IOException {
+        // TODO Auto-generated method stub
+<span class="nc" id="L949">        return 0;</span>
+    }
+
+    @Override
+    public long getLongValue() throws IOException {
+        // TODO Auto-generated method stub
+<span class="nc" id="L955">        return 0;</span>
+    }
+
+    @Override
+    public NumberType getNumberType() throws IOException {
+        // TODO Auto-generated method stub
+<span class="nc" id="L961">        return null;</span>
+    }
+
+    @Override
+    public Number getNumberValue() throws IOException {
+        // TODO Auto-generated method stub
+<span class="nc" id="L967">        return null;</span>
+    }
+
+    /*
+    /**********************************************************
+    /* Abstract method impls for stuff from JsonParser
+    /**********************************************************
+     */
+
+    /**
+     * Method called when an EOF is encountered between tokens.
+     * If so, it may be a legitimate EOF, but only iff there
+     * is no open non-root context.
+     */
+    @Override
+    protected void _handleEOF() throws JsonParseException
+    {
+<span class="nc bnc" id="L984" title="All 2 branches missed.">        if (!_parsingContext.inRoot()) {</span>
+<span class="nc bnc" id="L985" title="All 2 branches missed.">            String marker = _parsingContext.inArray() ? &quot;Array&quot; : &quot;Object&quot;;</span>
+<span class="nc" id="L986">            _reportInvalidEOF(String.format(</span>
+                    &quot;: expected close marker for %s (start marker at %s)&quot;,
+                    marker,
+<span class="nc" id="L989">                    _parsingContext.getStartLocation(_ioContext.getSourceReference())),</span>
+                    null);
+        }
+<span class="nc" id="L992">    }</span>
+
+    /*
+    /**********************************************************
+    /* Internal methods
+    /**********************************************************
+     */
+
+    /**
+     * Method called to release internal buffers owned by the base
+     * parser.
+     */
+    protected void _releaseBuffers() throws IOException {
+        // anything we can/must release? Underlying parser should do all of it, for now?
+<span class="fc" id="L1006">    }</span>
+
+    protected ByteArrayBuilder _getByteArrayBuilder()
+    {
+<span class="fc bfc" id="L1010" title="All 2 branches covered.">        if (_byteArrayBuilder == null) {</span>
+<span class="fc" id="L1011">            _byteArrayBuilder = new ByteArrayBuilder();</span>
+        } else {
+<span class="fc" id="L1013">            _byteArrayBuilder.reset();</span>
+        }
+<span class="fc" id="L1015">        return _byteArrayBuilder;</span>
+    }
+
+    protected boolean _isEmpty(String str)
+    {
+<span class="pc bpc" id="L1020" title="1 of 2 branches missed.">        int len = (str == null) ? 0 : str.length();</span>
+<span class="fc bfc" id="L1021" title="All 2 branches covered.">        if (len &gt; 0) {</span>
+<span class="fc bfc" id="L1022" title="All 2 branches covered.">            for (int i = 0; i &lt; len; ++i) {</span>
+<span class="fc bfc" id="L1023" title="All 2 branches covered.">                if (str.charAt(i) &gt; ' ') {</span>
+<span class="fc" id="L1024">                    return false;</span>
+                }
+            }
+        }
+<span class="fc" id="L1028">        return true;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>JacobiPreconditioner.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Commons Math</a> &gt; <a href="index.source.html" class="el_package">org.apache.commons.math.linear</a> &gt; <span class="el_source">JacobiPreconditioner.java</span></div><h1>JacobiPreconditioner.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.commons.math.linear;
+
+/**
+ * This class implements the standard Jacobi (diagonal) preconditioner.
+ *
+ * @version $Id$
+ * @since 3.0
+ */
+public class JacobiPreconditioner
+    extends InvertibleRealLinearOperator {
+
+    /** The diagonal coefficients of the preconditioner. */
+    private final ArrayRealVector diag;
+
+    /**
+     * Creates a new instance of this class.
+     *
+     * @param diag Diagonal coefficients of the preconditioner.
+     * @param deep {@code true} if a deep copy of the above array should be
+     *        performed.
+     */
+<span class="fc" id="L38">    public JacobiPreconditioner(final double[] diag, final boolean deep) {</span>
+<span class="fc" id="L39">        this.diag = new ArrayRealVector(diag, deep);</span>
+<span class="fc" id="L40">    }</span>
+
+    /**
+     * Creates a new instance of this class. This method extracts the diagonal
+     * coefficients of the specified linear operator. If {@code a} does not
+     * extend {@link AbstractRealMatrix}, then the coefficients of the
+     * underlying matrix are not accessible, coefficient extraction is made by
+     * matrix-vector products with the basis vectors (and might therefore take
+     * some time). With matrices, direct entry access is carried out.
+     *
+     * @param a Linear operator for which the preconditioner should be built.
+     * @return Preconditioner made of the diagonal coefficients of the specified
+     *         linear operator.
+     * @throws NonSquareOperatorException if {@code a} is not square.
+     */
+    public static JacobiPreconditioner create(final RealLinearOperator a)
+        throws NonSquareOperatorException {
+<span class="fc" id="L57">        final int n = a.getColumnDimension();</span>
+<span class="pc bpc" id="L58" title="1 of 2 branches missed.">        if (a.getRowDimension() != n) {</span>
+<span class="nc" id="L59">            throw new NonSquareOperatorException(a.getRowDimension(), n);</span>
+        }
+<span class="fc" id="L61">        final double[] diag = new double[n];</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">        if (a instanceof AbstractRealMatrix) {</span>
+<span class="fc" id="L63">            final AbstractRealMatrix m = (AbstractRealMatrix) a;</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">            for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L65">                diag[i] = m.getEntry(i, i);</span>
+            }
+<span class="fc" id="L67">        } else {</span>
+<span class="fc" id="L68">            final ArrayRealVector x = new ArrayRealVector(n);</span>
+<span class="fc bfc" id="L69" title="All 2 branches covered.">            for (int i = 0; i &lt; n; i++) {</span>
+<span class="fc" id="L70">                x.set(0.);</span>
+<span class="fc" id="L71">                x.setEntry(i, 1.);</span>
+<span class="fc" id="L72">                diag[i] = a.operate(x).getEntry(i);</span>
+            }
+        }
+<span class="fc" id="L75">        return new JacobiPreconditioner(diag, false);</span>
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public int getColumnDimension() {
+<span class="fc" id="L81">        return diag.getDimension();</span>
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public int getRowDimension() {
+<span class="fc" id="L87">        return diag.getDimension();</span>
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public RealVector operate(final RealVector x) {
+        // Dimension check is carried out by ebeMultiply
+<span class="nc" id="L94">        return x.ebeMultiply(diag);</span>
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public RealVector solve(final RealVector b) {
+        // Dimension check is carried out by ebeDivide
+<span class="fc" id="L101">        return b.ebeDivide(diag);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

@@ -1,0 +1,223 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AbstractContinuousDistribution.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Commons Math</a> &gt; <a href="index.source.html" class="el_package">org.apache.commons.math.distribution</a> &gt; <span class="el_source">AbstractContinuousDistribution.java</span></div><h1>AbstractContinuousDistribution.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.commons.math.distribution;
+
+import java.io.Serializable;
+
+import org.apache.commons.math.analysis.UnivariateFunction;
+import org.apache.commons.math.analysis.solvers.UnivariateRealSolverUtils;
+import org.apache.commons.math.exception.MathInternalError;
+import org.apache.commons.math.exception.NotStrictlyPositiveException;
+import org.apache.commons.math.exception.OutOfRangeException;
+import org.apache.commons.math.exception.util.LocalizedFormats;
+import org.apache.commons.math.exception.NumberIsTooLargeException;
+import org.apache.commons.math.random.RandomDataImpl;
+import org.apache.commons.math.util.FastMath;
+
+/**
+ * Base class for continuous distributions.  Default implementations are
+ * provided for some of the methods that do not vary from distribution to
+ * distribution.
+ *
+ * @version $Id$
+ */
+public abstract class AbstractContinuousDistribution
+    extends AbstractDistribution
+    implements ContinuousDistribution, Serializable {
+
+    /** Default accuracy. */
+    public static final double SOLVER_DEFAULT_ABSOLUTE_ACCURACY = 1e-6;
+    /** Serializable version identifier */
+    private static final long serialVersionUID = -38038050983108802L;
+    /**
+     * RandomData instance used to generate samples from the distribution
+     * @since 2.2
+     */
+<span class="fc" id="L50">    protected final RandomDataImpl randomData = new RandomDataImpl();</span>
+    /**
+     * Solver absolute accuracy for inverse cumulative computation.
+     * @since 2.1
+     */
+<span class="fc" id="L55">    private double solverAbsoluteAccuracy = SOLVER_DEFAULT_ABSOLUTE_ACCURACY;</span>
+    /**
+     * Default constructor.
+     */
+<span class="fc" id="L59">    protected AbstractContinuousDistribution() {}</span>
+
+    /**
+     * {@inheritDoc}
+     *
+     * For continuous distributions {@code P(X = x)} always evaluates to 0.
+     *
+     * @return 0
+     */
+    public final double probability(double x) {
+<span class="nc" id="L69">        return 0.0;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public double inverseCumulativeProbability(final double p) throws OutOfRangeException {
+
+<span class="fc bfc" id="L77" title="All 4 branches covered.">        if (p &lt; 0.0 || p &gt; 1.0) {</span>
+<span class="fc" id="L78">            throw new OutOfRangeException(p, 0, 1);</span>
+        }
+
+        // by default, do simple root finding using bracketing and default solver.
+        // subclasses can override if there is a better method.
+<span class="fc" id="L83">        UnivariateFunction rootFindingFunction =</span>
+<span class="fc" id="L84">            new UnivariateFunction() {</span>
+            public double value(double x) {
+<span class="fc" id="L86">                return cumulativeProbability(x) - p;</span>
+            }
+        };
+
+        // Try to bracket root, test domain endpoints if this fails
+<span class="fc" id="L91">        double lowerBound = getDomainLowerBound(p);</span>
+<span class="fc" id="L92">        double upperBound = getDomainUpperBound(p);</span>
+<span class="fc" id="L93">        double[] bracket = null;</span>
+        try {
+<span class="fc" id="L95">            bracket = UnivariateRealSolverUtils.bracket(</span>
+<span class="fc" id="L96">                    rootFindingFunction, getInitialDomain(p),</span>
+                    lowerBound, upperBound);
+<span class="fc" id="L98">        } catch (NumberIsTooLargeException ex) {</span>
+            /*
+             * Check domain endpoints to see if one gives value that is within
+             * the default solver's defaultAbsoluteAccuracy of 0 (will be the
+             * case if density has bounded support and p is 0 or 1).
+             */
+<span class="pc bpc" id="L104" title="1 of 2 branches missed.">            if (FastMath.abs(rootFindingFunction.value(lowerBound)) &lt; getSolverAbsoluteAccuracy()) {</span>
+<span class="fc" id="L105">                return lowerBound;</span>
+            }
+<span class="nc bnc" id="L107" title="All 2 branches missed.">            if (FastMath.abs(rootFindingFunction.value(upperBound)) &lt; getSolverAbsoluteAccuracy()) {</span>
+<span class="nc" id="L108">                return upperBound;</span>
+            }
+            // Failed bracket convergence was not because of corner solution
+<span class="nc" id="L111">            throw new MathInternalError(ex);</span>
+<span class="fc" id="L112">        }</span>
+
+        // find root
+<span class="fc" id="L115">        double root = UnivariateRealSolverUtils.solve(rootFindingFunction,</span>
+                // override getSolverAbsoluteAccuracy() to use a Brent solver with
+                // absolute accuracy different from the default.
+<span class="fc" id="L118">                bracket[0],bracket[1], getSolverAbsoluteAccuracy());</span>
+<span class="fc" id="L119">        return root;</span>
+    }
+
+    /**
+     * Reseed the random generator used to generate samples.
+     *
+     * @param seed New seed.
+     * @since 2.2
+     */
+    public void reseedRandomGenerator(long seed) {
+<span class="fc" id="L129">        randomData.reSeed(seed);</span>
+<span class="fc" id="L130">    }</span>
+
+    /**
+     * Generate a random value sampled from this distribution. The default
+     * implementation uses the
+     * &lt;a href=&quot;http://en.wikipedia.org/wiki/Inverse_transform_sampling&quot;&gt;
+     *  inversion method.
+     * &lt;/a&gt;
+     *
+     * @return a random value.
+     * @since 2.2
+     */
+    public double sample() {
+<span class="fc" id="L143">        return randomData.nextInversionDeviate(this);</span>
+    }
+
+    /**
+     * Generate a random sample from the distribution.  The default implementation
+     * generates the sample by calling {@link #sample()} in a loop.
+     *
+     * @param sampleSize Number of random values to generate.
+     * @return an array representing the random sample.
+     * @throws NotStrictlyPositiveException if {@code sampleSize} is not positive.
+     * @since 2.2
+     */
+    public double[] sample(int sampleSize) {
+<span class="pc bpc" id="L156" title="1 of 2 branches missed.">        if (sampleSize &lt;= 0) {</span>
+<span class="nc" id="L157">            throw new NotStrictlyPositiveException(LocalizedFormats.NUMBER_OF_SAMPLES,</span>
+<span class="nc" id="L158">                                                   sampleSize);</span>
+        }
+<span class="fc" id="L160">        double[] out = new double[sampleSize];</span>
+<span class="fc bfc" id="L161" title="All 2 branches covered.">        for (int i = 0; i &lt; sampleSize; i++) {</span>
+<span class="fc" id="L162">            out[i] = sample();</span>
+        }
+<span class="fc" id="L164">        return out;</span>
+    }
+
+    /**
+     * Access the initial domain value, based on {@code p}, used to
+     * bracket a CDF root.  This method is used by
+     * {@link #inverseCumulativeProbability(double)} to find critical values.
+     *
+     * @param p Desired probability for the critical value.
+     * @return the initial domain value.
+     */
+    protected abstract double getInitialDomain(double p);
+
+    /**
+     * Access the domain value lower bound, based on {@code p}, used to
+     * bracket a CDF root.  This method is used by
+     * {@link #inverseCumulativeProbability(double)} to find critical values.
+     *
+     * @param p Desired probability for the critical value.
+     * @return the domain value lower bound, i.e. {@code P(X &lt; 'lower bound') &lt; p}.
+     */
+    protected abstract double getDomainLowerBound(double p);
+
+    /**
+     * Access the domain value upper bound, based on {@code p}, used to
+     * bracket a CDF root.  This method is used by
+     * {@link #inverseCumulativeProbability(double)} to find critical values.
+     *
+     * @param p Desired probability for the critical value.
+     * @return the domain value upper bound, i.e. {@code P(X &lt; 'upper bound') &gt; p}.
+     */
+    protected abstract double getDomainUpperBound(double p);
+
+    /**
+     * Returns the solver absolute accuracy for inverse cumulative computation.
+     * You can override this method in order to use a Brent solver with an
+     * absolute accuracy different from the default.
+     *
+     * @return the maximum absolute error in inverse cumulative probability estimates
+     * @since 2.1
+     */
+    protected double getSolverAbsoluteAccuracy() {
+<span class="nc" id="L206">        return solverAbsoluteAccuracy;</span>
+    }
+
+    /**
+     * Access the lower bound of the support.
+     *
+     * @return lower bound of the support (might be Double.NEGATIVE_INFINITY)
+     */
+    public abstract double getSupportLowerBound();
+
+    /**
+     * Access the upper bound of the support.
+     *
+     * @return upper bound of the support (might be Double.POSITIVE_INFINITY)
+     */
+    public abstract double getSupportUpperBound();
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

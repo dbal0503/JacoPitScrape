@@ -1,0 +1,208 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Beta.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Commons Math</a> &gt; <a href="index.source.html" class="el_package">org.apache.commons.math.special</a> &gt; <span class="el_source">Beta.java</span></div><h1>Beta.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.commons.math.special;
+
+import org.apache.commons.math.util.ContinuedFraction;
+import org.apache.commons.math.util.FastMath;
+
+/**
+ * This is a utility class that provides computation methods related to the
+ * Beta family of functions.
+ *
+ * @version $Id$
+ */
+public class Beta {
+    /** Maximum allowed numerical error. */
+    private static final double DEFAULT_EPSILON = 10e-15;
+
+    /**
+     * Default constructor.  Prohibit instantiation.
+     */
+    private Beta() {}
+
+    /**
+     * Returns the
+     * &lt;a href=&quot;http://mathworld.wolfram.com/RegularizedBetaFunction.html&quot;&gt;
+     * regularized beta function&lt;/a&gt; I(x, a, b).
+     *
+     * @param x Value.
+     * @param a Parameter {@code a}.
+     * @param b Parameter {@code b}.
+     * @return the regularized beta function I(x, a, b).
+     * @throws org.apache.commons.math.exception.MaxCountExceededException
+     * if the algorithm fails to converge.
+     */
+    public static double regularizedBeta(double x, double a, double b) {
+<span class="fc" id="L50">        return regularizedBeta(x, a, b, DEFAULT_EPSILON, Integer.MAX_VALUE);</span>
+    }
+
+    /**
+     * Returns the
+     * &lt;a href=&quot;http://mathworld.wolfram.com/RegularizedBetaFunction.html&quot;&gt;
+     * regularized beta function&lt;/a&gt; I(x, a, b).
+     *
+     * @param x Value.
+     * @param a Parameter {@code a}.
+     * @param b Parameter {@code b}.
+     * @param epsilon When the absolute value of the nth item in the
+     * series is less than epsilon the approximation ceases to calculate
+     * further elements in the series.
+     * @return the regularized beta function I(x, a, b)
+     * @throws org.apache.commons.math.exception.MaxCountExceededException
+     * if the algorithm fails to converge.
+     */
+    public static double regularizedBeta(double x,
+                                         double a, double b,
+                                         double epsilon) {
+<span class="nc" id="L71">        return regularizedBeta(x, a, b, epsilon, Integer.MAX_VALUE);</span>
+    }
+
+    /**
+     * Returns the regularized beta function I(x, a, b).
+     *
+     * @param x the value.
+     * @param a Parameter {@code a}.
+     * @param b Parameter {@code b}.
+     * @param maxIterations Maximum number of &quot;iterations&quot; to complete.
+     * @return the regularized beta function I(x, a, b)
+     * @throws org.apache.commons.math.exception.MaxCountExceededException
+     * if the algorithm fails to converge.
+     */
+    public static double regularizedBeta(double x,
+                                         double a, double b,
+                                         int maxIterations) {
+<span class="nc" id="L88">        return regularizedBeta(x, a, b, DEFAULT_EPSILON, maxIterations);</span>
+    }
+
+    /**
+     * Returns the regularized beta function I(x, a, b).
+     *
+     * The implementation of this method is based on:
+     * &lt;ul&gt;
+     * &lt;li&gt;
+     * &lt;a href=&quot;http://mathworld.wolfram.com/RegularizedBetaFunction.html&quot;&gt;
+     * Regularized Beta Function&lt;/a&gt;.&lt;/li&gt;
+     * &lt;li&gt;
+     * &lt;a href=&quot;http://functions.wolfram.com/06.21.10.0001.01&quot;&gt;
+     * Regularized Beta Function&lt;/a&gt;.&lt;/li&gt;
+     * &lt;/ul&gt;
+     *
+     * @param x the value.
+     * @param a Parameter {@code a}.
+     * @param b Parameter {@code b}.
+     * @param epsilon When the absolute value of the nth item in the
+     * series is less than epsilon the approximation ceases to calculate
+     * further elements in the series.
+     * @param maxIterations Maximum number of &quot;iterations&quot; to complete.
+     * @return the regularized beta function I(x, a, b)
+     * @throws org.apache.commons.math.exception.MaxCountExceededException
+     * if the algorithm fails to converge.
+     */
+    public static double regularizedBeta(double x,
+                                         final double a, final double b,
+                                         double epsilon, int maxIterations) {
+        double ret;
+
+<span class="fc bfc" id="L120" title="All 2 branches covered.">        if (Double.isNaN(x) ||</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">            Double.isNaN(a) ||</span>
+<span class="pc bpc" id="L122" title="1 of 10 branches missed.">            Double.isNaN(b) ||</span>
+            x &lt; 0 ||
+            x &gt; 1 ||
+            a &lt;= 0.0 ||
+            b &lt;= 0.0) {
+<span class="fc" id="L127">            ret = Double.NaN;</span>
+<span class="fc bfc" id="L128" title="All 2 branches covered.">        } else if (x &gt; (a + 1.0) / (a + b + 2.0)) {</span>
+<span class="fc" id="L129">            ret = 1.0 - regularizedBeta(1.0 - x, b, a, epsilon, maxIterations);</span>
+        } else {
+<span class="fc" id="L131">            ContinuedFraction fraction = new ContinuedFraction() {</span>
+
+                @Override
+                protected double getB(int n, double x) {
+                    double ret;
+                    double m;
+<span class="fc bfc" id="L137" title="All 2 branches covered.">                    if (n % 2 == 0) { // even</span>
+<span class="fc" id="L138">                        m = n / 2.0;</span>
+<span class="fc" id="L139">                        ret = (m * (b - m) * x) /</span>
+                            ((a + (2 * m) - 1) * (a + (2 * m)));
+                    } else {
+<span class="fc" id="L142">                        m = (n - 1.0) / 2.0;</span>
+<span class="fc" id="L143">                        ret = -((a + m) * (a + b + m) * x) /</span>
+                                ((a + (2 * m)) * (a + (2 * m) + 1.0));
+                    }
+<span class="fc" id="L146">                    return ret;</span>
+                }
+
+                @Override
+                protected double getA(int n, double x) {
+<span class="fc" id="L151">                    return 1.0;</span>
+                }
+            };
+<span class="fc" id="L154">            ret = FastMath.exp((a * FastMath.log(x)) + (b * FastMath.log(1.0 - x)) -</span>
+<span class="fc" id="L155">                FastMath.log(a) - logBeta(a, b, epsilon, maxIterations)) *</span>
+<span class="fc" id="L156">                1.0 / fraction.evaluate(x, epsilon, maxIterations);</span>
+        }
+
+<span class="fc" id="L159">        return ret;</span>
+    }
+
+    /**
+     * Returns the natural logarithm of the beta function B(a, b).
+     *
+     * @param a Parameter {@code a}.
+     * @param b Parameter {@code b}.
+     * @return log(B(a, b)).
+     */
+    public static double logBeta(double a, double b) {
+<span class="fc" id="L170">        return logBeta(a, b, DEFAULT_EPSILON, Integer.MAX_VALUE);</span>
+    }
+
+    /**
+     * Returns the natural logarithm of the beta function B(a, b).
+     *
+     * The implementation of this method is based on:
+     * &lt;ul&gt;
+     * &lt;li&gt;&lt;a href=&quot;http://mathworld.wolfram.com/BetaFunction.html&quot;&gt;
+     * Beta Function&lt;/a&gt;, equation (1).&lt;/li&gt;
+     * &lt;/ul&gt;
+     *
+     * @param a Parameter {@code a}.
+     * @param b Parameter {@code b}.
+     * @param epsilon When the absolute value of the nth item in the
+     * series is less than epsilon the approximation ceases to calculate
+     * further elements in the series.
+     * @param maxIterations Maximum number of &quot;iterations&quot; to complete.
+     * @return log(B(a, b)).
+     */
+    public static double logBeta(double a, double b,
+                                 double epsilon,
+                                 int maxIterations) {
+        double ret;
+
+<span class="fc bfc" id="L195" title="All 2 branches covered.">        if (Double.isNaN(a) ||</span>
+<span class="fc bfc" id="L196" title="All 6 branches covered.">            Double.isNaN(b) ||</span>
+            a &lt;= 0.0 ||
+            b &lt;= 0.0) {
+<span class="fc" id="L199">            ret = Double.NaN;</span>
+        } else {
+<span class="fc" id="L201">            ret = Gamma.logGamma(a) + Gamma.logGamma(b) -</span>
+<span class="fc" id="L202">                Gamma.logGamma(a + b);</span>
+        }
+
+<span class="fc" id="L205">        return ret;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

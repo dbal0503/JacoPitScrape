@@ -1,0 +1,1729 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DateTimeZoneBuilder.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Joda time</a> &gt; <a href="index.source.html" class="el_package">org.joda.time.tz</a> &gt; <span class="el_source">DateTimeZoneBuilder.java</span></div><h1>DateTimeZoneBuilder.java</h1><pre class="source lang-java linenums">/*
+ *  Copyright 2001-2010 Stephen Colebourne
+ *
+ *  Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+package org.joda.time.tz;
+
+import java.io.DataInput;
+import java.io.DataInputStream;
+import java.io.DataOutput;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.text.DateFormatSymbols;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.Locale;
+import java.util.Set;
+
+import org.joda.time.Chronology;
+import org.joda.time.DateTime;
+import org.joda.time.DateTimeUtils;
+import org.joda.time.DateTimeZone;
+import org.joda.time.Period;
+import org.joda.time.PeriodType;
+import org.joda.time.chrono.ISOChronology;
+
+/**
+ * DateTimeZoneBuilder allows complex DateTimeZones to be constructed. Since
+ * creating a new DateTimeZone this way is a relatively expensive operation,
+ * built zones can be written to a file. Reading back the encoded data is a
+ * quick operation.
+ * &lt;p&gt;
+ * DateTimeZoneBuilder itself is mutable and not thread-safe, but the
+ * DateTimeZone objects that it builds are thread-safe and immutable.
+ * &lt;p&gt;
+ * It is intended that {@link ZoneInfoCompiler} be used to read time zone data
+ * files, indirectly calling DateTimeZoneBuilder. The following complex
+ * example defines the America/Los_Angeles time zone, with all historical
+ * transitions:
+ * 
+ * &lt;pre&gt;
+ * DateTimeZone America_Los_Angeles = new DateTimeZoneBuilder()
+ *     .addCutover(-2147483648, 'w', 1, 1, 0, false, 0)
+ *     .setStandardOffset(-28378000)
+ *     .setFixedSavings(&quot;LMT&quot;, 0)
+ *     .addCutover(1883, 'w', 11, 18, 0, false, 43200000)
+ *     .setStandardOffset(-28800000)
+ *     .addRecurringSavings(&quot;PDT&quot;, 3600000, 1918, 1919, 'w',  3, -1, 7, false, 7200000)
+ *     .addRecurringSavings(&quot;PST&quot;,       0, 1918, 1919, 'w', 10, -1, 7, false, 7200000)
+ *     .addRecurringSavings(&quot;PWT&quot;, 3600000, 1942, 1942, 'w',  2,  9, 0, false, 7200000)
+ *     .addRecurringSavings(&quot;PPT&quot;, 3600000, 1945, 1945, 'u',  8, 14, 0, false, 82800000)
+ *     .addRecurringSavings(&quot;PST&quot;,       0, 1945, 1945, 'w',  9, 30, 0, false, 7200000)
+ *     .addRecurringSavings(&quot;PDT&quot;, 3600000, 1948, 1948, 'w',  3, 14, 0, false, 7200000)
+ *     .addRecurringSavings(&quot;PST&quot;,       0, 1949, 1949, 'w',  1,  1, 0, false, 7200000)
+ *     .addRecurringSavings(&quot;PDT&quot;, 3600000, 1950, 1966, 'w',  4, -1, 7, false, 7200000)
+ *     .addRecurringSavings(&quot;PST&quot;,       0, 1950, 1961, 'w',  9, -1, 7, false, 7200000)
+ *     .addRecurringSavings(&quot;PST&quot;,       0, 1962, 1966, 'w', 10, -1, 7, false, 7200000)
+ *     .addRecurringSavings(&quot;PST&quot;,       0, 1967, 2147483647, 'w', 10, -1, 7, false, 7200000)
+ *     .addRecurringSavings(&quot;PDT&quot;, 3600000, 1967, 1973, 'w', 4, -1,  7, false, 7200000)
+ *     .addRecurringSavings(&quot;PDT&quot;, 3600000, 1974, 1974, 'w', 1,  6,  0, false, 7200000)
+ *     .addRecurringSavings(&quot;PDT&quot;, 3600000, 1975, 1975, 'w', 2, 23,  0, false, 7200000)
+ *     .addRecurringSavings(&quot;PDT&quot;, 3600000, 1976, 1986, 'w', 4, -1,  7, false, 7200000)
+ *     .addRecurringSavings(&quot;PDT&quot;, 3600000, 1987, 2147483647, 'w', 4, 1, 7, true, 7200000)
+ *     .toDateTimeZone(&quot;America/Los_Angeles&quot;, true);
+ * &lt;/pre&gt;
+ *
+ * @author Brian S O'Neill
+ * @see ZoneInfoCompiler
+ * @see ZoneInfoProvider
+ * @since 1.0
+ */
+public class DateTimeZoneBuilder {
+    /**
+     * Decodes a built DateTimeZone from the given stream, as encoded by
+     * writeTo.
+     *
+     * @param in input stream to read encoded DateTimeZone from.
+     * @param id time zone id to assign
+     */
+    public static DateTimeZone readFrom(InputStream in, String id) throws IOException {
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">        if (in instanceof DataInput) {</span>
+<span class="nc" id="L96">            return readFrom((DataInput)in, id);</span>
+        } else {
+<span class="fc" id="L98">            return readFrom((DataInput)new DataInputStream(in), id);</span>
+        }
+    }
+
+    /**
+     * Decodes a built DateTimeZone from the given stream, as encoded by
+     * writeTo.
+     *
+     * @param in input stream to read encoded DateTimeZone from.
+     * @param id time zone id to assign
+     */
+    public static DateTimeZone readFrom(DataInput in, String id) throws IOException {
+<span class="pc bpc" id="L110" title="1 of 4 branches missed.">        switch (in.readUnsignedByte()) {</span>
+        case 'F':
+<span class="fc" id="L112">            DateTimeZone fixed = new FixedDateTimeZone</span>
+<span class="fc" id="L113">                (id, in.readUTF(), (int)readMillis(in), (int)readMillis(in));</span>
+<span class="pc bpc" id="L114" title="1 of 2 branches missed.">            if (fixed.equals(DateTimeZone.UTC)) {</span>
+<span class="nc" id="L115">                fixed = DateTimeZone.UTC;</span>
+            }
+<span class="fc" id="L117">            return fixed;</span>
+        case 'C':
+<span class="fc" id="L119">            return CachedDateTimeZone.forZone(PrecalculatedZone.readFrom(in, id));</span>
+        case 'P':
+<span class="fc" id="L121">            return PrecalculatedZone.readFrom(in, id);</span>
+        default:
+<span class="nc" id="L123">            throw new IOException(&quot;Invalid encoding&quot;);</span>
+        }
+    }
+
+    /**
+     * Millisecond encoding formats:
+     *
+     * upper two bits  units       field length  approximate range
+     * ---------------------------------------------------------------
+     * 00              30 minutes  1 byte        +/- 16 hours
+     * 01              minutes     4 bytes       +/- 1020 years
+     * 10              seconds     5 bytes       +/- 4355 years
+     * 11              millis      9 bytes       +/- 292,000,000 years
+     *
+     * Remaining bits in field form signed offset from 1970-01-01T00:00:00Z.
+     */
+    static void writeMillis(DataOutput out, long millis) throws IOException {
+<span class="fc bfc" id="L140" title="All 2 branches covered.">        if (millis % (30 * 60000L) == 0) {</span>
+            // Try to write in 30 minute units.
+<span class="fc" id="L142">            long units = millis / (30 * 60000L);</span>
+<span class="fc bfc" id="L143" title="All 2 branches covered.">            if (((units &lt;&lt; (64 - 6)) &gt;&gt; (64 - 6)) == units) {</span>
+                // Form 00 (6 bits effective precision)
+<span class="fc" id="L145">                out.writeByte((int)(units &amp; 0x3f));</span>
+<span class="fc" id="L146">                return;</span>
+            }
+        }
+
+<span class="fc bfc" id="L150" title="All 2 branches covered.">        if (millis % 60000L == 0) {</span>
+            // Try to write minutes.
+<span class="fc" id="L152">            long minutes = millis / 60000L;</span>
+<span class="pc bpc" id="L153" title="1 of 2 branches missed.">            if (((minutes &lt;&lt; (64 - 30)) &gt;&gt; (64 - 30)) == minutes) {</span>
+                // Form 01 (30 bits effective precision)
+<span class="fc" id="L155">                out.writeInt(0x40000000 | (int)(minutes &amp; 0x3fffffff));</span>
+<span class="fc" id="L156">                return;</span>
+            }
+        }
+        
+<span class="fc bfc" id="L160" title="All 2 branches covered.">        if (millis % 1000L == 0) {</span>
+            // Try to write seconds.
+<span class="fc" id="L162">            long seconds = millis / 1000L;</span>
+<span class="pc bpc" id="L163" title="1 of 2 branches missed.">            if (((seconds &lt;&lt; (64 - 38)) &gt;&gt; (64 - 38)) == seconds) {</span>
+                // Form 10 (38 bits effective precision)
+<span class="fc" id="L165">                out.writeByte(0x80 | (int)((seconds &gt;&gt; 32) &amp; 0x3f));</span>
+<span class="fc" id="L166">                out.writeInt((int)(seconds &amp; 0xffffffff));</span>
+<span class="fc" id="L167">                return;</span>
+            }
+        }
+
+        // Write milliseconds either because the additional precision is
+        // required or the minutes didn't fit in the field.
+        
+        // Form 11 (64 bits effective precision, but write as if 70 bits)
+<span class="pc bpc" id="L175" title="1 of 2 branches missed.">        out.writeByte(millis &lt; 0 ? 0xff : 0xc0);</span>
+<span class="fc" id="L176">        out.writeLong(millis);</span>
+<span class="fc" id="L177">    }</span>
+
+    /**
+     * Reads encoding generated by writeMillis.
+     */
+    static long readMillis(DataInput in) throws IOException {
+<span class="fc" id="L183">        int v = in.readUnsignedByte();</span>
+<span class="fc bfc" id="L184" title="All 4 branches covered.">        switch (v &gt;&gt; 6) {</span>
+        case 0: default:
+            // Form 00 (6 bits effective precision)
+<span class="fc" id="L187">            v = (v &lt;&lt; (32 - 6)) &gt;&gt; (32 - 6);</span>
+<span class="fc" id="L188">            return v * (30 * 60000L);</span>
+
+        case 1:
+            // Form 01 (30 bits effective precision)
+<span class="fc" id="L192">            v = (v &lt;&lt; (32 - 6)) &gt;&gt; (32 - 30);</span>
+<span class="fc" id="L193">            v |= (in.readUnsignedByte()) &lt;&lt; 16;</span>
+<span class="fc" id="L194">            v |= (in.readUnsignedByte()) &lt;&lt; 8;</span>
+<span class="fc" id="L195">            v |= (in.readUnsignedByte());</span>
+<span class="fc" id="L196">            return v * 60000L;</span>
+
+        case 2:
+            // Form 10 (38 bits effective precision)
+<span class="fc" id="L200">            long w = (((long)v) &lt;&lt; (64 - 6)) &gt;&gt; (64 - 38);</span>
+<span class="fc" id="L201">            w |= (in.readUnsignedByte()) &lt;&lt; 24;</span>
+<span class="fc" id="L202">            w |= (in.readUnsignedByte()) &lt;&lt; 16;</span>
+<span class="fc" id="L203">            w |= (in.readUnsignedByte()) &lt;&lt; 8;</span>
+<span class="fc" id="L204">            w |= (in.readUnsignedByte());</span>
+<span class="fc" id="L205">            return w * 1000L;</span>
+
+        case 3:
+            // Form 11 (64 bits effective precision)
+<span class="fc" id="L209">            return in.readLong();</span>
+        }
+    }
+
+    private static DateTimeZone buildFixedZone(String id, String nameKey,
+                                               int wallOffset, int standardOffset) {
+<span class="pc bpc" id="L215" title="7 of 8 branches missed.">        if (&quot;UTC&quot;.equals(id) &amp;&amp; id.equals(nameKey) &amp;&amp;</span>
+            wallOffset == 0 &amp;&amp; standardOffset == 0) {
+<span class="nc" id="L217">            return DateTimeZone.UTC;</span>
+        }
+<span class="fc" id="L219">        return new FixedDateTimeZone(id, nameKey, wallOffset, standardOffset);</span>
+    }
+
+    // List of RuleSets.
+    private final ArrayList&lt;RuleSet&gt; iRuleSets;
+
+<span class="fc" id="L225">    public DateTimeZoneBuilder() {</span>
+<span class="fc" id="L226">        iRuleSets = new ArrayList&lt;RuleSet&gt;(10);</span>
+<span class="fc" id="L227">    }</span>
+
+    /**
+     * Adds a cutover for added rules. The standard offset at the cutover
+     * defaults to 0. Call setStandardOffset afterwards to change it.
+     *
+     * @param year  the year of cutover
+     * @param mode 'u' - cutover is measured against UTC, 'w' - against wall
+     *  offset, 's' - against standard offset
+     * @param monthOfYear  the month from 1 (January) to 12 (December)
+     * @param dayOfMonth  if negative, set to ((last day of month) - ~dayOfMonth).
+     *  For example, if -1, set to last day of month
+     * @param dayOfWeek  from 1 (Monday) to 7 (Sunday), if 0 then ignore
+     * @param advanceDayOfWeek  if dayOfMonth does not fall on dayOfWeek, advance to
+     *  dayOfWeek when true, retreat when false.
+     * @param millisOfDay  additional precision for specifying time of day of cutover
+     */
+    public DateTimeZoneBuilder addCutover(int year,
+                                          char mode,
+                                          int monthOfYear,
+                                          int dayOfMonth,
+                                          int dayOfWeek,
+                                          boolean advanceDayOfWeek,
+                                          int millisOfDay)
+    {
+<span class="fc bfc" id="L252" title="All 2 branches covered.">        if (iRuleSets.size() &gt; 0) {</span>
+<span class="fc" id="L253">            OfYear ofYear = new OfYear</span>
+                (mode, monthOfYear, dayOfMonth, dayOfWeek, advanceDayOfWeek, millisOfDay);
+<span class="fc" id="L255">            RuleSet lastRuleSet = iRuleSets.get(iRuleSets.size() - 1);</span>
+<span class="fc" id="L256">            lastRuleSet.setUpperLimit(year, ofYear);</span>
+        }
+<span class="fc" id="L258">        iRuleSets.add(new RuleSet());</span>
+<span class="fc" id="L259">        return this;</span>
+    }
+
+    /**
+     * Sets the standard offset to use for newly added rules until the next
+     * cutover is added.
+     * @param standardOffset  the standard offset in millis
+     */
+    public DateTimeZoneBuilder setStandardOffset(int standardOffset) {
+<span class="fc" id="L268">        getLastRuleSet().setStandardOffset(standardOffset);</span>
+<span class="fc" id="L269">        return this;</span>
+    }
+
+    /**
+     * Set a fixed savings rule at the cutover.
+     */
+    public DateTimeZoneBuilder setFixedSavings(String nameKey, int saveMillis) {
+<span class="fc" id="L276">        getLastRuleSet().setFixedSavings(nameKey, saveMillis);</span>
+<span class="fc" id="L277">        return this;</span>
+    }
+
+    /**
+     * Add a recurring daylight saving time rule.
+     *
+     * @param nameKey  the name key of new rule
+     * @param saveMillis  the milliseconds to add to standard offset
+     * @param fromYear  the first year that rule is in effect, MIN_VALUE indicates
+     * beginning of time
+     * @param toYear  the last year (inclusive) that rule is in effect, MAX_VALUE
+     *  indicates end of time
+     * @param mode  'u' - transitions are calculated against UTC, 'w' -
+     *  transitions are calculated against wall offset, 's' - transitions are
+     *  calculated against standard offset
+     * @param monthOfYear  the month from 1 (January) to 12 (December)
+     * @param dayOfMonth  if negative, set to ((last day of month) - ~dayOfMonth).
+     *  For example, if -1, set to last day of month
+     * @param dayOfWeek  from 1 (Monday) to 7 (Sunday), if 0 then ignore
+     * @param advanceDayOfWeek  if dayOfMonth does not fall on dayOfWeek, advance to
+     *  dayOfWeek when true, retreat when false.
+     * @param millisOfDay  additional precision for specifying time of day of transitions
+     */
+    public DateTimeZoneBuilder addRecurringSavings(String nameKey, int saveMillis,
+                                                   int fromYear, int toYear,
+                                                   char mode,
+                                                   int monthOfYear,
+                                                   int dayOfMonth,
+                                                   int dayOfWeek,
+                                                   boolean advanceDayOfWeek,
+                                                   int millisOfDay)
+    {
+<span class="pc bpc" id="L309" title="1 of 2 branches missed.">        if (fromYear &lt;= toYear) {</span>
+<span class="fc" id="L310">            OfYear ofYear = new OfYear</span>
+                (mode, monthOfYear, dayOfMonth, dayOfWeek, advanceDayOfWeek, millisOfDay);
+<span class="fc" id="L312">            Recurrence recurrence = new Recurrence(ofYear, nameKey, saveMillis);</span>
+<span class="fc" id="L313">            Rule rule = new Rule(recurrence, fromYear, toYear);</span>
+<span class="fc" id="L314">            getLastRuleSet().addRule(rule);</span>
+        }
+<span class="fc" id="L316">        return this;</span>
+    }
+
+    private RuleSet getLastRuleSet() {
+<span class="fc bfc" id="L320" title="All 2 branches covered.">        if (iRuleSets.size() == 0) {</span>
+<span class="fc" id="L321">            addCutover(Integer.MIN_VALUE, 'w', 1, 1, 0, false, 0);</span>
+        }
+<span class="fc" id="L323">        return iRuleSets.get(iRuleSets.size() - 1);</span>
+    }
+    
+    /**
+     * Processes all the rules and builds a DateTimeZone.
+     *
+     * @param id  time zone id to assign
+     * @param outputID  true if the zone id should be output
+     */
+    public DateTimeZone toDateTimeZone(String id, boolean outputID) {
+<span class="pc bpc" id="L333" title="1 of 2 branches missed.">        if (id == null) {</span>
+<span class="nc" id="L334">            throw new IllegalArgumentException();</span>
+        }
+
+        // Discover where all the transitions occur and store the results in
+        // these lists.
+<span class="fc" id="L339">        ArrayList&lt;Transition&gt; transitions = new ArrayList&lt;Transition&gt;();</span>
+
+        // Tail zone picks up remaining transitions in the form of an endless
+        // DST cycle.
+<span class="fc" id="L343">        DSTZone tailZone = null;</span>
+
+<span class="fc" id="L345">        long millis = Long.MIN_VALUE;</span>
+<span class="fc" id="L346">        int saveMillis = 0;</span>
+            
+<span class="fc" id="L348">        int ruleSetCount = iRuleSets.size();</span>
+<span class="fc bfc" id="L349" title="All 2 branches covered.">        for (int i=0; i&lt;ruleSetCount; i++) {</span>
+<span class="fc" id="L350">            RuleSet rs = iRuleSets.get(i);</span>
+<span class="fc" id="L351">            Transition next = rs.firstTransition(millis);</span>
+<span class="pc bpc" id="L352" title="1 of 2 branches missed.">            if (next == null) {</span>
+<span class="nc" id="L353">                continue;</span>
+            }
+<span class="fc" id="L355">            addTransition(transitions, next);</span>
+<span class="fc" id="L356">            millis = next.getMillis();</span>
+<span class="fc" id="L357">            saveMillis = next.getSaveMillis();</span>
+
+            // Copy it since we're going to destroy it.
+<span class="fc" id="L360">            rs = new RuleSet(rs);</span>
+
+<span class="fc bfc" id="L362" title="All 2 branches covered.">            while ((next = rs.nextTransition(millis, saveMillis)) != null) {</span>
+<span class="fc bfc" id="L363" title="All 2 branches covered.">                if (addTransition(transitions, next)) {</span>
+<span class="fc bfc" id="L364" title="All 2 branches covered.">                    if (tailZone != null) {</span>
+                        // Got the extra transition before DSTZone.
+<span class="fc" id="L366">                        break;</span>
+                    }
+                }
+<span class="fc" id="L369">                millis = next.getMillis();</span>
+<span class="fc" id="L370">                saveMillis = next.getSaveMillis();</span>
+<span class="fc bfc" id="L371" title="All 4 branches covered.">                if (tailZone == null &amp;&amp; i == ruleSetCount - 1) {</span>
+<span class="fc" id="L372">                    tailZone = rs.buildTailZone(id);</span>
+                    // If tailZone is not null, don't break out of main loop until
+                    // at least one more transition is calculated. This ensures a
+                    // correct 'seam' to the DSTZone.
+                }
+            }
+
+<span class="fc" id="L379">            millis = rs.getUpperLimit(saveMillis);</span>
+        }
+
+        // Check if a simpler zone implementation can be returned.
+<span class="pc bpc" id="L383" title="1 of 2 branches missed.">        if (transitions.size() == 0) {</span>
+<span class="nc bnc" id="L384" title="All 2 branches missed.">            if (tailZone != null) {</span>
+                // This shouldn't happen, but handle just in case.
+<span class="nc" id="L386">                return tailZone;</span>
+            }
+<span class="nc" id="L388">            return buildFixedZone(id, &quot;UTC&quot;, 0, 0);</span>
+        }
+<span class="pc bpc" id="L390" title="1 of 4 branches missed.">        if (transitions.size() == 1 &amp;&amp; tailZone == null) {</span>
+<span class="fc" id="L391">            Transition tr = transitions.get(0);</span>
+<span class="fc" id="L392">            return buildFixedZone(id, tr.getNameKey(),</span>
+<span class="fc" id="L393">                                  tr.getWallOffset(), tr.getStandardOffset());</span>
+        }
+
+<span class="fc" id="L396">        PrecalculatedZone zone = PrecalculatedZone.create(id, outputID, transitions, tailZone);</span>
+<span class="fc bfc" id="L397" title="All 2 branches covered.">        if (zone.isCachable()) {</span>
+<span class="fc" id="L398">            return CachedDateTimeZone.forZone(zone);</span>
+        }
+<span class="fc" id="L400">        return zone;</span>
+    }
+
+    private boolean addTransition(ArrayList&lt;Transition&gt; transitions, Transition tr) {
+<span class="fc" id="L404">        int size = transitions.size();</span>
+<span class="fc bfc" id="L405" title="All 2 branches covered.">        if (size == 0) {</span>
+<span class="fc" id="L406">            transitions.add(tr);</span>
+<span class="fc" id="L407">            return true;</span>
+        }
+
+<span class="fc" id="L410">        Transition last = transitions.get(size - 1);</span>
+<span class="fc bfc" id="L411" title="All 2 branches covered.">        if (!tr.isTransitionFrom(last)) {</span>
+<span class="fc" id="L412">            return false;</span>
+        }
+
+        // If local time of new transition is same as last local time, just
+        // replace last transition with new one.
+<span class="fc" id="L417">        int offsetForLast = 0;</span>
+<span class="fc bfc" id="L418" title="All 2 branches covered.">        if (size &gt;= 2) {</span>
+<span class="fc" id="L419">            offsetForLast = transitions.get(size - 2).getWallOffset();</span>
+        }
+<span class="fc" id="L421">        int offsetForNew = last.getWallOffset();</span>
+
+<span class="fc" id="L423">        long lastLocal = last.getMillis() + offsetForLast;</span>
+<span class="fc" id="L424">        long newLocal = tr.getMillis() + offsetForNew;</span>
+
+<span class="pc bpc" id="L426" title="1 of 2 branches missed.">        if (newLocal != lastLocal) {</span>
+<span class="fc" id="L427">            transitions.add(tr);</span>
+<span class="fc" id="L428">            return true;</span>
+        }
+
+<span class="nc" id="L431">        transitions.remove(size - 1);</span>
+<span class="nc" id="L432">        return addTransition(transitions, tr);</span>
+    }
+
+    /**
+     * Encodes a built DateTimeZone to the given stream. Call readFrom to
+     * decode the data into a DateTimeZone object.
+     *
+     * @param out  the output stream to receive the encoded DateTimeZone
+     * @since 1.5 (parameter added)
+     */
+    public void writeTo(String zoneID, OutputStream out) throws IOException {
+<span class="pc bpc" id="L443" title="1 of 2 branches missed.">        if (out instanceof DataOutput) {</span>
+<span class="nc" id="L444">            writeTo(zoneID, (DataOutput)out);</span>
+        } else {
+<span class="fc" id="L446">            writeTo(zoneID, (DataOutput)new DataOutputStream(out));</span>
+        }
+<span class="fc" id="L448">    }</span>
+
+    /**
+     * Encodes a built DateTimeZone to the given stream. Call readFrom to
+     * decode the data into a DateTimeZone object.
+     *
+     * @param out  the output stream to receive the encoded DateTimeZone
+     * @since 1.5 (parameter added)
+     */
+    public void writeTo(String zoneID, DataOutput out) throws IOException {
+        // pass false so zone id is not written out
+<span class="fc" id="L459">        DateTimeZone zone = toDateTimeZone(zoneID, false);</span>
+
+<span class="fc bfc" id="L461" title="All 2 branches covered.">        if (zone instanceof FixedDateTimeZone) {</span>
+<span class="fc" id="L462">            out.writeByte('F'); // 'F' for fixed</span>
+<span class="fc" id="L463">            out.writeUTF(zone.getNameKey(0));</span>
+<span class="fc" id="L464">            writeMillis(out, zone.getOffset(0));</span>
+<span class="fc" id="L465">            writeMillis(out, zone.getStandardOffset(0));</span>
+        } else {
+<span class="pc bpc" id="L467" title="1 of 2 branches missed.">            if (zone instanceof CachedDateTimeZone) {</span>
+<span class="fc" id="L468">                out.writeByte('C'); // 'C' for cached, precalculated</span>
+<span class="fc" id="L469">                zone = ((CachedDateTimeZone)zone).getUncachedZone();</span>
+            } else {
+<span class="nc" id="L471">                out.writeByte('P'); // 'P' for precalculated, uncached</span>
+            }
+<span class="fc" id="L473">            ((PrecalculatedZone)zone).writeTo(out);</span>
+        }
+<span class="fc" id="L475">    }</span>
+
+    /**
+     * Supports setting fields of year and moving between transitions.
+     */
+    private static final class OfYear {
+        static OfYear readFrom(DataInput in) throws IOException {
+<span class="fc" id="L482">            return new OfYear((char)in.readUnsignedByte(),</span>
+<span class="fc" id="L483">                              (int)in.readUnsignedByte(),</span>
+<span class="fc" id="L484">                              (int)in.readByte(),</span>
+<span class="fc" id="L485">                              (int)in.readUnsignedByte(),</span>
+<span class="fc" id="L486">                              in.readBoolean(),</span>
+<span class="fc" id="L487">                              (int)readMillis(in));</span>
+        }
+
+        // Is 'u', 'w', or 's'.
+        final char iMode;
+
+        final int iMonthOfYear;
+        final int iDayOfMonth;
+        final int iDayOfWeek;
+        final boolean iAdvance;
+        final int iMillisOfDay;
+
+        OfYear(char mode,
+               int monthOfYear,
+               int dayOfMonth,
+               int dayOfWeek, boolean advanceDayOfWeek,
+               int millisOfDay)
+<span class="fc" id="L504">        {</span>
+<span class="pc bpc" id="L505" title="1 of 6 branches missed.">            if (mode != 'u' &amp;&amp; mode != 'w' &amp;&amp; mode != 's') {</span>
+<span class="nc" id="L506">                throw new IllegalArgumentException(&quot;Unknown mode: &quot; + mode);</span>
+            }
+
+<span class="fc" id="L509">            iMode = mode;</span>
+<span class="fc" id="L510">            iMonthOfYear = monthOfYear;</span>
+<span class="fc" id="L511">            iDayOfMonth = dayOfMonth;</span>
+<span class="fc" id="L512">            iDayOfWeek = dayOfWeek;</span>
+<span class="fc" id="L513">            iAdvance = advanceDayOfWeek;</span>
+<span class="fc" id="L514">            iMillisOfDay = millisOfDay;</span>
+<span class="fc" id="L515">        }</span>
+
+        /**
+         * @param standardOffset standard offset just before instant
+         */
+        public long setInstant(int year, int standardOffset, int saveMillis) {
+            int offset;
+<span class="pc bpc" id="L522" title="1 of 2 branches missed.">            if (iMode == 'w') {</span>
+<span class="fc" id="L523">                offset = standardOffset + saveMillis;</span>
+<span class="nc bnc" id="L524" title="All 2 branches missed.">            } else if (iMode == 's') {</span>
+<span class="nc" id="L525">                offset = standardOffset;</span>
+            } else {
+<span class="nc" id="L527">                offset = 0;</span>
+            }
+
+<span class="fc" id="L530">            Chronology chrono = ISOChronology.getInstanceUTC();</span>
+<span class="fc" id="L531">            long millis = chrono.year().set(0, year);</span>
+<span class="fc" id="L532">            millis = chrono.monthOfYear().set(millis, iMonthOfYear);</span>
+<span class="fc" id="L533">            millis = chrono.millisOfDay().set(millis, iMillisOfDay);</span>
+<span class="fc" id="L534">            millis = setDayOfMonth(chrono, millis);</span>
+
+<span class="pc bpc" id="L536" title="1 of 2 branches missed.">            if (iDayOfWeek != 0) {</span>
+<span class="nc" id="L537">                millis = setDayOfWeek(chrono, millis);</span>
+            }
+
+            // Convert from local time to UTC.
+<span class="fc" id="L541">            return millis - offset;</span>
+        }
+
+        /**
+         * @param standardOffset standard offset just before next recurrence
+         */
+        public long next(long instant, int standardOffset, int saveMillis) {
+            int offset;
+<span class="fc bfc" id="L549" title="All 2 branches covered.">            if (iMode == 'w') {</span>
+<span class="fc" id="L550">                offset = standardOffset + saveMillis;</span>
+<span class="pc bpc" id="L551" title="1 of 2 branches missed.">            } else if (iMode == 's') {</span>
+<span class="nc" id="L552">                offset = standardOffset;</span>
+            } else {
+<span class="fc" id="L554">                offset = 0;</span>
+            }
+
+            // Convert from UTC to local time.
+<span class="fc" id="L558">            instant += offset;</span>
+
+<span class="fc" id="L560">            Chronology chrono = ISOChronology.getInstanceUTC();</span>
+<span class="fc" id="L561">            long next = chrono.monthOfYear().set(instant, iMonthOfYear);</span>
+            // Be lenient with millisOfDay.
+<span class="fc" id="L563">            next = chrono.millisOfDay().set(next, 0);</span>
+<span class="fc" id="L564">            next = chrono.millisOfDay().add(next, iMillisOfDay);</span>
+<span class="fc" id="L565">            next = setDayOfMonthNext(chrono, next);</span>
+
+<span class="fc bfc" id="L567" title="All 2 branches covered.">            if (iDayOfWeek == 0) {</span>
+<span class="fc bfc" id="L568" title="All 2 branches covered.">                if (next &lt;= instant) {</span>
+<span class="fc" id="L569">                    next = chrono.year().add(next, 1);</span>
+<span class="fc" id="L570">                    next = setDayOfMonthNext(chrono, next);</span>
+                }
+            } else {
+<span class="fc" id="L573">                next = setDayOfWeek(chrono, next);</span>
+<span class="fc bfc" id="L574" title="All 2 branches covered.">                if (next &lt;= instant) {</span>
+<span class="fc" id="L575">                    next = chrono.year().add(next, 1);</span>
+<span class="fc" id="L576">                    next = chrono.monthOfYear().set(next, iMonthOfYear);</span>
+<span class="fc" id="L577">                    next = setDayOfMonthNext(chrono, next);</span>
+<span class="fc" id="L578">                    next = setDayOfWeek(chrono, next);</span>
+                }
+            }
+
+            // Convert from local time to UTC.
+<span class="fc" id="L583">            return next - offset;</span>
+        }
+
+        /**
+         * @param standardOffset standard offset just before previous recurrence
+         */
+        public long previous(long instant, int standardOffset, int saveMillis) {
+            int offset;
+<span class="fc bfc" id="L591" title="All 2 branches covered.">            if (iMode == 'w') {</span>
+<span class="fc" id="L592">                offset = standardOffset + saveMillis;</span>
+<span class="pc bpc" id="L593" title="1 of 2 branches missed.">            } else if (iMode == 's') {</span>
+<span class="nc" id="L594">                offset = standardOffset;</span>
+            } else {
+<span class="fc" id="L596">                offset = 0;</span>
+            }
+
+            // Convert from UTC to local time.
+<span class="fc" id="L600">            instant += offset;</span>
+
+<span class="fc" id="L602">            Chronology chrono = ISOChronology.getInstanceUTC();</span>
+<span class="fc" id="L603">            long prev = chrono.monthOfYear().set(instant, iMonthOfYear);</span>
+            // Be lenient with millisOfDay.
+<span class="fc" id="L605">            prev = chrono.millisOfDay().set(prev, 0);</span>
+<span class="fc" id="L606">            prev = chrono.millisOfDay().add(prev, iMillisOfDay);</span>
+<span class="fc" id="L607">            prev = setDayOfMonthPrevious(chrono, prev);</span>
+
+<span class="pc bpc" id="L609" title="1 of 2 branches missed.">            if (iDayOfWeek == 0) {</span>
+<span class="nc bnc" id="L610" title="All 2 branches missed.">                if (prev &gt;= instant) {</span>
+<span class="nc" id="L611">                    prev = chrono.year().add(prev, -1);</span>
+<span class="nc" id="L612">                    prev = setDayOfMonthPrevious(chrono, prev);</span>
+                }
+            } else {
+<span class="fc" id="L615">                prev = setDayOfWeek(chrono, prev);</span>
+<span class="fc bfc" id="L616" title="All 2 branches covered.">                if (prev &gt;= instant) {</span>
+<span class="fc" id="L617">                    prev = chrono.year().add(prev, -1);</span>
+<span class="fc" id="L618">                    prev = chrono.monthOfYear().set(prev, iMonthOfYear);</span>
+<span class="fc" id="L619">                    prev = setDayOfMonthPrevious(chrono, prev);</span>
+<span class="fc" id="L620">                    prev = setDayOfWeek(chrono, prev);</span>
+                }
+            }
+
+            // Convert from local time to UTC.
+<span class="fc" id="L625">            return prev - offset;</span>
+        }
+
+        public boolean equals(Object obj) {
+<span class="pc bpc" id="L629" title="1 of 2 branches missed.">            if (this == obj) {</span>
+<span class="nc" id="L630">                return true;</span>
+            }
+<span class="pc bpc" id="L632" title="1 of 2 branches missed.">            if (obj instanceof OfYear) {</span>
+<span class="fc" id="L633">                OfYear other = (OfYear)obj;</span>
+<span class="pc bpc" id="L634" title="6 of 12 branches missed.">                return</span>
+                    iMode == other.iMode &amp;&amp;
+                    iMonthOfYear == other.iMonthOfYear &amp;&amp;
+                    iDayOfMonth == other.iDayOfMonth &amp;&amp;
+                    iDayOfWeek == other.iDayOfWeek &amp;&amp;
+                    iAdvance == other.iAdvance &amp;&amp;
+                    iMillisOfDay == other.iMillisOfDay;
+            }
+<span class="nc" id="L642">            return false;</span>
+        }
+
+        /*
+        public String toString() {
+            return
+                &quot;[OfYear]\n&quot; + 
+                &quot;Mode: &quot; + iMode + '\n' +
+                &quot;MonthOfYear: &quot; + iMonthOfYear + '\n' +
+                &quot;DayOfMonth: &quot; + iDayOfMonth + '\n' +
+                &quot;DayOfWeek: &quot; + iDayOfWeek + '\n' +
+                &quot;AdvanceDayOfWeek: &quot; + iAdvance + '\n' +
+                &quot;MillisOfDay: &quot; + iMillisOfDay + '\n';
+        }
+        */
+
+        public void writeTo(DataOutput out) throws IOException {
+<span class="fc" id="L659">            out.writeByte(iMode);</span>
+<span class="fc" id="L660">            out.writeByte(iMonthOfYear);</span>
+<span class="fc" id="L661">            out.writeByte(iDayOfMonth);</span>
+<span class="fc" id="L662">            out.writeByte(iDayOfWeek);</span>
+<span class="fc" id="L663">            out.writeBoolean(iAdvance);</span>
+<span class="fc" id="L664">            writeMillis(out, iMillisOfDay);</span>
+<span class="fc" id="L665">        }</span>
+
+        /**
+         * If month-day is 02-29 and year isn't leap, advances to next leap year.
+         */
+        private long setDayOfMonthNext(Chronology chrono, long next) {
+            try {
+<span class="fc" id="L672">                next = setDayOfMonth(chrono, next);</span>
+<span class="nc" id="L673">            } catch (IllegalArgumentException e) {</span>
+<span class="nc bnc" id="L674" title="All 4 branches missed.">                if (iMonthOfYear == 2 &amp;&amp; iDayOfMonth == 29) {</span>
+<span class="nc bnc" id="L675" title="All 2 branches missed.">                    while (chrono.year().isLeap(next) == false) {</span>
+<span class="nc" id="L676">                        next = chrono.year().add(next, 1);</span>
+                    }
+<span class="nc" id="L678">                    next = setDayOfMonth(chrono, next);</span>
+                } else {
+<span class="nc" id="L680">                    throw e;</span>
+                }
+<span class="fc" id="L682">            }</span>
+<span class="fc" id="L683">            return next;</span>
+        }
+
+        /**
+         * If month-day is 02-29 and year isn't leap, retreats to previous leap year.
+         */
+        private long setDayOfMonthPrevious(Chronology chrono, long prev) {
+            try {
+<span class="fc" id="L691">                prev = setDayOfMonth(chrono, prev);</span>
+<span class="nc" id="L692">            } catch (IllegalArgumentException e) {</span>
+<span class="nc bnc" id="L693" title="All 4 branches missed.">                if (iMonthOfYear == 2 &amp;&amp; iDayOfMonth == 29) {</span>
+<span class="nc bnc" id="L694" title="All 2 branches missed.">                    while (chrono.year().isLeap(prev) == false) {</span>
+<span class="nc" id="L695">                        prev = chrono.year().add(prev, -1);</span>
+                    }
+<span class="nc" id="L697">                    prev = setDayOfMonth(chrono, prev);</span>
+                } else {
+<span class="nc" id="L699">                    throw e;</span>
+                }
+<span class="fc" id="L701">            }</span>
+<span class="fc" id="L702">            return prev;</span>
+        }
+
+        private long setDayOfMonth(Chronology chrono, long instant) {
+<span class="fc bfc" id="L706" title="All 2 branches covered.">            if (iDayOfMonth &gt;= 0) {</span>
+<span class="fc" id="L707">                instant = chrono.dayOfMonth().set(instant, iDayOfMonth);</span>
+            } else {
+<span class="fc" id="L709">                instant = chrono.dayOfMonth().set(instant, 1);</span>
+<span class="fc" id="L710">                instant = chrono.monthOfYear().add(instant, 1);</span>
+<span class="fc" id="L711">                instant = chrono.dayOfMonth().add(instant, iDayOfMonth);</span>
+            }
+<span class="fc" id="L713">            return instant;</span>
+        }
+
+        private long setDayOfWeek(Chronology chrono, long instant) {
+<span class="fc" id="L717">            int dayOfWeek = chrono.dayOfWeek().get(instant);</span>
+<span class="fc" id="L718">            int daysToAdd = iDayOfWeek - dayOfWeek;</span>
+<span class="fc bfc" id="L719" title="All 2 branches covered.">            if (daysToAdd != 0) {</span>
+<span class="fc bfc" id="L720" title="All 2 branches covered.">                if (iAdvance) {</span>
+<span class="pc bpc" id="L721" title="1 of 2 branches missed.">                    if (daysToAdd &lt; 0) {</span>
+<span class="nc" id="L722">                        daysToAdd += 7;</span>
+                    }
+                } else {
+<span class="pc bpc" id="L725" title="1 of 2 branches missed.">                    if (daysToAdd &gt; 0) {</span>
+<span class="fc" id="L726">                        daysToAdd -= 7;</span>
+                    }
+                }
+<span class="fc" id="L729">                instant = chrono.dayOfWeek().add(instant, daysToAdd);</span>
+            }
+<span class="fc" id="L731">            return instant;</span>
+        }
+    }
+
+    /**
+     * Extends OfYear with a nameKey and savings.
+     */
+    private static final class Recurrence {
+        static Recurrence readFrom(DataInput in) throws IOException {
+<span class="fc" id="L740">            return new Recurrence(OfYear.readFrom(in), in.readUTF(), (int)readMillis(in));</span>
+        }
+
+        final OfYear iOfYear;
+        final String iNameKey;
+        final int iSaveMillis;
+
+<span class="fc" id="L747">        Recurrence(OfYear ofYear, String nameKey, int saveMillis) {</span>
+<span class="fc" id="L748">            iOfYear = ofYear;</span>
+<span class="fc" id="L749">            iNameKey = nameKey;</span>
+<span class="fc" id="L750">            iSaveMillis = saveMillis;</span>
+<span class="fc" id="L751">        }</span>
+
+        public OfYear getOfYear() {
+<span class="nc" id="L754">            return iOfYear;</span>
+        }
+
+        /**
+         * @param standardOffset standard offset just before next recurrence
+         */
+        public long next(long instant, int standardOffset, int saveMillis) {
+<span class="fc" id="L761">            return iOfYear.next(instant, standardOffset, saveMillis);</span>
+        }
+
+        /**
+         * @param standardOffset standard offset just before previous recurrence
+         */
+        public long previous(long instant, int standardOffset, int saveMillis) {
+<span class="fc" id="L768">            return iOfYear.previous(instant, standardOffset, saveMillis);</span>
+        }
+
+        public String getNameKey() {
+<span class="fc" id="L772">            return iNameKey;</span>
+        }
+
+        public int getSaveMillis() {
+<span class="fc" id="L776">            return iSaveMillis;</span>
+        }
+
+        public boolean equals(Object obj) {
+<span class="pc bpc" id="L780" title="1 of 2 branches missed.">            if (this == obj) {</span>
+<span class="nc" id="L781">                return true;</span>
+            }
+<span class="pc bpc" id="L783" title="1 of 2 branches missed.">            if (obj instanceof Recurrence) {</span>
+<span class="fc" id="L784">                Recurrence other = (Recurrence)obj;</span>
+<span class="pc bpc" id="L785" title="1 of 2 branches missed.">                return</span>
+                    iSaveMillis == other.iSaveMillis &amp;&amp;
+<span class="pc bpc" id="L787" title="1 of 2 branches missed.">                    iNameKey.equals(other.iNameKey) &amp;&amp;</span>
+<span class="pc bpc" id="L788" title="1 of 2 branches missed.">                    iOfYear.equals(other.iOfYear);</span>
+            }
+<span class="nc" id="L790">            return false;</span>
+        }
+
+        public void writeTo(DataOutput out) throws IOException {
+<span class="fc" id="L794">            iOfYear.writeTo(out);</span>
+<span class="fc" id="L795">            out.writeUTF(iNameKey);</span>
+<span class="fc" id="L796">            writeMillis(out, iSaveMillis);</span>
+<span class="fc" id="L797">        }</span>
+
+        Recurrence rename(String nameKey) {
+<span class="nc" id="L800">            return new Recurrence(iOfYear, nameKey, iSaveMillis);</span>
+        }
+
+        Recurrence renameAppend(String appendNameKey) {
+<span class="nc" id="L804">            return rename((iNameKey + appendNameKey).intern());</span>
+        }
+    }
+
+    /**
+     * Extends Recurrence with inclusive year limits.
+     */
+    private static final class Rule {
+        final Recurrence iRecurrence;
+        final int iFromYear; // inclusive
+        final int iToYear;   // inclusive
+
+<span class="fc" id="L816">        Rule(Recurrence recurrence, int fromYear, int toYear) {</span>
+<span class="fc" id="L817">            iRecurrence = recurrence;</span>
+<span class="fc" id="L818">            iFromYear = fromYear;</span>
+<span class="fc" id="L819">            iToYear = toYear;</span>
+<span class="fc" id="L820">        }</span>
+
+        public int getFromYear() {
+<span class="nc" id="L823">            return iFromYear;</span>
+        }
+
+        public int getToYear() {
+<span class="fc" id="L827">            return iToYear;</span>
+        }
+
+        public OfYear getOfYear() {
+<span class="nc" id="L831">            return iRecurrence.getOfYear();</span>
+        }
+
+        public String getNameKey() {
+<span class="fc" id="L835">            return iRecurrence.getNameKey();</span>
+        }
+
+        public int getSaveMillis() {
+<span class="fc" id="L839">            return iRecurrence.getSaveMillis();</span>
+        }
+
+        public long next(final long instant, int standardOffset, int saveMillis) {
+<span class="fc" id="L843">            Chronology chrono = ISOChronology.getInstanceUTC();</span>
+
+<span class="fc" id="L845">            final int wallOffset = standardOffset + saveMillis;</span>
+<span class="fc" id="L846">            long testInstant = instant;</span>
+
+            int year;
+<span class="fc bfc" id="L849" title="All 2 branches covered.">            if (instant == Long.MIN_VALUE) {</span>
+<span class="fc" id="L850">                year = Integer.MIN_VALUE;</span>
+            } else {
+<span class="fc" id="L852">                year = chrono.year().get(instant + wallOffset);</span>
+            }
+
+<span class="fc bfc" id="L855" title="All 2 branches covered.">            if (year &lt; iFromYear) {</span>
+                // First advance instant to start of from year.
+<span class="fc" id="L857">                testInstant = chrono.year().set(0, iFromYear) - wallOffset;</span>
+                // Back off one millisecond to account for next recurrence
+                // being exactly at the beginning of the year.
+<span class="fc" id="L860">                testInstant -= 1;</span>
+            }
+
+<span class="fc" id="L863">            long next = iRecurrence.next(testInstant, standardOffset, saveMillis);</span>
+
+<span class="pc bpc" id="L865" title="1 of 2 branches missed.">            if (next &gt; instant) {</span>
+<span class="fc" id="L866">                year = chrono.year().get(next + wallOffset);</span>
+<span class="fc bfc" id="L867" title="All 2 branches covered.">                if (year &gt; iToYear) {</span>
+                    // Out of range, return original value.
+<span class="fc" id="L869">                    next = instant;</span>
+                }
+            }
+
+<span class="fc" id="L873">            return next;</span>
+        }
+    }
+
+    private static final class Transition {
+        private final long iMillis;
+        private final String iNameKey;
+        private final int iWallOffset;
+        private final int iStandardOffset;
+
+<span class="fc" id="L883">        Transition(long millis, Transition tr) {</span>
+<span class="fc" id="L884">            iMillis = millis;</span>
+<span class="fc" id="L885">            iNameKey = tr.iNameKey;</span>
+<span class="fc" id="L886">            iWallOffset = tr.iWallOffset;</span>
+<span class="fc" id="L887">            iStandardOffset = tr.iStandardOffset;</span>
+<span class="fc" id="L888">        }</span>
+
+<span class="fc" id="L890">        Transition(long millis, Rule rule, int standardOffset) {</span>
+<span class="fc" id="L891">            iMillis = millis;</span>
+<span class="fc" id="L892">            iNameKey = rule.getNameKey();</span>
+<span class="fc" id="L893">            iWallOffset = standardOffset + rule.getSaveMillis();</span>
+<span class="fc" id="L894">            iStandardOffset = standardOffset;</span>
+<span class="fc" id="L895">        }</span>
+
+        Transition(long millis, String nameKey,
+<span class="fc" id="L898">                   int wallOffset, int standardOffset) {</span>
+<span class="fc" id="L899">            iMillis = millis;</span>
+<span class="fc" id="L900">            iNameKey = nameKey;</span>
+<span class="fc" id="L901">            iWallOffset = wallOffset;</span>
+<span class="fc" id="L902">            iStandardOffset = standardOffset;</span>
+<span class="fc" id="L903">        }</span>
+
+        public long getMillis() {
+<span class="fc" id="L906">            return iMillis;</span>
+        }
+
+        public String getNameKey() {
+<span class="fc" id="L910">            return iNameKey;</span>
+        }
+
+        public int getWallOffset() {
+<span class="fc" id="L914">            return iWallOffset;</span>
+        }
+
+        public int getStandardOffset() {
+<span class="fc" id="L918">            return iStandardOffset;</span>
+        }
+
+        public int getSaveMillis() {
+<span class="fc" id="L922">            return iWallOffset - iStandardOffset;</span>
+        }
+
+        /**
+         * There must be a change in the millis, wall offsets or name keys.
+         */
+        public boolean isTransitionFrom(Transition other) {
+<span class="fc bfc" id="L929" title="All 2 branches covered.">            if (other == null) {</span>
+<span class="fc" id="L930">                return true;</span>
+            }
+<span class="pc bpc" id="L932" title="1 of 4 branches missed.">            return iMillis &gt; other.iMillis &amp;&amp;</span>
+                (iWallOffset != other.iWallOffset ||
+                 //iStandardOffset != other.iStandardOffset ||
+<span class="fc bfc" id="L935" title="All 2 branches covered.">                 !(iNameKey.equals(other.iNameKey)));</span>
+        }
+    }
+
+    private static final class RuleSet {
+        private static final int YEAR_LIMIT;
+
+        static {
+            // Don't pre-calculate more than 100 years into the future. Almost
+            // all zones will stop pre-calculating far sooner anyhow. Either a
+            // simple DST cycle is detected or the last rule is a fixed
+            // offset. If a zone has a fixed offset set more than 100 years
+            // into the future, then it won't be observed.
+<span class="fc" id="L948">            long now = DateTimeUtils.currentTimeMillis();</span>
+<span class="fc" id="L949">            YEAR_LIMIT = ISOChronology.getInstanceUTC().year().get(now) + 100;</span>
+<span class="fc" id="L950">        }</span>
+
+        private int iStandardOffset;
+        private ArrayList&lt;Rule&gt; iRules;
+
+        // Optional.
+        private String iInitialNameKey;
+        private int iInitialSaveMillis;
+
+        // Upper limit is exclusive.
+        private int iUpperYear;
+        private OfYear iUpperOfYear;
+
+<span class="fc" id="L963">        RuleSet() {</span>
+<span class="fc" id="L964">            iRules = new ArrayList&lt;Rule&gt;(10);</span>
+<span class="fc" id="L965">            iUpperYear = Integer.MAX_VALUE;</span>
+<span class="fc" id="L966">        }</span>
+
+        /**
+         * Copy constructor.
+         */
+<span class="fc" id="L971">        RuleSet(RuleSet rs) {</span>
+<span class="fc" id="L972">            iStandardOffset = rs.iStandardOffset;</span>
+<span class="fc" id="L973">            iRules = new ArrayList&lt;Rule&gt;(rs.iRules);</span>
+<span class="fc" id="L974">            iInitialNameKey = rs.iInitialNameKey;</span>
+<span class="fc" id="L975">            iInitialSaveMillis = rs.iInitialSaveMillis;</span>
+<span class="fc" id="L976">            iUpperYear = rs.iUpperYear;</span>
+<span class="fc" id="L977">            iUpperOfYear = rs.iUpperOfYear;</span>
+<span class="fc" id="L978">        }</span>
+
+        public int getStandardOffset() {
+<span class="nc" id="L981">            return iStandardOffset;</span>
+        }
+
+        public void setStandardOffset(int standardOffset) {
+<span class="fc" id="L985">            iStandardOffset = standardOffset;</span>
+<span class="fc" id="L986">        }</span>
+
+        public void setFixedSavings(String nameKey, int saveMillis) {
+<span class="fc" id="L989">            iInitialNameKey = nameKey;</span>
+<span class="fc" id="L990">            iInitialSaveMillis = saveMillis;</span>
+<span class="fc" id="L991">        }</span>
+
+        public void addRule(Rule rule) {
+<span class="pc bpc" id="L994" title="1 of 2 branches missed.">            if (!iRules.contains(rule)) {</span>
+<span class="fc" id="L995">                iRules.add(rule);</span>
+            }
+<span class="fc" id="L997">        }</span>
+
+        public void setUpperLimit(int year, OfYear ofYear) {
+<span class="fc" id="L1000">            iUpperYear = year;</span>
+<span class="fc" id="L1001">            iUpperOfYear = ofYear;</span>
+<span class="fc" id="L1002">        }</span>
+
+        /**
+         * Returns a transition at firstMillis with the first name key and
+         * offsets for this rule set. This method may return null.
+         *
+         * @param firstMillis millis of first transition
+         */
+        public Transition firstTransition(final long firstMillis) {
+<span class="fc bfc" id="L1011" title="All 2 branches covered.">            if (iInitialNameKey != null) {</span>
+                // Initial zone info explicitly set, so don't search the rules.
+<span class="fc" id="L1013">                return new Transition(firstMillis, iInitialNameKey,</span>
+                                      iStandardOffset + iInitialSaveMillis, iStandardOffset);
+            }
+
+            // Make a copy before we destroy the rules.
+<span class="fc" id="L1018">            ArrayList&lt;Rule&gt; copy = new ArrayList&lt;Rule&gt;(iRules);</span>
+
+            // Iterate through all the transitions until firstMillis is
+            // reached. Use the name key and savings for whatever rule reaches
+            // the limit.
+
+<span class="fc" id="L1024">            long millis = Long.MIN_VALUE;</span>
+<span class="fc" id="L1025">            int saveMillis = 0;</span>
+<span class="fc" id="L1026">            Transition first = null;</span>
+
+            Transition next;
+<span class="pc bpc" id="L1029" title="1 of 2 branches missed.">            while ((next = nextTransition(millis, saveMillis)) != null) {</span>
+<span class="fc" id="L1030">                millis = next.getMillis();</span>
+
+<span class="pc bpc" id="L1032" title="1 of 2 branches missed.">                if (millis == firstMillis) {</span>
+<span class="nc" id="L1033">                    first = new Transition(firstMillis, next);</span>
+<span class="nc" id="L1034">                    break;</span>
+                }
+
+<span class="fc bfc" id="L1037" title="All 2 branches covered.">                if (millis &gt; firstMillis) {</span>
+<span class="fc bfc" id="L1038" title="All 2 branches covered.">                    if (first == null) {</span>
+                        // Find first rule without savings. This way a more
+                        // accurate nameKey is found even though no rule
+                        // extends to the RuleSet's lower limit.
+<span class="pc bpc" id="L1042" title="1 of 2 branches missed.">                        for (Rule rule : copy) {</span>
+<span class="fc bfc" id="L1043" title="All 2 branches covered.">                            if (rule.getSaveMillis() == 0) {</span>
+<span class="fc" id="L1044">                                first = new Transition(firstMillis, rule, iStandardOffset);</span>
+<span class="fc" id="L1045">                                break;</span>
+                            }
+<span class="fc" id="L1047">                        }</span>
+                    }
+<span class="pc bpc" id="L1049" title="1 of 2 branches missed.">                    if (first == null) {</span>
+                        // Found no rule without savings. Create a transition
+                        // with no savings anyhow, and use the best available
+                        // name key.
+<span class="nc" id="L1053">                        first = new Transition(firstMillis, next.getNameKey(),</span>
+                                               iStandardOffset, iStandardOffset);
+                    }
+                    break;
+                }
+                
+                // Set first to the best transition found so far, but next
+                // iteration may find something closer to lower limit.
+<span class="fc" id="L1061">                first = new Transition(firstMillis, next);</span>
+
+<span class="fc" id="L1063">                saveMillis = next.getSaveMillis();</span>
+            }
+
+<span class="fc" id="L1066">            iRules = copy;</span>
+<span class="fc" id="L1067">            return first;</span>
+        }
+
+        /**
+         * Returns null if RuleSet is exhausted or upper limit reached. Calling
+         * this method will throw away rules as they each become
+         * exhausted. Copy the RuleSet before using it to compute transitions.
+         *
+         * Returned transition may be a duplicate from previous
+         * transition. Caller must call isTransitionFrom to filter out
+         * duplicates.
+         *
+         * @param saveMillis savings before next transition
+         */
+        public Transition nextTransition(final long instant, final int saveMillis) {
+<span class="fc" id="L1082">            Chronology chrono = ISOChronology.getInstanceUTC();</span>
+
+            // Find next matching rule.
+<span class="fc" id="L1085">            Rule nextRule = null;</span>
+<span class="fc" id="L1086">            long nextMillis = Long.MAX_VALUE;</span>
+            
+<span class="fc" id="L1088">            Iterator&lt;Rule&gt; it = iRules.iterator();</span>
+<span class="fc bfc" id="L1089" title="All 2 branches covered.">            while (it.hasNext()) {</span>
+<span class="fc" id="L1090">                Rule rule = it.next();</span>
+<span class="fc" id="L1091">                long next = rule.next(instant, iStandardOffset, saveMillis);</span>
+<span class="fc bfc" id="L1092" title="All 2 branches covered.">                if (next &lt;= instant) {</span>
+<span class="fc" id="L1093">                    it.remove();</span>
+<span class="fc" id="L1094">                    continue;</span>
+                }
+                // Even if next is same as previous next, choose the rule
+                // in order for more recently added rules to override.
+<span class="fc bfc" id="L1098" title="All 2 branches covered.">                if (next &lt;= nextMillis) {</span>
+                    // Found a better match.
+<span class="fc" id="L1100">                    nextRule = rule;</span>
+<span class="fc" id="L1101">                    nextMillis = next;</span>
+                }
+<span class="fc" id="L1103">            }</span>
+            
+<span class="fc bfc" id="L1105" title="All 2 branches covered.">            if (nextRule == null) {</span>
+<span class="fc" id="L1106">                return null;</span>
+            }
+            
+            // Stop precalculating if year reaches some arbitrary limit.
+<span class="pc bpc" id="L1110" title="1 of 2 branches missed.">            if (chrono.year().get(nextMillis) &gt;= YEAR_LIMIT) {</span>
+<span class="nc" id="L1111">                return null;</span>
+            }
+            
+            // Check if upper limit reached or passed.
+<span class="fc bfc" id="L1115" title="All 2 branches covered.">            if (iUpperYear &lt; Integer.MAX_VALUE) {</span>
+<span class="fc" id="L1116">                long upperMillis =</span>
+<span class="fc" id="L1117">                    iUpperOfYear.setInstant(iUpperYear, iStandardOffset, saveMillis);</span>
+<span class="fc bfc" id="L1118" title="All 2 branches covered.">                if (nextMillis &gt;= upperMillis) {</span>
+                    // At or after upper limit.
+<span class="fc" id="L1120">                    return null;</span>
+                }
+            }
+            
+<span class="fc" id="L1124">            return new Transition(nextMillis, nextRule, iStandardOffset);</span>
+        }
+
+        /**
+         * @param saveMillis savings before upper limit
+         */
+        public long getUpperLimit(int saveMillis) {
+<span class="fc bfc" id="L1131" title="All 2 branches covered.">            if (iUpperYear == Integer.MAX_VALUE) {</span>
+<span class="fc" id="L1132">                return Long.MAX_VALUE;</span>
+            }
+<span class="fc" id="L1134">            return iUpperOfYear.setInstant(iUpperYear, iStandardOffset, saveMillis);</span>
+        }
+
+        /**
+         * Returns null if none can be built.
+         */
+        public DSTZone buildTailZone(String id) {
+<span class="fc bfc" id="L1141" title="All 2 branches covered.">            if (iRules.size() == 2) {</span>
+<span class="fc" id="L1142">                Rule startRule = iRules.get(0);</span>
+<span class="fc" id="L1143">                Rule endRule = iRules.get(1);</span>
+<span class="fc bfc" id="L1144" title="All 2 branches covered.">                if (startRule.getToYear() == Integer.MAX_VALUE &amp;&amp;</span>
+<span class="pc bpc" id="L1145" title="1 of 2 branches missed.">                    endRule.getToYear() == Integer.MAX_VALUE) {</span>
+
+                    // With exactly two infinitely recurring rules left, a
+                    // simple DSTZone can be formed.
+
+                    // The order of rules can come in any order, and it doesn't
+                    // really matter which rule was chosen the 'start' and
+                    // which is chosen the 'end'. DSTZone works properly either
+                    // way.
+<span class="fc" id="L1154">                    return new DSTZone(id, iStandardOffset,</span>
+                                       startRule.iRecurrence, endRule.iRecurrence);
+                }
+            }
+<span class="fc" id="L1158">            return null;</span>
+        }
+    }
+
+    private static final class DSTZone extends DateTimeZone {
+        private static final long serialVersionUID = 6941492635554961361L;
+
+        static DSTZone readFrom(DataInput in, String id) throws IOException {
+<span class="fc" id="L1166">            return new DSTZone(id, (int)readMillis(in), </span>
+<span class="fc" id="L1167">                               Recurrence.readFrom(in), Recurrence.readFrom(in));</span>
+        }
+
+        final int iStandardOffset;
+        final Recurrence iStartRecurrence;
+        final Recurrence iEndRecurrence;
+
+        DSTZone(String id, int standardOffset,
+                Recurrence startRecurrence, Recurrence endRecurrence) {
+<span class="fc" id="L1176">            super(id);</span>
+<span class="fc" id="L1177">            iStandardOffset = standardOffset;</span>
+<span class="fc" id="L1178">            iStartRecurrence = startRecurrence;</span>
+<span class="fc" id="L1179">            iEndRecurrence = endRecurrence;</span>
+<span class="fc" id="L1180">        }</span>
+
+        public String getNameKey(long instant) {
+<span class="fc" id="L1183">            return findMatchingRecurrence(instant).getNameKey();</span>
+        }
+
+        public int getOffset(long instant) {
+<span class="fc" id="L1187">            return iStandardOffset + findMatchingRecurrence(instant).getSaveMillis();</span>
+        }
+
+        public int getStandardOffset(long instant) {
+<span class="fc" id="L1191">            return iStandardOffset;</span>
+        }
+
+        public boolean isFixed() {
+<span class="nc" id="L1195">            return false;</span>
+        }
+
+        public long nextTransition(long instant) {
+<span class="fc" id="L1199">            int standardOffset = iStandardOffset;</span>
+<span class="fc" id="L1200">            Recurrence startRecurrence = iStartRecurrence;</span>
+<span class="fc" id="L1201">            Recurrence endRecurrence = iEndRecurrence;</span>
+
+            long start, end;
+
+            try {
+<span class="fc" id="L1206">                start = startRecurrence.next</span>
+<span class="fc" id="L1207">                    (instant, standardOffset, endRecurrence.getSaveMillis());</span>
+<span class="pc bpc" id="L1208" title="2 of 4 branches missed.">                if (instant &gt; 0 &amp;&amp; start &lt; 0) {</span>
+                    // Overflowed.
+<span class="nc" id="L1210">                    start = instant;</span>
+                }
+<span class="fc" id="L1212">            } catch (IllegalArgumentException e) {</span>
+                // Overflowed.
+<span class="fc" id="L1214">                start = instant;</span>
+<span class="nc" id="L1215">            } catch (ArithmeticException e) {</span>
+                // Overflowed.
+<span class="nc" id="L1217">                start = instant;</span>
+<span class="fc" id="L1218">            }</span>
+
+            try {
+<span class="fc" id="L1221">                end = endRecurrence.next</span>
+<span class="fc" id="L1222">                    (instant, standardOffset, startRecurrence.getSaveMillis());</span>
+<span class="pc bpc" id="L1223" title="2 of 4 branches missed.">                if (instant &gt; 0 &amp;&amp; end &lt; 0) {</span>
+                    // Overflowed.
+<span class="nc" id="L1225">                    end = instant;</span>
+                }
+<span class="nc" id="L1227">            } catch (IllegalArgumentException e) {</span>
+                // Overflowed.
+<span class="nc" id="L1229">                end = instant;</span>
+<span class="nc" id="L1230">            } catch (ArithmeticException e) {</span>
+                // Overflowed.
+<span class="nc" id="L1232">                end = instant;</span>
+<span class="pc" id="L1233">            }</span>
+
+<span class="fc bfc" id="L1235" title="All 2 branches covered.">            return (start &gt; end) ? end : start;</span>
+        }
+
+        public long previousTransition(long instant) {
+            // Increment in order to handle the case where instant is exactly at
+            // a transition.
+<span class="fc" id="L1241">            instant++;</span>
+
+<span class="fc" id="L1243">            int standardOffset = iStandardOffset;</span>
+<span class="fc" id="L1244">            Recurrence startRecurrence = iStartRecurrence;</span>
+<span class="fc" id="L1245">            Recurrence endRecurrence = iEndRecurrence;</span>
+
+            long start, end;
+
+            try {
+<span class="fc" id="L1250">                start = startRecurrence.previous</span>
+<span class="fc" id="L1251">                    (instant, standardOffset, endRecurrence.getSaveMillis());</span>
+<span class="pc bpc" id="L1252" title="3 of 4 branches missed.">                if (instant &lt; 0 &amp;&amp; start &gt; 0) {</span>
+                    // Overflowed.
+<span class="nc" id="L1254">                    start = instant;</span>
+                }
+<span class="nc" id="L1256">            } catch (IllegalArgumentException e) {</span>
+                // Overflowed.
+<span class="nc" id="L1258">                start = instant;</span>
+<span class="nc" id="L1259">            } catch (ArithmeticException e) {</span>
+                // Overflowed.
+<span class="nc" id="L1261">                start = instant;</span>
+<span class="pc" id="L1262">            }</span>
+
+            try {
+<span class="fc" id="L1265">                end = endRecurrence.previous</span>
+<span class="fc" id="L1266">                    (instant, standardOffset, startRecurrence.getSaveMillis());</span>
+<span class="pc bpc" id="L1267" title="3 of 4 branches missed.">                if (instant &lt; 0 &amp;&amp; end &gt; 0) {</span>
+                    // Overflowed.
+<span class="nc" id="L1269">                    end = instant;</span>
+                }
+<span class="nc" id="L1271">            } catch (IllegalArgumentException e) {</span>
+                // Overflowed.
+<span class="nc" id="L1273">                end = instant;</span>
+<span class="nc" id="L1274">            } catch (ArithmeticException e) {</span>
+                // Overflowed.
+<span class="nc" id="L1276">                end = instant;</span>
+<span class="pc" id="L1277">            }</span>
+
+<span class="fc bfc" id="L1279" title="All 2 branches covered.">            return ((start &gt; end) ? start : end) - 1;</span>
+        }
+
+        public boolean equals(Object obj) {
+<span class="pc bpc" id="L1283" title="1 of 2 branches missed.">            if (this == obj) {</span>
+<span class="nc" id="L1284">                return true;</span>
+            }
+<span class="pc bpc" id="L1286" title="1 of 2 branches missed.">            if (obj instanceof DSTZone) {</span>
+<span class="fc" id="L1287">                DSTZone other = (DSTZone)obj;</span>
+<span class="fc" id="L1288">                return</span>
+<span class="pc bpc" id="L1289" title="2 of 4 branches missed.">                    getID().equals(other.getID()) &amp;&amp;</span>
+                    iStandardOffset == other.iStandardOffset &amp;&amp;
+<span class="pc bpc" id="L1291" title="1 of 2 branches missed.">                    iStartRecurrence.equals(other.iStartRecurrence) &amp;&amp;</span>
+<span class="pc bpc" id="L1292" title="1 of 2 branches missed.">                    iEndRecurrence.equals(other.iEndRecurrence);</span>
+            }
+<span class="nc" id="L1294">            return false;</span>
+        }
+
+        public void writeTo(DataOutput out) throws IOException {
+<span class="fc" id="L1298">            writeMillis(out, iStandardOffset);</span>
+<span class="fc" id="L1299">            iStartRecurrence.writeTo(out);</span>
+<span class="fc" id="L1300">            iEndRecurrence.writeTo(out);</span>
+<span class="fc" id="L1301">        }</span>
+
+        private Recurrence findMatchingRecurrence(long instant) {
+<span class="fc" id="L1304">            int standardOffset = iStandardOffset;</span>
+<span class="fc" id="L1305">            Recurrence startRecurrence = iStartRecurrence;</span>
+<span class="fc" id="L1306">            Recurrence endRecurrence = iEndRecurrence;</span>
+
+            long start, end;
+
+            try {
+<span class="fc" id="L1311">                start = startRecurrence.next</span>
+<span class="fc" id="L1312">                    (instant, standardOffset, endRecurrence.getSaveMillis());</span>
+<span class="fc" id="L1313">            } catch (IllegalArgumentException e) {</span>
+                // Overflowed.
+<span class="fc" id="L1315">                start = instant;</span>
+<span class="nc" id="L1316">            } catch (ArithmeticException e) {</span>
+                // Overflowed.
+<span class="nc" id="L1318">                start = instant;</span>
+<span class="fc" id="L1319">            }</span>
+
+            try {
+<span class="fc" id="L1322">                end = endRecurrence.next</span>
+<span class="fc" id="L1323">                    (instant, standardOffset, startRecurrence.getSaveMillis());</span>
+<span class="nc" id="L1324">            } catch (IllegalArgumentException e) {</span>
+                // Overflowed.
+<span class="nc" id="L1326">                end = instant;</span>
+<span class="nc" id="L1327">            } catch (ArithmeticException e) {</span>
+                // Overflowed.
+<span class="nc" id="L1329">                end = instant;</span>
+<span class="pc" id="L1330">            }</span>
+
+<span class="fc bfc" id="L1332" title="All 2 branches covered.">            return (start &gt; end) ? startRecurrence : endRecurrence;</span>
+        }
+    }
+
+    private static final class PrecalculatedZone extends DateTimeZone {
+        private static final long serialVersionUID = 7811976468055766265L;
+
+        static PrecalculatedZone readFrom(DataInput in, String id) throws IOException {
+            // Read string pool.
+<span class="fc" id="L1341">            int poolSize = in.readUnsignedShort();</span>
+<span class="fc" id="L1342">            String[] pool = new String[poolSize];</span>
+<span class="fc bfc" id="L1343" title="All 2 branches covered.">            for (int i=0; i&lt;poolSize; i++) {</span>
+<span class="fc" id="L1344">                pool[i] = in.readUTF();</span>
+            }
+
+<span class="fc" id="L1347">            int size = in.readInt();</span>
+<span class="fc" id="L1348">            long[] transitions = new long[size];</span>
+<span class="fc" id="L1349">            int[] wallOffsets = new int[size];</span>
+<span class="fc" id="L1350">            int[] standardOffsets = new int[size];</span>
+<span class="fc" id="L1351">            String[] nameKeys = new String[size];</span>
+            
+<span class="fc bfc" id="L1353" title="All 2 branches covered.">            for (int i=0; i&lt;size; i++) {</span>
+<span class="fc" id="L1354">                transitions[i] = readMillis(in);</span>
+<span class="fc" id="L1355">                wallOffsets[i] = (int)readMillis(in);</span>
+<span class="fc" id="L1356">                standardOffsets[i] = (int)readMillis(in);</span>
+                try {
+                    int index;
+<span class="pc bpc" id="L1359" title="1 of 2 branches missed.">                    if (poolSize &lt; 256) {</span>
+<span class="fc" id="L1360">                        index = in.readUnsignedByte();</span>
+                    } else {
+<span class="nc" id="L1362">                        index = in.readUnsignedShort();</span>
+                    }
+<span class="fc" id="L1364">                    nameKeys[i] = pool[index];</span>
+<span class="nc" id="L1365">                } catch (ArrayIndexOutOfBoundsException e) {</span>
+<span class="nc" id="L1366">                    throw new IOException(&quot;Invalid encoding&quot;);</span>
+<span class="fc" id="L1367">                }</span>
+            }
+
+<span class="fc" id="L1370">            DSTZone tailZone = null;</span>
+<span class="fc bfc" id="L1371" title="All 2 branches covered.">            if (in.readBoolean()) {</span>
+<span class="fc" id="L1372">                tailZone = DSTZone.readFrom(in, id);</span>
+            }
+
+<span class="fc" id="L1375">            return new PrecalculatedZone</span>
+                (id, transitions, wallOffsets, standardOffsets, nameKeys, tailZone);
+        }
+
+        /**
+         * Factory to create instance from builder.
+         * 
+         * @param id  the zone id
+         * @param outputID  true if the zone id should be output
+         * @param transitions  the list of Transition objects
+         * @param tailZone  optional zone for getting info beyond precalculated tables
+         */
+        static PrecalculatedZone create(String id, boolean outputID, ArrayList&lt;Transition&gt; transitions,
+                                        DSTZone tailZone) {
+<span class="fc" id="L1389">            int size = transitions.size();</span>
+<span class="pc bpc" id="L1390" title="1 of 2 branches missed.">            if (size == 0) {</span>
+<span class="nc" id="L1391">                throw new IllegalArgumentException();</span>
+            }
+
+<span class="fc" id="L1394">            long[] trans = new long[size];</span>
+<span class="fc" id="L1395">            int[] wallOffsets = new int[size];</span>
+<span class="fc" id="L1396">            int[] standardOffsets = new int[size];</span>
+<span class="fc" id="L1397">            String[] nameKeys = new String[size];</span>
+
+<span class="fc" id="L1399">            Transition last = null;</span>
+<span class="fc bfc" id="L1400" title="All 2 branches covered.">            for (int i=0; i&lt;size; i++) {</span>
+<span class="fc" id="L1401">                Transition tr = transitions.get(i);</span>
+
+<span class="pc bpc" id="L1403" title="1 of 2 branches missed.">                if (!tr.isTransitionFrom(last)) {</span>
+<span class="nc" id="L1404">                    throw new IllegalArgumentException(id);</span>
+                }
+
+<span class="fc" id="L1407">                trans[i] = tr.getMillis();</span>
+<span class="fc" id="L1408">                wallOffsets[i] = tr.getWallOffset();</span>
+<span class="fc" id="L1409">                standardOffsets[i] = tr.getStandardOffset();</span>
+<span class="fc" id="L1410">                nameKeys[i] = tr.getNameKey();</span>
+
+<span class="fc" id="L1412">                last = tr;</span>
+            }
+
+            // Some timezones (Australia) have the same name key for
+            // summer and winter which messes everything up. Fix it here.
+<span class="fc" id="L1417">            String[] zoneNameData = new String[5];</span>
+<span class="fc" id="L1418">            String[][] zoneStrings = new DateFormatSymbols(Locale.ENGLISH).getZoneStrings();</span>
+<span class="fc bfc" id="L1419" title="All 2 branches covered.">            for (int j = 0; j &lt; zoneStrings.length; j++) {</span>
+<span class="fc" id="L1420">                String[] set = zoneStrings[j];</span>
+<span class="pc bpc" id="L1421" title="4 of 6 branches missed.">                if (set != null &amp;&amp; set.length == 5 &amp;&amp; id.equals(set[0])) {</span>
+<span class="nc" id="L1422">                    zoneNameData = set;</span>
+                }
+            }
+
+<span class="fc" id="L1426">            Chronology chrono = ISOChronology.getInstanceUTC();</span>
+
+<span class="fc bfc" id="L1428" title="All 2 branches covered.">            for (int i = 0; i &lt; nameKeys.length - 1; i++) {</span>
+<span class="fc" id="L1429">                String curNameKey = nameKeys[i];</span>
+<span class="fc" id="L1430">                String nextNameKey = nameKeys[i + 1];</span>
+<span class="fc" id="L1431">                long curOffset = wallOffsets[i];</span>
+<span class="fc" id="L1432">                long nextOffset = wallOffsets[i + 1];</span>
+<span class="fc" id="L1433">                long curStdOffset = standardOffsets[i];</span>
+<span class="fc" id="L1434">                long nextStdOffset = standardOffsets[i + 1];</span>
+<span class="fc" id="L1435">                Period p = new Period(trans[i], trans[i + 1], PeriodType.yearMonthDay(), chrono);</span>
+<span class="fc bfc" id="L1436" title="All 4 branches covered.">                if (curOffset != nextOffset &amp;&amp;</span>
+                        curStdOffset == nextStdOffset &amp;&amp;
+<span class="pc bpc" id="L1438" title="1 of 2 branches missed.">                        curNameKey.equals(nextNameKey) &amp;&amp;</span>
+<span class="nc bnc" id="L1439" title="All 6 branches missed.">                        p.getYears() == 0 &amp;&amp; p.getMonths() &gt; 4 &amp;&amp; p.getMonths() &lt; 8 &amp;&amp;</span>
+<span class="nc bnc" id="L1440" title="All 2 branches missed.">                        curNameKey.equals(zoneNameData[2]) &amp;&amp;</span>
+<span class="nc bnc" id="L1441" title="All 2 branches missed.">                        curNameKey.equals(zoneNameData[4])) {</span>
+                    
+<span class="nc bnc" id="L1443" title="All 2 branches missed.">                    if (ZoneInfoCompiler.verbose()) {</span>
+<span class="nc" id="L1444">                        System.out.println(&quot;Fixing duplicate name key - &quot; + nextNameKey);</span>
+<span class="nc" id="L1445">                        System.out.println(&quot;     - &quot; + new DateTime(trans[i], chrono) +</span>
+                                           &quot; - &quot; + new DateTime(trans[i + 1], chrono));
+                    }
+<span class="nc bnc" id="L1448" title="All 2 branches missed.">                    if (curOffset &gt; nextOffset) {</span>
+<span class="nc" id="L1449">                        nameKeys[i] = (curNameKey + &quot;-Summer&quot;).intern();</span>
+<span class="nc bnc" id="L1450" title="All 2 branches missed.">                    } else if (curOffset &lt; nextOffset) {</span>
+<span class="nc" id="L1451">                        nameKeys[i + 1] = (nextNameKey + &quot;-Summer&quot;).intern();</span>
+<span class="nc" id="L1452">                        i++;</span>
+                    }
+                }
+            }
+
+<span class="fc bfc" id="L1457" title="All 2 branches covered.">            if (tailZone != null) {</span>
+<span class="fc" id="L1458">                if (tailZone.iStartRecurrence.getNameKey()</span>
+<span class="pc bpc" id="L1459" title="1 of 2 branches missed.">                    .equals(tailZone.iEndRecurrence.getNameKey())) {</span>
+<span class="nc bnc" id="L1460" title="All 2 branches missed.">                    if (ZoneInfoCompiler.verbose()) {</span>
+<span class="nc" id="L1461">                        System.out.println(&quot;Fixing duplicate recurrent name key - &quot; +</span>
+<span class="nc" id="L1462">                                           tailZone.iStartRecurrence.getNameKey());</span>
+                    }
+<span class="nc bnc" id="L1464" title="All 2 branches missed.">                    if (tailZone.iStartRecurrence.getSaveMillis() &gt; 0) {</span>
+<span class="nc" id="L1465">                        tailZone = new DSTZone(</span>
+<span class="nc" id="L1466">                            tailZone.getID(),</span>
+                            tailZone.iStandardOffset,
+<span class="nc" id="L1468">                            tailZone.iStartRecurrence.renameAppend(&quot;-Summer&quot;),</span>
+                            tailZone.iEndRecurrence);
+                    } else {
+<span class="nc" id="L1471">                        tailZone = new DSTZone(</span>
+<span class="nc" id="L1472">                            tailZone.getID(),</span>
+                            tailZone.iStandardOffset,
+                            tailZone.iStartRecurrence,
+<span class="nc" id="L1475">                            tailZone.iEndRecurrence.renameAppend(&quot;-Summer&quot;));</span>
+                    }
+                }
+            }
+            
+<span class="fc" id="L1480">            return new PrecalculatedZone</span>
+<span class="fc bfc" id="L1481" title="All 2 branches covered.">                ((outputID ? id : &quot;&quot;), trans, wallOffsets, standardOffsets, nameKeys, tailZone);</span>
+        }
+
+        // All array fields have the same length.
+
+        private final long[] iTransitions;
+
+        private final int[] iWallOffsets;
+        private final int[] iStandardOffsets;
+        private final String[] iNameKeys;
+
+        private final DSTZone iTailZone;
+
+        /**
+         * Constructor used ONLY for valid input, loaded via static methods.
+         */
+        private PrecalculatedZone(String id, long[] transitions, int[] wallOffsets,
+                          int[] standardOffsets, String[] nameKeys, DSTZone tailZone)
+        {
+<span class="fc" id="L1500">            super(id);</span>
+<span class="fc" id="L1501">            iTransitions = transitions;</span>
+<span class="fc" id="L1502">            iWallOffsets = wallOffsets;</span>
+<span class="fc" id="L1503">            iStandardOffsets = standardOffsets;</span>
+<span class="fc" id="L1504">            iNameKeys = nameKeys;</span>
+<span class="fc" id="L1505">            iTailZone = tailZone;</span>
+<span class="fc" id="L1506">        }</span>
+
+        public String getNameKey(long instant) {
+<span class="fc" id="L1509">            long[] transitions = iTransitions;</span>
+<span class="fc" id="L1510">            int i = Arrays.binarySearch(transitions, instant);</span>
+<span class="fc bfc" id="L1511" title="All 2 branches covered.">            if (i &gt;= 0) {</span>
+<span class="fc" id="L1512">                return iNameKeys[i];</span>
+            }
+<span class="fc" id="L1514">            i = ~i;</span>
+<span class="fc bfc" id="L1515" title="All 2 branches covered.">            if (i &lt; transitions.length) {</span>
+<span class="pc bpc" id="L1516" title="1 of 2 branches missed.">                if (i &gt; 0) {</span>
+<span class="fc" id="L1517">                    return iNameKeys[i - 1];</span>
+                }
+<span class="nc" id="L1519">                return &quot;UTC&quot;;</span>
+            }
+<span class="pc bpc" id="L1521" title="1 of 2 branches missed.">            if (iTailZone == null) {</span>
+<span class="nc" id="L1522">                return iNameKeys[i - 1];</span>
+            }
+<span class="fc" id="L1524">            return iTailZone.getNameKey(instant);</span>
+        }
+
+        public int getOffset(long instant) {
+<span class="fc" id="L1528">            long[] transitions = iTransitions;</span>
+<span class="fc" id="L1529">            int i = Arrays.binarySearch(transitions, instant);</span>
+<span class="fc bfc" id="L1530" title="All 2 branches covered.">            if (i &gt;= 0) {</span>
+<span class="fc" id="L1531">                return iWallOffsets[i];</span>
+            }
+<span class="fc" id="L1533">            i = ~i;</span>
+<span class="fc bfc" id="L1534" title="All 2 branches covered.">            if (i &lt; transitions.length) {</span>
+<span class="pc bpc" id="L1535" title="1 of 2 branches missed.">                if (i &gt; 0) {</span>
+<span class="fc" id="L1536">                    return iWallOffsets[i - 1];</span>
+                }
+<span class="nc" id="L1538">                return 0;</span>
+            }
+<span class="fc bfc" id="L1540" title="All 2 branches covered.">            if (iTailZone == null) {</span>
+<span class="fc" id="L1541">                return iWallOffsets[i - 1];</span>
+            }
+<span class="fc" id="L1543">            return iTailZone.getOffset(instant);</span>
+        }
+
+        public int getStandardOffset(long instant) {
+<span class="fc" id="L1547">            long[] transitions = iTransitions;</span>
+<span class="fc" id="L1548">            int i = Arrays.binarySearch(transitions, instant);</span>
+<span class="fc bfc" id="L1549" title="All 2 branches covered.">            if (i &gt;= 0) {</span>
+<span class="fc" id="L1550">                return iStandardOffsets[i];</span>
+            }
+<span class="fc" id="L1552">            i = ~i;</span>
+<span class="fc bfc" id="L1553" title="All 2 branches covered.">            if (i &lt; transitions.length) {</span>
+<span class="pc bpc" id="L1554" title="1 of 2 branches missed.">                if (i &gt; 0) {</span>
+<span class="fc" id="L1555">                    return iStandardOffsets[i - 1];</span>
+                }
+<span class="nc" id="L1557">                return 0;</span>
+            }
+<span class="pc bpc" id="L1559" title="1 of 2 branches missed.">            if (iTailZone == null) {</span>
+<span class="nc" id="L1560">                return iStandardOffsets[i - 1];</span>
+            }
+<span class="fc" id="L1562">            return iTailZone.getStandardOffset(instant);</span>
+        }
+
+        public boolean isFixed() {
+<span class="fc" id="L1566">            return false;</span>
+        }
+
+        public long nextTransition(long instant) {
+<span class="fc" id="L1570">            long[] transitions = iTransitions;</span>
+<span class="fc" id="L1571">            int i = Arrays.binarySearch(transitions, instant);</span>
+<span class="fc bfc" id="L1572" title="All 2 branches covered.">            i = (i &gt;= 0) ? (i + 1) : ~i;</span>
+<span class="fc bfc" id="L1573" title="All 2 branches covered.">            if (i &lt; transitions.length) {</span>
+<span class="fc" id="L1574">                return transitions[i];</span>
+            }
+<span class="fc bfc" id="L1576" title="All 2 branches covered.">            if (iTailZone == null) {</span>
+<span class="fc" id="L1577">                return instant;</span>
+            }
+<span class="fc" id="L1579">            long end = transitions[transitions.length - 1];</span>
+<span class="pc bpc" id="L1580" title="1 of 2 branches missed.">            if (instant &lt; end) {</span>
+<span class="nc" id="L1581">                instant = end;</span>
+            }
+<span class="fc" id="L1583">            return iTailZone.nextTransition(instant);</span>
+        }
+
+        public long previousTransition(long instant) {
+<span class="fc" id="L1587">            long[] transitions = iTransitions;</span>
+<span class="fc" id="L1588">            int i = Arrays.binarySearch(transitions, instant);</span>
+<span class="fc bfc" id="L1589" title="All 2 branches covered.">            if (i &gt;= 0) {</span>
+<span class="pc bpc" id="L1590" title="1 of 2 branches missed.">                if (instant &gt; Long.MIN_VALUE) {</span>
+<span class="fc" id="L1591">                    return instant - 1;</span>
+                }
+<span class="nc" id="L1593">                return instant;</span>
+            }
+<span class="fc" id="L1595">            i = ~i;</span>
+<span class="fc bfc" id="L1596" title="All 2 branches covered.">            if (i &lt; transitions.length) {</span>
+<span class="pc bpc" id="L1597" title="1 of 2 branches missed.">                if (i &gt; 0) {</span>
+<span class="fc" id="L1598">                    long prev = transitions[i - 1];</span>
+<span class="pc bpc" id="L1599" title="1 of 2 branches missed.">                    if (prev &gt; Long.MIN_VALUE) {</span>
+<span class="fc" id="L1600">                        return prev - 1;</span>
+                    }
+                }
+<span class="nc" id="L1603">                return instant;</span>
+            }
+<span class="fc bfc" id="L1605" title="All 2 branches covered.">            if (iTailZone != null) {</span>
+<span class="fc" id="L1606">                long prev = iTailZone.previousTransition(instant);</span>
+<span class="pc bpc" id="L1607" title="1 of 2 branches missed.">                if (prev &lt; instant) {</span>
+<span class="fc" id="L1608">                    return prev;</span>
+                }
+            }
+<span class="fc" id="L1611">            long prev = transitions[i - 1];</span>
+<span class="pc bpc" id="L1612" title="1 of 2 branches missed.">            if (prev &gt; Long.MIN_VALUE) {</span>
+<span class="fc" id="L1613">                return prev - 1;</span>
+            }
+<span class="nc" id="L1615">            return instant;</span>
+        }
+
+        public boolean equals(Object obj) {
+<span class="pc bpc" id="L1619" title="1 of 2 branches missed.">            if (this == obj) {</span>
+<span class="nc" id="L1620">                return true;</span>
+            }
+<span class="pc bpc" id="L1622" title="1 of 2 branches missed.">            if (obj instanceof PrecalculatedZone) {</span>
+<span class="fc" id="L1623">                PrecalculatedZone other = (PrecalculatedZone)obj;</span>
+<span class="fc" id="L1624">                return</span>
+<span class="fc bfc" id="L1625" title="All 2 branches covered.">                    getID().equals(other.getID()) &amp;&amp;</span>
+<span class="pc bpc" id="L1626" title="1 of 2 branches missed.">                    Arrays.equals(iTransitions, other.iTransitions) &amp;&amp;</span>
+<span class="pc bpc" id="L1627" title="1 of 2 branches missed.">                    Arrays.equals(iNameKeys, other.iNameKeys) &amp;&amp;</span>
+<span class="pc bpc" id="L1628" title="1 of 2 branches missed.">                    Arrays.equals(iWallOffsets, other.iWallOffsets) &amp;&amp;</span>
+<span class="pc bpc" id="L1629" title="2 of 6 branches missed.">                    Arrays.equals(iStandardOffsets, other.iStandardOffsets) &amp;&amp;</span>
+                    ((iTailZone == null)
+                     ? (null == other.iTailZone)
+<span class="pc bpc" id="L1632" title="1 of 2 branches missed.">                     : (iTailZone.equals(other.iTailZone)));</span>
+            }
+<span class="nc" id="L1634">            return false;</span>
+        }
+
+        public void writeTo(DataOutput out) throws IOException {
+<span class="fc" id="L1638">            int size = iTransitions.length;</span>
+
+            // Create unique string pool.
+<span class="fc" id="L1641">            Set&lt;String&gt; poolSet = new HashSet&lt;String&gt;();</span>
+<span class="fc bfc" id="L1642" title="All 2 branches covered.">            for (int i=0; i&lt;size; i++) {</span>
+<span class="fc" id="L1643">                poolSet.add(iNameKeys[i]);</span>
+            }
+
+<span class="fc" id="L1646">            int poolSize = poolSet.size();</span>
+<span class="pc bpc" id="L1647" title="1 of 2 branches missed.">            if (poolSize &gt; 65535) {</span>
+<span class="nc" id="L1648">                throw new UnsupportedOperationException(&quot;String pool is too large&quot;);</span>
+            }
+<span class="fc" id="L1650">            String[] pool = new String[poolSize];</span>
+<span class="fc" id="L1651">            Iterator&lt;String&gt; it = poolSet.iterator();</span>
+<span class="fc bfc" id="L1652" title="All 2 branches covered.">            for (int i=0; it.hasNext(); i++) {</span>
+<span class="fc" id="L1653">                pool[i] = it.next();</span>
+            }
+
+            // Write out the pool.
+<span class="fc" id="L1657">            out.writeShort(poolSize);</span>
+<span class="fc bfc" id="L1658" title="All 2 branches covered.">            for (int i=0; i&lt;poolSize; i++) {</span>
+<span class="fc" id="L1659">                out.writeUTF(pool[i]);</span>
+            }
+
+<span class="fc" id="L1662">            out.writeInt(size);</span>
+
+<span class="fc bfc" id="L1664" title="All 2 branches covered.">            for (int i=0; i&lt;size; i++) {</span>
+<span class="fc" id="L1665">                writeMillis(out, iTransitions[i]);</span>
+<span class="fc" id="L1666">                writeMillis(out, iWallOffsets[i]);</span>
+<span class="fc" id="L1667">                writeMillis(out, iStandardOffsets[i]);</span>
+                
+                // Find pool index and write it out.
+<span class="fc" id="L1670">                String nameKey = iNameKeys[i];</span>
+<span class="pc bpc" id="L1671" title="1 of 2 branches missed.">                for (int j=0; j&lt;poolSize; j++) {</span>
+<span class="fc bfc" id="L1672" title="All 2 branches covered.">                    if (pool[j].equals(nameKey)) {</span>
+<span class="pc bpc" id="L1673" title="1 of 2 branches missed.">                        if (poolSize &lt; 256) {</span>
+<span class="fc" id="L1674">                            out.writeByte(j);</span>
+                        } else {
+<span class="nc" id="L1676">                            out.writeShort(j);</span>
+                        }
+<span class="nc" id="L1678">                        break;</span>
+                    }
+                }
+            }
+
+<span class="pc bpc" id="L1683" title="1 of 2 branches missed.">            out.writeBoolean(iTailZone != null);</span>
+<span class="pc bpc" id="L1684" title="1 of 2 branches missed.">            if (iTailZone != null) {</span>
+<span class="fc" id="L1685">                iTailZone.writeTo(out);</span>
+            }
+<span class="fc" id="L1687">        }</span>
+
+        public boolean isCachable() {
+<span class="fc bfc" id="L1690" title="All 2 branches covered.">            if (iTailZone != null) {</span>
+<span class="fc" id="L1691">                return true;</span>
+            }
+<span class="fc" id="L1693">            long[] transitions = iTransitions;</span>
+<span class="pc bpc" id="L1694" title="1 of 2 branches missed.">            if (transitions.length &lt;= 1) {</span>
+<span class="nc" id="L1695">                return false;</span>
+            }
+
+            // Add up all the distances between transitions that are less than
+            // about two years.
+<span class="fc" id="L1700">            double distances = 0;</span>
+<span class="fc" id="L1701">            int count = 0;</span>
+
+<span class="fc bfc" id="L1703" title="All 2 branches covered.">            for (int i=1; i&lt;transitions.length; i++) {</span>
+<span class="fc" id="L1704">                long diff = transitions[i] - transitions[i - 1];</span>
+<span class="pc bpc" id="L1705" title="1 of 2 branches missed.">                if (diff &lt; ((366L + 365) * 24 * 60 * 60 * 1000)) {</span>
+<span class="fc" id="L1706">                    distances += (double)diff;</span>
+<span class="fc" id="L1707">                    count++;</span>
+                }
+            }
+
+<span class="pc bpc" id="L1711" title="1 of 2 branches missed.">            if (count &gt; 0) {</span>
+<span class="fc" id="L1712">                double avg = distances / count;</span>
+<span class="fc" id="L1713">                avg /= 24 * 60 * 60 * 1000;</span>
+<span class="pc bpc" id="L1714" title="1 of 2 branches missed.">                if (avg &gt;= 25) {</span>
+                    // Only bother caching if average distance between
+                    // transitions is at least 25 days. Why 25?
+                    // CachedDateTimeZone is more efficient if the distance
+                    // between transitions is large. With an average of 25, it
+                    // will on average perform about 2 tests per cache
+                    // hit. (49.7 / 25) is approximately 2.
+<span class="nc" id="L1721">                    return true;</span>
+                }
+            }
+
+<span class="fc" id="L1725">            return false;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

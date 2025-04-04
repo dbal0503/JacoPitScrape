@@ -1,0 +1,251 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>NumberRange.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Commons Lang</a> &gt; <a href="index.source.html" class="el_package">org.apache.commons.lang.math</a> &gt; <span class="el_source">NumberRange.java</span></div><h1>NumberRange.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ * 
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.commons.lang.math;
+
+import java.io.Serializable;
+
+/**
+ * &lt;p&gt;&lt;code&gt;NumberRange&lt;/code&gt; represents an inclusive range of 
+ * {@link java.lang.Number} objects of the same type.&lt;/p&gt;
+ *
+ * @author &lt;a href=&quot;mailto:chrise@esha.com&quot;&gt;Christopher Elkins&lt;/a&gt;
+ * @author Stephen Colebourne
+ * @since 2.0 (previously in org.apache.commons.lang)
+ * @version $Id$
+ */
+public final class NumberRange extends Range implements Serializable {
+    
+    /**
+     * Required for serialization support.
+     * 
+     * @see java.io.Serializable
+     */
+    private static final long serialVersionUID = 71849363892710L;
+
+    /**
+     * The minimum number in this range.
+     */
+    private final Number min;
+    /**
+     * The maximum number in this range.
+     */
+    private final Number max;
+    
+    /**
+     * Cached output hashCode (class is immutable).
+     */
+<span class="fc" id="L51">    private transient int hashCode = 0;</span>
+    /**
+     * Cached output toString (class is immutable).
+     */
+<span class="fc" id="L55">    private transient String toString = null;</span>
+
+    /**
+     * &lt;p&gt;Constructs a new &lt;code&gt;NumberRange&lt;/code&gt; using the specified
+     * number as both the minimum and maximum in this range.&lt;/p&gt;
+     *
+     * @param num the number to use for this range
+     * @throws IllegalArgumentException if the number is &lt;code&gt;null&lt;/code&gt;
+     * @throws IllegalArgumentException if the number doesn't implement &lt;code&gt;Comparable&lt;/code&gt;
+     * @throws IllegalArgumentException if the number is &lt;code&gt;Double.NaN&lt;/code&gt; or &lt;code&gt;Float.NaN&lt;/code&gt;
+     */
+<span class="fc" id="L66">    public NumberRange(Number num) {</span>
+<span class="fc bfc" id="L67" title="All 2 branches covered.">        if (num == null) {</span>
+<span class="fc" id="L68">            throw new IllegalArgumentException(&quot;The number must not be null&quot;);</span>
+        }
+<span class="fc bfc" id="L70" title="All 2 branches covered.">        if (num instanceof Comparable&lt;?&gt; == false) {</span>
+<span class="fc" id="L71">            throw new IllegalArgumentException(&quot;The number must implement Comparable&quot;);</span>
+        }
+<span class="pc bpc" id="L73" title="1 of 4 branches missed.">        if (num instanceof Double &amp;&amp; ((Double) num).isNaN()) {</span>
+<span class="fc" id="L74">            throw new IllegalArgumentException(&quot;The number must not be NaN&quot;);</span>
+        }
+<span class="pc bpc" id="L76" title="1 of 4 branches missed.">        if (num instanceof Float &amp;&amp; ((Float) num).isNaN()) {</span>
+<span class="fc" id="L77">            throw new IllegalArgumentException(&quot;The number must not be NaN&quot;);</span>
+        }
+
+<span class="fc" id="L80">        this.min = num;</span>
+<span class="fc" id="L81">        this.max = num;</span>
+<span class="fc" id="L82">    }</span>
+
+    /**
+     * &lt;p&gt;Constructs a new &lt;code&gt;NumberRange&lt;/code&gt; with the specified
+     * minimum and maximum numbers (both inclusive).&lt;/p&gt;
+     * 
+     * &lt;p&gt;The arguments may be passed in the order (min,max) or (max,min). The
+     * {@link #getMinimumNumber()} and {@link #getMaximumNumber()} methods will return the
+     * correct value.&lt;/p&gt;
+     * 
+     * &lt;p&gt;This constructor is designed to be used with two &lt;code&gt;Number&lt;/code&gt;
+     * objects of the same type. If two objects of different types are passed in,
+     * an exception is thrown.&lt;/p&gt;
+     *
+     * @param num1  first number that defines the edge of the range, inclusive
+     * @param num2  second number that defines the edge of the range, inclusive
+     * @throws IllegalArgumentException if either number is &lt;code&gt;null&lt;/code&gt;
+     * @throws IllegalArgumentException if the numbers are of different types
+     * @throws IllegalArgumentException if the numbers don't implement &lt;code&gt;Comparable&lt;/code&gt;
+     */
+<span class="fc" id="L102">    public NumberRange(Number num1, Number num2) {</span>
+<span class="fc bfc" id="L103" title="All 4 branches covered.">        if (num1 == null || num2 == null) {</span>
+<span class="fc" id="L104">            throw new IllegalArgumentException(&quot;The numbers must not be null&quot;);</span>
+        }
+<span class="fc bfc" id="L106" title="All 2 branches covered.">        if (num1.getClass() != num2.getClass()) {</span>
+<span class="fc" id="L107">            throw new IllegalArgumentException(&quot;The numbers must be of the same type&quot;);</span>
+        }
+<span class="fc bfc" id="L109" title="All 2 branches covered.">        if (num1 instanceof Comparable&lt;?&gt; == false) {</span>
+<span class="fc" id="L110">            throw new IllegalArgumentException(&quot;The numbers must implement Comparable&quot;);</span>
+        }
+<span class="fc bfc" id="L112" title="All 2 branches covered.">        if (num1 instanceof Double) {</span>
+<span class="pc bpc" id="L113" title="1 of 4 branches missed.">            if (((Double) num1).isNaN() || ((Double) num2).isNaN()) {</span>
+<span class="fc" id="L114">                throw new IllegalArgumentException(&quot;The number must not be NaN&quot;);</span>
+            }
+<span class="fc bfc" id="L116" title="All 2 branches covered.">        } else if (num1 instanceof Float) {</span>
+<span class="pc bpc" id="L117" title="1 of 4 branches missed.">            if (((Float) num1).isNaN() || ((Float) num2).isNaN()) {</span>
+<span class="fc" id="L118">                throw new IllegalArgumentException(&quot;The number must not be NaN&quot;);</span>
+            }
+        }
+        
+<span class="fc" id="L122">        int compare = ((Comparable&lt;Number&gt;) num1).compareTo(num2);</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">        if (compare == 0) {</span>
+<span class="fc" id="L124">            this.min = num1;</span>
+<span class="fc" id="L125">            this.max = num1;</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">        } else if (compare &gt; 0) {</span>
+<span class="fc" id="L127">            this.min = num2;</span>
+<span class="fc" id="L128">            this.max = num1;</span>
+        } else {
+<span class="fc" id="L130">            this.min = num1;</span>
+<span class="fc" id="L131">            this.max = num2;</span>
+        }
+<span class="fc" id="L133">    }</span>
+    
+    // Accessors
+    //--------------------------------------------------------------------
+
+    /**
+     * &lt;p&gt;Returns the minimum number in this range.&lt;/p&gt;
+     *
+     * @return the minimum number in this range
+     */
+    @Override
+    public Number getMinimumNumber() {
+<span class="fc" id="L145">        return min;</span>
+    }
+
+    /**
+     * &lt;p&gt;Returns the maximum number in this range.&lt;/p&gt;
+     *
+     * @return the maximum number in this range
+     */
+    @Override
+    public Number getMaximumNumber() {
+<span class="fc" id="L155">        return max;</span>
+    }
+
+    // Tests
+    //--------------------------------------------------------------------
+    
+    /**
+     * &lt;p&gt;Tests whether the specified &lt;code&gt;number&lt;/code&gt; occurs within
+     * this range.&lt;/p&gt;
+     * 
+     * &lt;p&gt;&lt;code&gt;null&lt;/code&gt; is handled and returns &lt;code&gt;false&lt;/code&gt;.&lt;/p&gt;
+     *
+     * @param number  the number to test, may be &lt;code&gt;null&lt;/code&gt;
+     * @return &lt;code&gt;true&lt;/code&gt; if the specified number occurs within this range
+     * @throws IllegalArgumentException if the number is of a different type to the range
+     */
+    @Override
+    public boolean containsNumber(Number number) {
+<span class="fc bfc" id="L173" title="All 2 branches covered.">        if (number == null) {</span>
+<span class="fc" id="L174">            return false;</span>
+        }
+<span class="fc bfc" id="L176" title="All 2 branches covered.">        if (number.getClass() != min.getClass()) {</span>
+<span class="fc" id="L177">            throw new IllegalArgumentException(&quot;The number must be of the same type as the range numbers&quot;);</span>
+        }
+<span class="fc" id="L179">        int compareMin = ((Comparable&lt;Number&gt;) min).compareTo(number);</span>
+<span class="fc" id="L180">        int compareMax = ((Comparable&lt;Number&gt;) max).compareTo(number);</span>
+<span class="fc bfc" id="L181" title="All 4 branches covered.">        return compareMin &lt;= 0 &amp;&amp; compareMax &gt;= 0;</span>
+    }
+
+    // Range tests
+    //--------------------------------------------------------------------
+    // use Range implementations
+
+    // Basics
+    //--------------------------------------------------------------------
+
+    /**
+     * &lt;p&gt;Compares this range to another object to test if they are equal.&lt;/p&gt;.
+     * 
+     * &lt;p&gt;To be equal, the class, minimum and maximum must be equal.&lt;/p&gt;
+     *
+     * @param obj the reference object with which to compare
+     * @return &lt;code&gt;true&lt;/code&gt; if this object is equal
+     */
+    @Override
+    public boolean equals(Object obj) {
+<span class="fc bfc" id="L201" title="All 2 branches covered.">        if (obj == this) {</span>
+<span class="fc" id="L202">            return true;</span>
+        }
+<span class="fc bfc" id="L204" title="All 2 branches covered.">        if (obj instanceof NumberRange == false) {</span>
+<span class="fc" id="L205">            return false;</span>
+        }
+<span class="fc" id="L207">        NumberRange range = (NumberRange) obj;</span>
+<span class="fc bfc" id="L208" title="All 4 branches covered.">        return min.equals(range.min) &amp;&amp; max.equals(range.max);</span>
+    }
+
+    /**
+     * &lt;p&gt;Gets a hashCode for the range.&lt;/p&gt;
+     *
+     * @return a hash code value for this object
+     */
+    @Override
+    public int hashCode() {
+<span class="fc" id="L218">        int temp = hashCode;</span>
+<span class="fc bfc" id="L219" title="All 2 branches covered.">        if (temp == 0) {</span>
+<span class="fc" id="L220">            temp = 17;</span>
+<span class="fc" id="L221">            temp = 37 * temp + getClass().hashCode();</span>
+<span class="fc" id="L222">            temp = 37 * temp + min.hashCode();</span>
+<span class="fc" id="L223">            temp = 37 * temp + max.hashCode();</span>
+<span class="fc" id="L224">            hashCode = temp;</span>
+        }
+<span class="fc" id="L226">        return hashCode;</span>
+    }
+
+    /**
+     * &lt;p&gt;Gets the range as a &lt;code&gt;String&lt;/code&gt;.&lt;/p&gt;
+     *
+     * &lt;p&gt;The format of the String is 'Range[&lt;i&gt;min&lt;/i&gt;,&lt;i&gt;max&lt;/i&gt;]'.&lt;/p&gt;
+     *
+     * @return the &lt;code&gt;String&lt;/code&gt; representation of this range
+     */
+    @Override
+    public String toString() {
+<span class="fc bfc" id="L238" title="All 2 branches covered.">        if (toString == null) {</span>
+<span class="fc" id="L239">            StringBuilder buf = new StringBuilder(32);</span>
+<span class="fc" id="L240">            buf.append(&quot;Range[&quot;);</span>
+<span class="fc" id="L241">            buf.append(min);</span>
+<span class="fc" id="L242">            buf.append(',');</span>
+<span class="fc" id="L243">            buf.append(max);</span>
+<span class="fc" id="L244">            buf.append(']');</span>
+<span class="fc" id="L245">            toString = buf.toString();</span>
+        }
+<span class="fc" id="L247">        return toString;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

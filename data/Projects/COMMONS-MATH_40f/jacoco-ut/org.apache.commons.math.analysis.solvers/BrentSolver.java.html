@@ -1,0 +1,230 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BrentSolver.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Commons Math</a> &gt; <a href="index.source.html" class="el_package">org.apache.commons.math.analysis.solvers</a> &gt; <span class="el_source">BrentSolver.java</span></div><h1>BrentSolver.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.commons.math.analysis.solvers;
+
+
+import org.apache.commons.math.exception.NoBracketingException;
+import org.apache.commons.math.util.FastMath;
+import org.apache.commons.math.util.Precision;
+
+/**
+ * This class implements the &lt;a href=&quot;http://mathworld.wolfram.com/BrentsMethod.html&quot;&gt;
+ * Brent algorithm&lt;/a&gt; for finding zeros of real univariate functions.
+ * The function should be continuous but not necessarily smooth.
+ * The {@code solve} method returns a zero {@code x} of the function {@code f}
+ * in the given interval {@code [a, b]} to within a tolerance
+ * {@code 6 eps abs(x) + t} where {@code eps} is the relative accuracy and
+ * {@code t} is the absolute accuracy.
+ * The given interval must bracket the root.
+ *
+ * @version $Id$
+ */
+public class BrentSolver extends AbstractUnivariateRealSolver {
+
+    /** Default absolute accuracy. */
+    private static final double DEFAULT_ABSOLUTE_ACCURACY = 1e-6;
+
+    /**
+     * Construct a solver with default accuracy (1e-6).
+     */
+    public BrentSolver() {
+<span class="fc" id="L45">        this(DEFAULT_ABSOLUTE_ACCURACY);</span>
+<span class="fc" id="L46">    }</span>
+    /**
+     * Construct a solver.
+     *
+     * @param absoluteAccuracy Absolute accuracy.
+     */
+    public BrentSolver(double absoluteAccuracy) {
+<span class="fc" id="L53">        super(absoluteAccuracy);</span>
+<span class="fc" id="L54">    }</span>
+    /**
+     * Construct a solver.
+     *
+     * @param relativeAccuracy Relative accuracy.
+     * @param absoluteAccuracy Absolute accuracy.
+     */
+    public BrentSolver(double relativeAccuracy,
+                       double absoluteAccuracy) {
+<span class="fc" id="L63">        super(relativeAccuracy, absoluteAccuracy);</span>
+<span class="fc" id="L64">    }</span>
+    /**
+     * Construct a solver.
+     *
+     * @param relativeAccuracy Relative accuracy.
+     * @param absoluteAccuracy Absolute accuracy.
+     * @param functionValueAccuracy Function value accuracy.
+     */
+    public BrentSolver(double relativeAccuracy,
+                       double absoluteAccuracy,
+                       double functionValueAccuracy) {
+<span class="nc" id="L75">        super(relativeAccuracy, absoluteAccuracy, functionValueAccuracy);</span>
+<span class="nc" id="L76">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    protected double doSolve() {
+<span class="fc" id="L83">        double min = getMin();</span>
+<span class="fc" id="L84">        double max = getMax();</span>
+<span class="fc" id="L85">        final double initial = getStartValue();</span>
+<span class="fc" id="L86">        final double functionValueAccuracy = getFunctionValueAccuracy();</span>
+
+<span class="fc" id="L88">        verifySequence(min, initial, max);</span>
+
+        // Return the initial guess if it is good enough.
+<span class="fc" id="L91">        double yInitial = computeObjectiveValue(initial);</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">        if (FastMath.abs(yInitial) &lt;= functionValueAccuracy) {</span>
+<span class="fc" id="L93">            return initial;</span>
+        }
+
+        // Return the first endpoint if it is good enough.
+<span class="fc" id="L97">        double yMin = computeObjectiveValue(min);</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">        if (FastMath.abs(yMin) &lt;= functionValueAccuracy) {</span>
+<span class="fc" id="L99">            return min;</span>
+        }
+
+        // Reduce interval if min and initial bracket the root.
+<span class="fc bfc" id="L103" title="All 2 branches covered.">        if (yInitial * yMin &lt; 0) {</span>
+<span class="fc" id="L104">            return brent(min, initial, yMin, yInitial);</span>
+        }
+
+        // Return the second endpoint if it is good enough.
+<span class="fc" id="L108">        double yMax = computeObjectiveValue(max);</span>
+<span class="fc bfc" id="L109" title="All 2 branches covered.">        if (FastMath.abs(yMax) &lt;= functionValueAccuracy) {</span>
+<span class="fc" id="L110">            return max;</span>
+        }
+
+        // Reduce interval if initial and max bracket the root.
+<span class="fc bfc" id="L114" title="All 2 branches covered.">        if (yInitial * yMax &lt; 0) {</span>
+<span class="fc" id="L115">            return brent(initial, max, yInitial, yMax);</span>
+        }
+
+<span class="fc" id="L118">        throw new NoBracketingException(min, max, yMin, yMax);</span>
+    }
+
+    /**
+     * Search for a zero inside the provided interval.
+     * This implementation is based on the algorithm described at page 58 of
+     * the book
+     * &lt;quote&gt;
+     *  &lt;b&gt;Algorithms for Minimization Without Derivatives&lt;/b&gt;
+     *  &lt;it&gt;Richard P. Brent&lt;/it&gt;
+     *  Dover 0-486-41998-3
+     * &lt;/quote&gt;
+     *
+     * @param lo Lower bound of the search interval.
+     * @param hi Higher bound of the search interval.
+     * @param fLo Function value at the lower bound of the search interval.
+     * @param fHi Function value at the higher bound of the search interval.
+     * @return the value where the function is zero.
+     */
+    private double brent(double lo, double hi,
+                         double fLo, double fHi) {
+<span class="fc" id="L139">        double a = lo;</span>
+<span class="fc" id="L140">        double fa = fLo;</span>
+<span class="fc" id="L141">        double b = hi;</span>
+<span class="fc" id="L142">        double fb = fHi;</span>
+<span class="fc" id="L143">        double c = a;</span>
+<span class="fc" id="L144">        double fc = fa;</span>
+<span class="fc" id="L145">        double d = b - a;</span>
+<span class="fc" id="L146">        double e = d;</span>
+
+<span class="fc" id="L148">        final double t = getAbsoluteAccuracy();</span>
+<span class="fc" id="L149">        final double eps = getRelativeAccuracy();</span>
+
+        while (true) {
+<span class="fc bfc" id="L152" title="All 2 branches covered.">            if (FastMath.abs(fc) &lt; FastMath.abs(fb)) {</span>
+<span class="fc" id="L153">                a = b;</span>
+<span class="fc" id="L154">                b = c;</span>
+<span class="fc" id="L155">                c = a;</span>
+<span class="fc" id="L156">                fa = fb;</span>
+<span class="fc" id="L157">                fb = fc;</span>
+<span class="fc" id="L158">                fc = fa;</span>
+            }
+
+<span class="fc" id="L161">            final double tol = 2 * eps * FastMath.abs(b) + t;</span>
+<span class="fc" id="L162">            final double m = 0.5 * (c - b);</span>
+
+<span class="fc bfc" id="L164" title="All 2 branches covered.">            if (FastMath.abs(m) &lt;= tol ||</span>
+<span class="fc bfc" id="L165" title="All 2 branches covered.">                Precision.equals(fb, 0))  {</span>
+<span class="fc" id="L166">                return b;</span>
+            }
+<span class="pc bpc" id="L168" title="1 of 2 branches missed.">            if (FastMath.abs(e) &lt; tol ||</span>
+<span class="fc bfc" id="L169" title="All 2 branches covered.">                FastMath.abs(fa) &lt;= FastMath.abs(fb)) {</span>
+                // Force bisection.
+<span class="fc" id="L171">                d = m;</span>
+<span class="fc" id="L172">                e = d;</span>
+            } else {
+<span class="fc" id="L174">                double s = fb / fa;</span>
+                double p;
+                double q;
+                // The equality test (a == c) is intentional,
+                // it is part of the original Brent's method and
+                // it should NOT be replaced by proximity test.
+<span class="fc bfc" id="L180" title="All 2 branches covered.">                if (a == c) {</span>
+                    // Linear interpolation.
+<span class="fc" id="L182">                    p = 2 * m * s;</span>
+<span class="fc" id="L183">                    q = 1 - s;</span>
+                } else {
+                    // Inverse quadratic interpolation.
+<span class="fc" id="L186">                    q = fa / fc;</span>
+<span class="fc" id="L187">                    final double r = fb / fc;</span>
+<span class="fc" id="L188">                    p = s * (2 * m * q * (q - r) - (b - a) * (r - 1));</span>
+<span class="fc" id="L189">                    q = (q - 1) * (r - 1) * (s - 1);</span>
+                }
+<span class="fc bfc" id="L191" title="All 2 branches covered.">                if (p &gt; 0) {</span>
+<span class="fc" id="L192">                    q = -q;</span>
+                } else {
+<span class="fc" id="L194">                    p = -p;</span>
+                }
+<span class="fc" id="L196">                s = e;</span>
+<span class="fc" id="L197">                e = d;</span>
+<span class="fc bfc" id="L198" title="All 2 branches covered.">                if (p &gt;= 1.5 * m * q - FastMath.abs(tol * q) ||</span>
+<span class="fc bfc" id="L199" title="All 2 branches covered.">                    p &gt;= FastMath.abs(0.5 * s * q)) {</span>
+                    // Inverse quadratic interpolation gives a value
+                    // in the wrong direction, or progress is slow.
+                    // Fall back to bisection.
+<span class="fc" id="L203">                    d = m;</span>
+<span class="fc" id="L204">                    e = d;</span>
+                } else {
+<span class="fc" id="L206">                    d = p / q;</span>
+                }
+            }
+<span class="fc" id="L209">            a = b;</span>
+<span class="fc" id="L210">            fa = fb;</span>
+
+<span class="fc bfc" id="L212" title="All 2 branches covered.">            if (FastMath.abs(d) &gt; tol) {</span>
+<span class="fc" id="L213">                b += d;</span>
+<span class="fc bfc" id="L214" title="All 2 branches covered.">            } else if (m &gt; 0) {</span>
+<span class="fc" id="L215">                b += tol;</span>
+            } else {
+<span class="fc" id="L217">                b -= tol;</span>
+            }
+<span class="fc" id="L219">            fb = computeObjectiveValue(b);</span>
+<span class="fc bfc" id="L220" title="All 8 branches covered.">            if ((fb &gt; 0 &amp;&amp; fc &gt; 0) ||</span>
+                (fb &lt;= 0 &amp;&amp; fc &lt;= 0)) {
+<span class="fc" id="L222">                c = a;</span>
+<span class="fc" id="L223">                fc = fa;</span>
+<span class="fc" id="L224">                d = b - a;</span>
+<span class="fc" id="L225">                e = d;</span>
+            }
+<span class="fc" id="L227">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

@@ -1,0 +1,210 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>OneWayAnovaImpl.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Commons Math</a> &gt; <a href="index.source.html" class="el_package">org.apache.commons.math.stat.inference</a> &gt; <span class="el_source">OneWayAnovaImpl.java</span></div><h1>OneWayAnovaImpl.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.commons.math.stat.inference;
+
+import java.util.Collection;
+
+import org.apache.commons.math.MathException;
+import org.apache.commons.math.MathRuntimeException;
+import org.apache.commons.math.distribution.FDistribution;
+import org.apache.commons.math.exception.util.LocalizedFormats;
+import org.apache.commons.math.stat.descriptive.summary.Sum;
+import org.apache.commons.math.stat.descriptive.summary.SumOfSquares;
+
+
+/**
+ * Implements one-way ANOVA statistics defined in the {@link OneWayAnova}
+ * interface.
+ *
+ * &lt;p&gt;Uses the
+ * {@link org.apache.commons.math.distribution.FDistribution
+ *  commons-math F Distribution implementation} to estimate exact p-values.&lt;/p&gt;
+ *
+ * &lt;p&gt;This implementation is based on a description at
+ * http://faculty.vassar.edu/lowry/ch13pt1.html&lt;/p&gt;
+ * &lt;pre&gt;
+ * Abbreviations: bg = between groups,
+ *                wg = within groups,
+ *                ss = sum squared deviations
+ * &lt;/pre&gt;
+ *
+ * @since 1.2
+ * @version $Id$
+ */
+public class OneWayAnovaImpl implements OneWayAnova  {
+
+    /**
+     * Default constructor.
+     */
+<span class="fc" id="L53">    public OneWayAnovaImpl() {</span>
+<span class="fc" id="L54">    }</span>
+
+    /**
+     * {@inheritDoc}&lt;p&gt;
+     * This implementation computes the F statistic using the definitional
+     * formula&lt;pre&gt;
+     *   F = msbg/mswg&lt;/pre&gt;
+     * where&lt;pre&gt;
+     *  msbg = between group mean square
+     *  mswg = within group mean square&lt;/pre&gt;
+     * are as defined &lt;a href=&quot;http://faculty.vassar.edu/lowry/ch13pt1.html&quot;&gt;
+     * here&lt;/a&gt;&lt;/p&gt;
+     */
+    public double anovaFValue(Collection&lt;double[]&gt; categoryData)
+        throws IllegalArgumentException, MathException {
+<span class="fc" id="L69">        AnovaStats a = anovaStats(categoryData);</span>
+<span class="fc" id="L70">        return a.F;</span>
+    }
+
+    /**
+     * {@inheritDoc}&lt;p&gt;
+     * This implementation uses the
+     * {@link org.apache.commons.math.distribution.FDistribution
+     * commons-math F Distribution implementation} to estimate the exact
+     * p-value, using the formula&lt;pre&gt;
+     *   p = 1 - cumulativeProbability(F)&lt;/pre&gt;
+     * where &lt;code&gt;F&lt;/code&gt; is the F value and &lt;code&gt;cumulativeProbability&lt;/code&gt;
+     * is the commons-math implementation of the F distribution.&lt;/p&gt;
+     */
+    public double anovaPValue(Collection&lt;double[]&gt; categoryData)
+        throws IllegalArgumentException, MathException {
+<span class="fc" id="L85">        AnovaStats a = anovaStats(categoryData);</span>
+<span class="fc" id="L86">        FDistribution fdist = new FDistribution(a.dfbg, a.dfwg);</span>
+<span class="fc" id="L87">        return 1.0 - fdist.cumulativeProbability(a.F);</span>
+    }
+
+    /**
+     * {@inheritDoc}&lt;p&gt;
+     * This implementation uses the
+     * {@link org.apache.commons.math.distribution.FDistribution
+     * commons-math F Distribution implementation} to estimate the exact
+     * p-value, using the formula&lt;pre&gt;
+     *   p = 1 - cumulativeProbability(F)&lt;/pre&gt;
+     * where &lt;code&gt;F&lt;/code&gt; is the F value and &lt;code&gt;cumulativeProbability&lt;/code&gt;
+     * is the commons-math implementation of the F distribution.&lt;/p&gt;
+     * &lt;p&gt;True is returned iff the estimated p-value is less than alpha.&lt;/p&gt;
+     */
+    public boolean anovaTest(Collection&lt;double[]&gt; categoryData, double alpha)
+        throws IllegalArgumentException, MathException {
+<span class="pc bpc" id="L103" title="2 of 4 branches missed.">        if ((alpha &lt;= 0) || (alpha &gt; 0.5)) {</span>
+<span class="nc" id="L104">            throw MathRuntimeException.createIllegalArgumentException(</span>
+                  LocalizedFormats.OUT_OF_BOUND_SIGNIFICANCE_LEVEL,
+<span class="nc" id="L106">                  alpha, 0, 0.5);</span>
+        }
+<span class="fc bfc" id="L108" title="All 2 branches covered.">        return anovaPValue(categoryData) &lt; alpha;</span>
+    }
+
+
+    /**
+     * This method actually does the calculations (except P-value).
+     *
+     * @param categoryData &lt;code&gt;Collection&lt;/code&gt; of &lt;code&gt;double[]&lt;/code&gt;
+     * arrays each containing data for one category
+     * @return computed AnovaStats
+     * @throws IllegalArgumentException if categoryData does not meet
+     * preconditions specified in the interface definition
+     * @throws MathException if an error occurs computing the Anova stats
+     */
+    private AnovaStats anovaStats(Collection&lt;double[]&gt; categoryData)
+        throws IllegalArgumentException, MathException {
+
+        // check if we have enough categories
+<span class="fc bfc" id="L126" title="All 2 branches covered.">        if (categoryData.size() &lt; 2) {</span>
+<span class="fc" id="L127">            throw MathRuntimeException.createIllegalArgumentException(</span>
+                  LocalizedFormats.TWO_OR_MORE_CATEGORIES_REQUIRED,
+<span class="fc" id="L129">                  categoryData.size());</span>
+        }
+
+        // check if each category has enough data and all is double[]
+<span class="fc bfc" id="L133" title="All 2 branches covered.">        for (double[] array : categoryData) {</span>
+<span class="fc bfc" id="L134" title="All 2 branches covered.">            if (array.length &lt;= 1) {</span>
+<span class="fc" id="L135">                throw MathRuntimeException.createIllegalArgumentException(</span>
+                      LocalizedFormats.TWO_OR_MORE_VALUES_IN_CATEGORY_REQUIRED,
+<span class="fc" id="L137">                      array.length);</span>
+            }
+<span class="fc" id="L139">        }</span>
+
+<span class="fc" id="L141">        int dfwg = 0;</span>
+<span class="fc" id="L142">        double sswg = 0;</span>
+<span class="fc" id="L143">        Sum totsum = new Sum();</span>
+<span class="fc" id="L144">        SumOfSquares totsumsq = new SumOfSquares();</span>
+<span class="fc" id="L145">        int totnum = 0;</span>
+
+<span class="fc bfc" id="L147" title="All 2 branches covered.">        for (double[] data : categoryData) {</span>
+
+<span class="fc" id="L149">            Sum sum = new Sum();</span>
+<span class="fc" id="L150">            SumOfSquares sumsq = new SumOfSquares();</span>
+<span class="fc" id="L151">            int num = 0;</span>
+
+<span class="fc bfc" id="L153" title="All 2 branches covered.">            for (int i = 0; i &lt; data.length; i++) {</span>
+<span class="fc" id="L154">                double val = data[i];</span>
+
+                // within category
+<span class="fc" id="L157">                num++;</span>
+<span class="fc" id="L158">                sum.increment(val);</span>
+<span class="fc" id="L159">                sumsq.increment(val);</span>
+
+                // for all categories
+<span class="fc" id="L162">                totnum++;</span>
+<span class="fc" id="L163">                totsum.increment(val);</span>
+<span class="fc" id="L164">                totsumsq.increment(val);</span>
+            }
+<span class="fc" id="L166">            dfwg += num - 1;</span>
+<span class="fc" id="L167">            double ss = sumsq.getResult() - sum.getResult() * sum.getResult() / num;</span>
+<span class="fc" id="L168">            sswg += ss;</span>
+<span class="fc" id="L169">        }</span>
+<span class="fc" id="L170">        double sst = totsumsq.getResult() - totsum.getResult() *</span>
+<span class="fc" id="L171">            totsum.getResult()/totnum;</span>
+<span class="fc" id="L172">        double ssbg = sst - sswg;</span>
+<span class="fc" id="L173">        int dfbg = categoryData.size() - 1;</span>
+<span class="fc" id="L174">        double msbg = ssbg/dfbg;</span>
+<span class="fc" id="L175">        double mswg = sswg/dfwg;</span>
+<span class="fc" id="L176">        double F = msbg/mswg;</span>
+
+<span class="fc" id="L178">        return new AnovaStats(dfbg, dfwg, F);</span>
+    }
+
+    /**
+        Convenience class to pass dfbg,dfwg,F values around within AnovaImpl.
+        No get/set methods provided.
+    */
+    private static class AnovaStats {
+
+        /** Degrees of freedom in numerator (between groups). */
+        private final int dfbg;
+
+        /** Degrees of freedom in denominator (within groups). */
+        private final int dfwg;
+
+        /** Statistic. */
+        private final double F;
+
+        /**
+         * Constructor
+         * @param dfbg degrees of freedom in numerator (between groups)
+         * @param dfwg degrees of freedom in denominator (within groups)
+         * @param F statistic
+         */
+<span class="fc" id="L202">        private AnovaStats(int dfbg, int dfwg, double F) {</span>
+<span class="fc" id="L203">            this.dfbg = dfbg;</span>
+<span class="fc" id="L204">            this.dfwg = dfwg;</span>
+<span class="fc" id="L205">            this.F = F;</span>
+<span class="fc" id="L206">        }</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

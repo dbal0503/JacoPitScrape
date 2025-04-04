@@ -1,0 +1,973 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HashCodeBuilder.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Commons Lang</a> &gt; <a href="index.source.html" class="el_package">org.apache.commons.lang.builder</a> &gt; <span class="el_source">HashCodeBuilder.java</span></div><h1>HashCodeBuilder.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ * 
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.commons.lang.builder;
+
+import java.lang.reflect.AccessibleObject;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
+/**
+ * &lt;p&gt;
+ * Assists in implementing {@link Object#hashCode()} methods.
+ * &lt;/p&gt;
+ * 
+ * &lt;p&gt;
+ * This class enables a good &lt;code&gt;hashCode&lt;/code&gt; method to be built for any class. It follows the rules laid out in
+ * the book &lt;a href=&quot;http://java.sun.com/docs/books/effective/index.html&quot;&gt;Effective Java&lt;/a&gt; by Joshua Bloch. Writing a
+ * good &lt;code&gt;hashCode&lt;/code&gt; method is actually quite difficult. This class aims to simplify the process.
+ * &lt;/p&gt;
+ * 
+ * &lt;p&gt;
+ * All relevant fields from the object should be included in the &lt;code&gt;hashCode&lt;/code&gt; method. Derived fields may be
+ * excluded. In general, any field used in the &lt;code&gt;equals&lt;/code&gt; method must be used in the &lt;code&gt;hashCode&lt;/code&gt;
+ * method.
+ * &lt;/p&gt;
+ * 
+ * &lt;p&gt;
+ * To use this class write code as follows:
+ * &lt;/p&gt;
+ * 
+ * &lt;pre&gt;
+ * public class Person {
+ *   String name;
+ *   int age;
+ *   boolean smoker;
+ *   ...
+ *
+ *   public int hashCode() {
+ *     // you pick a hard-coded, randomly chosen, non-zero, odd number
+ *     // ideally different for each class
+ *     return new HashCodeBuilder(17, 37).
+ *       append(name).
+ *       append(age).
+ *       append(smoker).
+ *       toHashCode();
+ *   }
+ * }
+ * &lt;/pre&gt;
+ * 
+ * &lt;p&gt;
+ * If required, the superclass &lt;code&gt;hashCode()&lt;/code&gt; can be added using {@link #appendSuper}.
+ * &lt;/p&gt;
+ * 
+ * &lt;p&gt;
+ * Alternatively, there is a method that uses reflection to determine the fields to test. Because these fields are
+ * usually private, the method, &lt;code&gt;reflectionHashCode&lt;/code&gt;, uses &lt;code&gt;AccessibleObject.setAccessible&lt;/code&gt;
+ * to change the visibility of the fields. This will fail under a security manager, unless the appropriate permissions
+ * are set up correctly. It is also slower than testing explicitly.
+ * &lt;/p&gt;
+ * 
+ * &lt;p&gt;
+ * A typical invocation for this method would look like:
+ * &lt;/p&gt;
+ * 
+ * &lt;pre&gt;
+ * public int hashCode() {
+ *   return HashCodeBuilder.reflectionHashCode(this);
+ * }
+ * &lt;/pre&gt;
+ * 
+ * @author Stephen Colebourne
+ * @author Gary Gregory
+ * @author Pete Gieser
+ * @since 1.0
+ * @version $Id$
+ */
+public class HashCodeBuilder {
+    /**
+     * &lt;p&gt;
+     * A registry of objects used by reflection methods to detect cyclical object references and avoid infinite loops.
+     * &lt;/p&gt;
+     * 
+     * @since 2.3
+     */
+<span class="fc" id="L105">    private static final ThreadLocal&lt;Set&lt;IDKey&gt;&gt; registry = new ThreadLocal&lt;Set&lt;IDKey&gt;&gt;() {</span>
+        @Override
+        protected Set&lt;IDKey&gt; initialValue() {
+            // The HashSet implementation is not synchronized,
+            // which is just what we need here.
+<span class="fc" id="L110">            return new HashSet&lt;IDKey&gt;();</span>
+        }
+    };
+
+    /*
+     * N.B. we cannot store the actual objects in a HashSet, as that would use the very hashCode()
+     * we are in the process of calculating.
+     * 
+     * So we generate a one-to-one mapping from the original object to a new object.
+     * 
+     * Now HashSet uses equals() to determine if two elements with the same hashcode really
+     * are equal, so we also need to ensure that the replacement objects are only equal
+     * if the original objects are identical.
+     * 
+     * The original implementation (2.4 and before) used the System.indentityHashCode()
+     * method - however this is not guaranteed to generate unique ids (e.g. LANG-459)
+     *  
+     * We now use the IDKey helper class (adapted from org.apache.axis.utils.IDKey)
+     * to disambiguate the duplicate ids.
+     */
+    
+    /**
+     * &lt;p&gt;
+     * Returns the registry of objects being traversed by the reflection methods in the current thread.
+     * &lt;/p&gt;
+     * 
+     * @return Set the registry of objects being traversed
+     * @since 2.3
+     */
+    static Set&lt;IDKey&gt; getRegistry() {
+<span class="fc" id="L140">        return registry.get();</span>
+    }
+
+    /**
+     * &lt;p&gt;
+     * Returns &lt;code&gt;true&lt;/code&gt; if the registry contains the given object. Used by the reflection methods to avoid
+     * infinite loops.
+     * &lt;/p&gt;
+     * 
+     * @param value
+     *            The object to lookup in the registry.
+     * @return boolean &lt;code&gt;true&lt;/code&gt; if the registry contains the given object.
+     * @since 2.3
+     */
+    static boolean isRegistered(Object value) {
+<span class="fc" id="L155">        return getRegistry().contains(new IDKey(value));</span>
+    }
+
+    /**
+     * &lt;p&gt;
+     * Appends the fields and values defined by the given object of the given &lt;code&gt;Class&lt;/code&gt;.
+     * &lt;/p&gt;
+     * 
+     * @param object
+     *            the object to append details of
+     * @param clazz
+     *            the class to append details of
+     * @param builder
+     *            the builder to append to
+     * @param useTransients
+     *            whether to use transient fields
+     * @param excludeFields
+     *            Collection of String field names to exclude from use in calculation of hash code
+     */
+    private static void reflectionAppend(Object object, Class&lt;?&gt; clazz, HashCodeBuilder builder, boolean useTransients,
+            String[] excludeFields) {
+<span class="fc bfc" id="L176" title="All 2 branches covered.">        if (isRegistered(object)) {</span>
+<span class="fc" id="L177">            return;</span>
+        }
+        try {
+<span class="fc" id="L180">            register(object);</span>
+<span class="fc" id="L181">            Field[] fields = clazz.getDeclaredFields();</span>
+<span class="fc bfc" id="L182" title="All 2 branches covered.">            List&lt;String&gt; excludedFieldList = excludeFields != null ? Arrays.asList(excludeFields) : Collections.EMPTY_LIST;</span>
+<span class="fc" id="L183">            AccessibleObject.setAccessible(fields, true);</span>
+<span class="fc bfc" id="L184" title="All 2 branches covered.">            for (Field field : fields) {</span>
+<span class="fc bfc" id="L185" title="All 2 branches covered.">                if (!excludedFieldList.contains(field.getName())</span>
+<span class="fc bfc" id="L186" title="All 4 branches covered.">                    &amp;&amp; (field.getName().indexOf('$') == -1)</span>
+<span class="fc bfc" id="L187" title="All 2 branches covered.">                    &amp;&amp; (useTransients || !Modifier.isTransient(field.getModifiers()))</span>
+<span class="fc bfc" id="L188" title="All 2 branches covered.">                    &amp;&amp; (!Modifier.isStatic(field.getModifiers()))) {</span>
+                    try {
+<span class="fc" id="L190">                        Object fieldValue = field.get(object);</span>
+<span class="fc" id="L191">                        builder.append(fieldValue);</span>
+<span class="nc" id="L192">                    } catch (IllegalAccessException e) {</span>
+                        // this can't happen. Would get a Security exception instead
+                        // throw a runtime exception in case the impossible happens.
+<span class="nc" id="L195">                        throw new InternalError(&quot;Unexpected IllegalAccessException&quot;);</span>
+<span class="fc" id="L196">                    }</span>
+                }
+            }
+        } finally {
+<span class="fc" id="L200">            unregister(object);</span>
+        }
+<span class="fc" id="L202">    }</span>
+
+    /**
+     * &lt;p&gt;
+     * This method uses reflection to build a valid hash code.
+     * &lt;/p&gt;
+     * 
+     * &lt;p&gt;
+     * It uses &lt;code&gt;AccessibleObject.setAccessible&lt;/code&gt; to gain access to private fields. This means that it will
+     * throw a security exception if run under a security manager, if the permissions are not set up correctly. It is
+     * also not as efficient as testing explicitly.
+     * &lt;/p&gt;
+     * 
+     * &lt;p&gt;
+     * Transient members will be not be used, as they are likely derived fields, and not part of the value of the
+     * &lt;code&gt;Object&lt;/code&gt;.
+     * &lt;/p&gt;
+     * 
+     * &lt;p&gt;
+     * Static fields will not be tested. Superclass fields will be included.
+     * &lt;/p&gt;
+     * 
+     * &lt;p&gt;
+     * Two randomly chosen, non-zero, odd numbers must be passed in. Ideally these should be different for each class,
+     * however this is not vital. Prime numbers are preferred, especially for the multiplier.
+     * &lt;/p&gt;
+     * 
+     * @param initialNonZeroOddNumber
+     *            a non-zero, odd number used as the initial value
+     * @param multiplierNonZeroOddNumber
+     *            a non-zero, odd number used as the multiplier
+     * @param object
+     *            the Object to create a &lt;code&gt;hashCode&lt;/code&gt; for
+     * @return int hash code
+     * @throws IllegalArgumentException
+     *             if the Object is &lt;code&gt;null&lt;/code&gt;
+     * @throws IllegalArgumentException
+     *             if the number is zero or even
+     */
+    public static int reflectionHashCode(int initialNonZeroOddNumber, int multiplierNonZeroOddNumber, Object object) {
+<span class="nc" id="L242">        return reflectionHashCode(initialNonZeroOddNumber, multiplierNonZeroOddNumber, object, false, null, null);</span>
+    }
+
+    /**
+     * &lt;p&gt;
+     * This method uses reflection to build a valid hash code.
+     * &lt;/p&gt;
+     * 
+     * &lt;p&gt;
+     * It uses &lt;code&gt;AccessibleObject.setAccessible&lt;/code&gt; to gain access to private fields. This means that it will
+     * throw a security exception if run under a security manager, if the permissions are not set up correctly. It is
+     * also not as efficient as testing explicitly.
+     * &lt;/p&gt;
+     * 
+     * &lt;p&gt;
+     * If the TestTransients parameter is set to &lt;code&gt;true&lt;/code&gt;, transient members will be tested, otherwise they
+     * are ignored, as they are likely derived fields, and not part of the value of the &lt;code&gt;Object&lt;/code&gt;.
+     * &lt;/p&gt;
+     * 
+     * &lt;p&gt;
+     * Static fields will not be tested. Superclass fields will be included.
+     * &lt;/p&gt;
+     * 
+     * &lt;p&gt;
+     * Two randomly chosen, non-zero, odd numbers must be passed in. Ideally these should be different for each class,
+     * however this is not vital. Prime numbers are preferred, especially for the multiplier.
+     * &lt;/p&gt;
+     * 
+     * @param initialNonZeroOddNumber
+     *            a non-zero, odd number used as the initial value
+     * @param multiplierNonZeroOddNumber
+     *            a non-zero, odd number used as the multiplier
+     * @param object
+     *            the Object to create a &lt;code&gt;hashCode&lt;/code&gt; for
+     * @param testTransients
+     *            whether to include transient fields
+     * @return int hash code
+     * @throws IllegalArgumentException
+     *             if the Object is &lt;code&gt;null&lt;/code&gt;
+     * @throws IllegalArgumentException
+     *             if the number is zero or even
+     */
+    public static int reflectionHashCode(int initialNonZeroOddNumber, int multiplierNonZeroOddNumber, Object object,
+            boolean testTransients) {
+<span class="nc" id="L286">        return reflectionHashCode(initialNonZeroOddNumber, multiplierNonZeroOddNumber, object, testTransients, null,</span>
+                null);
+    }
+
+    /**
+     * Calls {@link #reflectionHashCode(int, int, Object, boolean, Class, String[])} with excludeFields set to
+     * &lt;code&gt;null&lt;/code&gt;.
+     * 
+     * @param initialNonZeroOddNumber
+     *            a non-zero, odd number used as the initial value
+     * @param multiplierNonZeroOddNumber
+     *            a non-zero, odd number used as the multiplier
+     * @param object
+     *            the Object to create a &lt;code&gt;hashCode&lt;/code&gt; for
+     * @param testTransients
+     *            whether to include transient fields
+     * @param reflectUpToClass
+     *            the superclass to reflect up to (inclusive), may be &lt;code&gt;null&lt;/code&gt;
+     * @return int hash code
+     */
+    public static &lt;T&gt; int reflectionHashCode(int initialNonZeroOddNumber, int multiplierNonZeroOddNumber, T object,
+            boolean testTransients, Class&lt;? super T&gt; reflectUpToClass) {
+<span class="nc" id="L308">        return reflectionHashCode(initialNonZeroOddNumber, multiplierNonZeroOddNumber, object, testTransients,</span>
+                reflectUpToClass, null);
+    }
+
+    /**
+     * &lt;p&gt;
+     * This method uses reflection to build a valid hash code.
+     * &lt;/p&gt;
+     * 
+     * &lt;p&gt;
+     * It uses &lt;code&gt;AccessibleObject.setAccessible&lt;/code&gt; to gain access to private fields. This means that it will
+     * throw a security exception if run under a security manager, if the permissions are not set up correctly. It is
+     * also not as efficient as testing explicitly.
+     * &lt;/p&gt;
+     * 
+     * &lt;p&gt;
+     * If the TestTransients parameter is set to &lt;code&gt;true&lt;/code&gt;, transient members will be tested, otherwise they
+     * are ignored, as they are likely derived fields, and not part of the value of the &lt;code&gt;Object&lt;/code&gt;.
+     * &lt;/p&gt;
+     * 
+     * &lt;p&gt;
+     * Static fields will not be included. Superclass fields will be included up to and including the specified
+     * superclass. A null superclass is treated as java.lang.Object.
+     * &lt;/p&gt;
+     * 
+     * &lt;p&gt;
+     * Two randomly chosen, non-zero, odd numbers must be passed in. Ideally these should be different for each class,
+     * however this is not vital. Prime numbers are preferred, especially for the multiplier.
+     * &lt;/p&gt;
+     * 
+     * @param initialNonZeroOddNumber
+     *            a non-zero, odd number used as the initial value
+     * @param multiplierNonZeroOddNumber
+     *            a non-zero, odd number used as the multiplier
+     * @param object
+     *            the Object to create a &lt;code&gt;hashCode&lt;/code&gt; for
+     * @param testTransients
+     *            whether to include transient fields
+     * @param reflectUpToClass
+     *            the superclass to reflect up to (inclusive), may be &lt;code&gt;null&lt;/code&gt;
+     * @param excludeFields
+     *            array of field names to exclude from use in calculation of hash code
+     * @return int hash code
+     * @throws IllegalArgumentException
+     *             if the Object is &lt;code&gt;null&lt;/code&gt;
+     * @throws IllegalArgumentException
+     *             if the number is zero or even
+     * @since 2.0
+     */
+    public static &lt;T&gt; int reflectionHashCode(int initialNonZeroOddNumber, int multiplierNonZeroOddNumber, T object,
+            boolean testTransients, Class&lt;? super T&gt; reflectUpToClass, String[] excludeFields) {
+
+<span class="fc bfc" id="L360" title="All 2 branches covered.">        if (object == null) {</span>
+<span class="fc" id="L361">            throw new IllegalArgumentException(&quot;The object to build a hash code for must not be null&quot;);</span>
+        }
+<span class="fc" id="L363">        HashCodeBuilder builder = new HashCodeBuilder(initialNonZeroOddNumber, multiplierNonZeroOddNumber);</span>
+<span class="fc" id="L364">        Class&lt;?&gt; clazz = object.getClass();</span>
+<span class="fc" id="L365">        reflectionAppend(object, clazz, builder, testTransients, excludeFields);</span>
+<span class="pc bpc" id="L366" title="1 of 4 branches missed.">        while (clazz.getSuperclass() != null &amp;&amp; clazz != reflectUpToClass) {</span>
+<span class="fc" id="L367">            clazz = clazz.getSuperclass();</span>
+<span class="fc" id="L368">            reflectionAppend(object, clazz, builder, testTransients, excludeFields);</span>
+        }
+<span class="fc" id="L370">        return builder.toHashCode();</span>
+    }
+
+    /**
+     * &lt;p&gt;
+     * This method uses reflection to build a valid hash code.
+     * &lt;/p&gt;
+     * 
+     * &lt;p&gt;
+     * This constructor uses two hard coded choices for the constants needed to build a hash code.
+     * &lt;/p&gt;
+     * 
+     * &lt;p&gt;
+     * It uses &lt;code&gt;AccessibleObject.setAccessible&lt;/code&gt; to gain access to private fields. This means that it will
+     * throw a security exception if run under a security manager, if the permissions are not set up correctly. It is
+     * also not as efficient as testing explicitly.
+     * &lt;/p&gt;
+     * 
+     * &lt;p&gt;
+     * Transient members will be not be used, as they are likely derived fields, and not part of the value of the
+     * &lt;code&gt;Object&lt;/code&gt;.
+     * &lt;/p&gt;
+     * 
+     * &lt;p&gt;
+     * Static fields will not be tested. Superclass fields will be included.
+     * &lt;/p&gt;
+     * 
+     * @param object
+     *            the Object to create a &lt;code&gt;hashCode&lt;/code&gt; for
+     * @return int hash code
+     * @throws IllegalArgumentException
+     *             if the object is &lt;code&gt;null&lt;/code&gt;
+     */
+    public static int reflectionHashCode(Object object) {
+<span class="fc" id="L404">        return reflectionHashCode(17, 37, object, false, null, null);</span>
+    }
+
+    /**
+     * &lt;p&gt;
+     * This method uses reflection to build a valid hash code.
+     * &lt;/p&gt;
+     * 
+     * &lt;p&gt;
+     * This constructor uses two hard coded choices for the constants needed to build a hash code.
+     * &lt;/p&gt;
+     * 
+     * &lt;p&gt;
+     * It uses &lt;code&gt;AccessibleObject.setAccessible&lt;/code&gt; to gain access to private fields. This means that it will
+     * throw a security exception if run under a security manager, if the permissions are not set up correctly. It is
+     * also not as efficient as testing explicitly.
+     * &lt;/p&gt;
+     * 
+     * &lt;P&gt;
+     * If the TestTransients parameter is set to &lt;code&gt;true&lt;/code&gt;, transient members will be tested, otherwise they
+     * are ignored, as they are likely derived fields, and not part of the value of the &lt;code&gt;Object&lt;/code&gt;.
+     * &lt;/p&gt;
+     * 
+     * &lt;p&gt;
+     * Static fields will not be tested. Superclass fields will be included.
+     * &lt;/p&gt;
+     * 
+     * @param object
+     *            the Object to create a &lt;code&gt;hashCode&lt;/code&gt; for
+     * @param testTransients
+     *            whether to include transient fields
+     * @return int hash code
+     * @throws IllegalArgumentException
+     *             if the object is &lt;code&gt;null&lt;/code&gt;
+     */
+    public static int reflectionHashCode(Object object, boolean testTransients) {
+<span class="fc" id="L440">        return reflectionHashCode(17, 37, object, testTransients, null, null);</span>
+    }
+
+    /**
+     * &lt;p&gt;
+     * This method uses reflection to build a valid hash code.
+     * &lt;/p&gt;
+     * 
+     * &lt;p&gt;
+     * This constructor uses two hard coded choices for the constants needed to build a hash code.
+     * &lt;/p&gt;
+     * 
+     * &lt;p&gt;
+     * It uses &lt;code&gt;AccessibleObject.setAccessible&lt;/code&gt; to gain access to private fields. This means that it will
+     * throw a security exception if run under a security manager, if the permissions are not set up correctly. It is
+     * also not as efficient as testing explicitly.
+     * &lt;/p&gt;
+     * 
+     * &lt;p&gt;
+     * Transient members will be not be used, as they are likely derived fields, and not part of the value of the
+     * &lt;code&gt;Object&lt;/code&gt;.
+     * &lt;/p&gt;
+     * 
+     * &lt;p&gt;
+     * Static fields will not be tested. Superclass fields will be included.
+     * &lt;/p&gt;
+     * 
+     * @param object
+     *            the Object to create a &lt;code&gt;hashCode&lt;/code&gt; for
+     * @param excludeFields
+     *            Collection of String field names to exclude from use in calculation of hash code
+     * @return int hash code
+     * @throws IllegalArgumentException
+     *             if the object is &lt;code&gt;null&lt;/code&gt;
+     */
+    public static int reflectionHashCode(Object object, Collection&lt;String&gt; excludeFields) {
+<span class="nc" id="L476">        return reflectionHashCode(object, ReflectionToStringBuilder.toNoNullStringArray(excludeFields));</span>
+    }
+
+    // -------------------------------------------------------------------------
+
+    /**
+     * &lt;p&gt;
+     * This method uses reflection to build a valid hash code.
+     * &lt;/p&gt;
+     * 
+     * &lt;p&gt;
+     * This constructor uses two hard coded choices for the constants needed to build a hash code.
+     * &lt;/p&gt;
+     * 
+     * &lt;p&gt;
+     * It uses &lt;code&gt;AccessibleObject.setAccessible&lt;/code&gt; to gain access to private fields. This means that it will
+     * throw a security exception if run under a security manager, if the permissions are not set up correctly. It is
+     * also not as efficient as testing explicitly.
+     * &lt;/p&gt;
+     * 
+     * &lt;p&gt;
+     * Transient members will be not be used, as they are likely derived fields, and not part of the value of the
+     * &lt;code&gt;Object&lt;/code&gt;.
+     * &lt;/p&gt;
+     * 
+     * &lt;p&gt;
+     * Static fields will not be tested. Superclass fields will be included.
+     * &lt;/p&gt;
+     * 
+     * @param object
+     *            the Object to create a &lt;code&gt;hashCode&lt;/code&gt; for
+     * @param excludeFields
+     *            array of field names to exclude from use in calculation of hash code
+     * @return int hash code
+     * @throws IllegalArgumentException
+     *             if the object is &lt;code&gt;null&lt;/code&gt;
+     */
+    public static int reflectionHashCode(Object object, String[] excludeFields) {
+<span class="fc" id="L514">        return reflectionHashCode(17, 37, object, false, null, excludeFields);</span>
+    }
+
+    /**
+     * &lt;p&gt;
+     * Registers the given object. Used by the reflection methods to avoid infinite loops.
+     * &lt;/p&gt;
+     * 
+     * @param value
+     *            The object to register.
+     */
+    static void register(Object value) {
+<span class="fc" id="L526">        getRegistry().add(new IDKey(value));</span>
+<span class="fc" id="L527">    }</span>
+
+    /**
+     * &lt;p&gt;
+     * Unregisters the given object.
+     * &lt;/p&gt;
+     * 
+     * &lt;p&gt;
+     * Used by the reflection methods to avoid infinite loops.
+     * 
+     * @param value
+     *            The object to unregister.
+     * @since 2.3
+     */
+    static void unregister(Object value) {
+<span class="fc" id="L542">        getRegistry().remove(new IDKey(value));</span>
+<span class="fc" id="L543">    }</span>
+
+    /**
+     * Constant to use in building the hashCode.
+     */
+    private final int iConstant;
+
+    /**
+     * Running total of the hashCode.
+     */
+<span class="fc" id="L553">    private int iTotal = 0;</span>
+
+    /**
+     * &lt;p&gt;
+     * Uses two hard coded choices for the constants needed to build a &lt;code&gt;hashCode&lt;/code&gt;.
+     * &lt;/p&gt;
+     */
+<span class="fc" id="L560">    public HashCodeBuilder() {</span>
+<span class="fc" id="L561">        iConstant = 37;</span>
+<span class="fc" id="L562">        iTotal = 17;</span>
+<span class="fc" id="L563">    }</span>
+
+    /**
+     * &lt;p&gt;
+     * Two randomly chosen, non-zero, odd numbers must be passed in. Ideally these should be different for each class,
+     * however this is not vital.
+     * &lt;/p&gt;
+     * 
+     * &lt;p&gt;
+     * Prime numbers are preferred, especially for the multiplier.
+     * &lt;/p&gt;
+     * 
+     * @param initialNonZeroOddNumber
+     *            a non-zero, odd number used as the initial value
+     * @param multiplierNonZeroOddNumber
+     *            a non-zero, odd number used as the multiplier
+     * @throws IllegalArgumentException
+     *             if the number is zero or even
+     */
+<span class="fc" id="L582">    public HashCodeBuilder(int initialNonZeroOddNumber, int multiplierNonZeroOddNumber) {</span>
+<span class="fc bfc" id="L583" title="All 2 branches covered.">        if (initialNonZeroOddNumber == 0) {</span>
+<span class="fc" id="L584">            throw new IllegalArgumentException(&quot;HashCodeBuilder requires a non zero initial value&quot;);</span>
+        }
+<span class="fc bfc" id="L586" title="All 2 branches covered.">        if (initialNonZeroOddNumber % 2 == 0) {</span>
+<span class="fc" id="L587">            throw new IllegalArgumentException(&quot;HashCodeBuilder requires an odd initial value&quot;);</span>
+        }
+<span class="pc bpc" id="L589" title="1 of 2 branches missed.">        if (multiplierNonZeroOddNumber == 0) {</span>
+<span class="nc" id="L590">            throw new IllegalArgumentException(&quot;HashCodeBuilder requires a non zero multiplier&quot;);</span>
+        }
+<span class="pc bpc" id="L592" title="1 of 2 branches missed.">        if (multiplierNonZeroOddNumber % 2 == 0) {</span>
+<span class="nc" id="L593">            throw new IllegalArgumentException(&quot;HashCodeBuilder requires an odd multiplier&quot;);</span>
+        }
+<span class="fc" id="L595">        iConstant = multiplierNonZeroOddNumber;</span>
+<span class="fc" id="L596">        iTotal = initialNonZeroOddNumber;</span>
+<span class="fc" id="L597">    }</span>
+
+    /**
+     * &lt;p&gt;
+     * Append a &lt;code&gt;hashCode&lt;/code&gt; for a &lt;code&gt;boolean&lt;/code&gt;.
+     * &lt;/p&gt;
+     * &lt;p&gt;
+     * This adds &lt;code&gt;iConstant * 1&lt;/code&gt; to the &lt;code&gt;hashCode&lt;/code&gt; and not a &lt;code&gt;1231&lt;/code&gt; or
+     * &lt;code&gt;1237&lt;/code&gt; as done in java.lang.Boolean. This is in accordance with the &lt;quote&gt;Effective Java&lt;/quote&gt;
+     * design.
+     * &lt;/p&gt;
+     * 
+     * @param value
+     *            the boolean to add to the &lt;code&gt;hashCode&lt;/code&gt;
+     * @return this
+     */
+    public HashCodeBuilder append(boolean value) {
+<span class="fc bfc" id="L614" title="All 2 branches covered.">        iTotal = iTotal * iConstant + (value ? 0 : 1);</span>
+<span class="fc" id="L615">        return this;</span>
+    }
+
+    /**
+     * &lt;p&gt;
+     * Append a &lt;code&gt;hashCode&lt;/code&gt; for a &lt;code&gt;boolean&lt;/code&gt; array.
+     * &lt;/p&gt;
+     * 
+     * @param array
+     *            the array to add to the &lt;code&gt;hashCode&lt;/code&gt;
+     * @return this
+     */
+    public HashCodeBuilder append(boolean[] array) {
+<span class="fc bfc" id="L628" title="All 2 branches covered.">        if (array == null) {</span>
+<span class="fc" id="L629">            iTotal = iTotal * iConstant;</span>
+        } else {
+<span class="fc bfc" id="L631" title="All 2 branches covered.">            for (int i = 0; i &lt; array.length; i++) {</span>
+<span class="fc" id="L632">                append(array[i]);</span>
+            }
+        }
+<span class="fc" id="L635">        return this;</span>
+    }
+
+    // -------------------------------------------------------------------------
+
+    /**
+     * &lt;p&gt;
+     * Append a &lt;code&gt;hashCode&lt;/code&gt; for a &lt;code&gt;byte&lt;/code&gt;.
+     * &lt;/p&gt;
+     * 
+     * @param value
+     *            the byte to add to the &lt;code&gt;hashCode&lt;/code&gt;
+     * @return this
+     */
+    public HashCodeBuilder append(byte value) {
+<span class="fc" id="L650">        iTotal = iTotal * iConstant + value;</span>
+<span class="fc" id="L651">        return this;</span>
+    }
+
+    // -------------------------------------------------------------------------
+
+    /**
+     * &lt;p&gt;
+     * Append a &lt;code&gt;hashCode&lt;/code&gt; for a &lt;code&gt;byte&lt;/code&gt; array.
+     * &lt;/p&gt;
+     * 
+     * @param array
+     *            the array to add to the &lt;code&gt;hashCode&lt;/code&gt;
+     * @return this
+     */
+    public HashCodeBuilder append(byte[] array) {
+<span class="fc bfc" id="L666" title="All 2 branches covered.">        if (array == null) {</span>
+<span class="fc" id="L667">            iTotal = iTotal * iConstant;</span>
+        } else {
+<span class="fc bfc" id="L669" title="All 2 branches covered.">            for (int i = 0; i &lt; array.length; i++) {</span>
+<span class="fc" id="L670">                append(array[i]);</span>
+            }
+        }
+<span class="fc" id="L673">        return this;</span>
+    }
+
+    /**
+     * &lt;p&gt;
+     * Append a &lt;code&gt;hashCode&lt;/code&gt; for a &lt;code&gt;char&lt;/code&gt;.
+     * &lt;/p&gt;
+     * 
+     * @param value
+     *            the char to add to the &lt;code&gt;hashCode&lt;/code&gt;
+     * @return this
+     */
+    public HashCodeBuilder append(char value) {
+<span class="fc" id="L686">        iTotal = iTotal * iConstant + value;</span>
+<span class="fc" id="L687">        return this;</span>
+    }
+
+    /**
+     * &lt;p&gt;
+     * Append a &lt;code&gt;hashCode&lt;/code&gt; for a &lt;code&gt;char&lt;/code&gt; array.
+     * &lt;/p&gt;
+     * 
+     * @param array
+     *            the array to add to the &lt;code&gt;hashCode&lt;/code&gt;
+     * @return this
+     */
+    public HashCodeBuilder append(char[] array) {
+<span class="fc bfc" id="L700" title="All 2 branches covered.">        if (array == null) {</span>
+<span class="fc" id="L701">            iTotal = iTotal * iConstant;</span>
+        } else {
+<span class="fc bfc" id="L703" title="All 2 branches covered.">            for (int i = 0; i &lt; array.length; i++) {</span>
+<span class="fc" id="L704">                append(array[i]);</span>
+            }
+        }
+<span class="fc" id="L707">        return this;</span>
+    }
+
+    /**
+     * &lt;p&gt;
+     * Append a &lt;code&gt;hashCode&lt;/code&gt; for a &lt;code&gt;double&lt;/code&gt;.
+     * &lt;/p&gt;
+     * 
+     * @param value
+     *            the double to add to the &lt;code&gt;hashCode&lt;/code&gt;
+     * @return this
+     */
+    public HashCodeBuilder append(double value) {
+<span class="fc" id="L720">        return append(Double.doubleToLongBits(value));</span>
+    }
+
+    /**
+     * &lt;p&gt;
+     * Append a &lt;code&gt;hashCode&lt;/code&gt; for a &lt;code&gt;double&lt;/code&gt; array.
+     * &lt;/p&gt;
+     * 
+     * @param array
+     *            the array to add to the &lt;code&gt;hashCode&lt;/code&gt;
+     * @return this
+     */
+    public HashCodeBuilder append(double[] array) {
+<span class="fc bfc" id="L733" title="All 2 branches covered.">        if (array == null) {</span>
+<span class="fc" id="L734">            iTotal = iTotal * iConstant;</span>
+        } else {
+<span class="fc bfc" id="L736" title="All 2 branches covered.">            for (int i = 0; i &lt; array.length; i++) {</span>
+<span class="fc" id="L737">                append(array[i]);</span>
+            }
+        }
+<span class="fc" id="L740">        return this;</span>
+    }
+
+    /**
+     * &lt;p&gt;
+     * Append a &lt;code&gt;hashCode&lt;/code&gt; for a &lt;code&gt;float&lt;/code&gt;.
+     * &lt;/p&gt;
+     * 
+     * @param value
+     *            the float to add to the &lt;code&gt;hashCode&lt;/code&gt;
+     * @return this
+     */
+    public HashCodeBuilder append(float value) {
+<span class="fc" id="L753">        iTotal = iTotal * iConstant + Float.floatToIntBits(value);</span>
+<span class="fc" id="L754">        return this;</span>
+    }
+
+    /**
+     * &lt;p&gt;
+     * Append a &lt;code&gt;hashCode&lt;/code&gt; for a &lt;code&gt;float&lt;/code&gt; array.
+     * &lt;/p&gt;
+     * 
+     * @param array
+     *            the array to add to the &lt;code&gt;hashCode&lt;/code&gt;
+     * @return this
+     */
+    public HashCodeBuilder append(float[] array) {
+<span class="fc bfc" id="L767" title="All 2 branches covered.">        if (array == null) {</span>
+<span class="fc" id="L768">            iTotal = iTotal * iConstant;</span>
+        } else {
+<span class="fc bfc" id="L770" title="All 2 branches covered.">            for (int i = 0; i &lt; array.length; i++) {</span>
+<span class="fc" id="L771">                append(array[i]);</span>
+            }
+        }
+<span class="fc" id="L774">        return this;</span>
+    }
+
+    /**
+     * &lt;p&gt;
+     * Append a &lt;code&gt;hashCode&lt;/code&gt; for an &lt;code&gt;int&lt;/code&gt;.
+     * &lt;/p&gt;
+     * 
+     * @param value
+     *            the int to add to the &lt;code&gt;hashCode&lt;/code&gt;
+     * @return this
+     */
+    public HashCodeBuilder append(int value) {
+<span class="fc" id="L787">        iTotal = iTotal * iConstant + value;</span>
+<span class="fc" id="L788">        return this;</span>
+    }
+
+    /**
+     * &lt;p&gt;
+     * Append a &lt;code&gt;hashCode&lt;/code&gt; for an &lt;code&gt;int&lt;/code&gt; array.
+     * &lt;/p&gt;
+     * 
+     * @param array
+     *            the array to add to the &lt;code&gt;hashCode&lt;/code&gt;
+     * @return this
+     */
+    public HashCodeBuilder append(int[] array) {
+<span class="fc bfc" id="L801" title="All 2 branches covered.">        if (array == null) {</span>
+<span class="fc" id="L802">            iTotal = iTotal * iConstant;</span>
+        } else {
+<span class="fc bfc" id="L804" title="All 2 branches covered.">            for (int i = 0; i &lt; array.length; i++) {</span>
+<span class="fc" id="L805">                append(array[i]);</span>
+            }
+        }
+<span class="fc" id="L808">        return this;</span>
+    }
+
+    /**
+     * &lt;p&gt;
+     * Append a &lt;code&gt;hashCode&lt;/code&gt; for a &lt;code&gt;long&lt;/code&gt;.
+     * &lt;/p&gt;
+     * &lt;p&gt;
+     * 
+     * @param value
+     *            the long to add to the &lt;code&gt;hashCode&lt;/code&gt;
+     * @return this
+     */
+    // NOTE: This method uses &gt;&gt; and not &gt;&gt;&gt; as Effective Java and 
+    //       Long.hashCode do. Ideally we should switch to &gt;&gt;&gt; at 
+    //       some stage. There are backwards compat issues, so 
+    //       that will have to wait for the time being. cf LANG-342.
+    public HashCodeBuilder append(long value) {
+<span class="fc" id="L826">        iTotal = iTotal * iConstant + ((int) (value ^ (value &gt;&gt; 32)));</span>
+<span class="fc" id="L827">        return this;</span>
+    }
+
+    /**
+     * &lt;p&gt;
+     * Append a &lt;code&gt;hashCode&lt;/code&gt; for a &lt;code&gt;long&lt;/code&gt; array.
+     * &lt;/p&gt;
+     * 
+     * @param array
+     *            the array to add to the &lt;code&gt;hashCode&lt;/code&gt;
+     * @return this
+     */
+    public HashCodeBuilder append(long[] array) {
+<span class="fc bfc" id="L840" title="All 2 branches covered.">        if (array == null) {</span>
+<span class="fc" id="L841">            iTotal = iTotal * iConstant;</span>
+        } else {
+<span class="fc bfc" id="L843" title="All 2 branches covered.">            for (int i = 0; i &lt; array.length; i++) {</span>
+<span class="fc" id="L844">                append(array[i]);</span>
+            }
+        }
+<span class="fc" id="L847">        return this;</span>
+    }
+
+    /**
+     * &lt;p&gt;
+     * Append a &lt;code&gt;hashCode&lt;/code&gt; for an &lt;code&gt;Object&lt;/code&gt;.
+     * &lt;/p&gt;
+     * 
+     * @param object
+     *            the Object to add to the &lt;code&gt;hashCode&lt;/code&gt;
+     * @return this
+     */
+    public HashCodeBuilder append(Object object) {
+<span class="fc bfc" id="L860" title="All 2 branches covered.">        if (object == null) {</span>
+<span class="fc" id="L861">            iTotal = iTotal * iConstant;</span>
+
+        } else {
+                // 'Switch' on type of array, to dispatch to the correct handler
+                // This handles multi dimensional arrays
+<span class="fc bfc" id="L866" title="All 2 branches covered.">                if (object instanceof long[]) {</span>
+<span class="fc" id="L867">                    append((long[]) object);</span>
+<span class="fc bfc" id="L868" title="All 2 branches covered.">                } else if (object instanceof int[]) {</span>
+<span class="fc" id="L869">                    append((int[]) object);</span>
+<span class="fc bfc" id="L870" title="All 2 branches covered.">                } else if (object instanceof short[]) {</span>
+<span class="fc" id="L871">                    append((short[]) object);</span>
+<span class="fc bfc" id="L872" title="All 2 branches covered.">                } else if (object instanceof char[]) {</span>
+<span class="fc" id="L873">                    append((char[]) object);</span>
+<span class="fc bfc" id="L874" title="All 2 branches covered.">                } else if (object instanceof byte[]) {</span>
+<span class="fc" id="L875">                    append((byte[]) object);</span>
+<span class="fc bfc" id="L876" title="All 2 branches covered.">                } else if (object instanceof double[]) {</span>
+<span class="fc" id="L877">                    append((double[]) object);</span>
+<span class="fc bfc" id="L878" title="All 2 branches covered.">                } else if (object instanceof float[]) {</span>
+<span class="fc" id="L879">                    append((float[]) object);</span>
+<span class="fc bfc" id="L880" title="All 2 branches covered.">                } else if (object instanceof boolean[]) {</span>
+<span class="fc" id="L881">                    append((boolean[]) object);</span>
+<span class="fc bfc" id="L882" title="All 2 branches covered.">                } else if (object instanceof Object[]) {</span>
+                    // Not an array of primitives
+<span class="fc" id="L884">                    append((Object[]) object);</span>
+                } else {
+<span class="fc" id="L886">                    iTotal = iTotal * iConstant + object.hashCode();</span>
+                }
+        }
+<span class="fc" id="L889">        return this;</span>
+    }
+
+    /**
+     * &lt;p&gt;
+     * Append a &lt;code&gt;hashCode&lt;/code&gt; for an &lt;code&gt;Object&lt;/code&gt; array.
+     * &lt;/p&gt;
+     * 
+     * @param array
+     *            the array to add to the &lt;code&gt;hashCode&lt;/code&gt;
+     * @return this
+     */
+    public HashCodeBuilder append(Object[] array) {
+<span class="fc bfc" id="L902" title="All 2 branches covered.">        if (array == null) {</span>
+<span class="fc" id="L903">            iTotal = iTotal * iConstant;</span>
+        } else {
+<span class="fc bfc" id="L905" title="All 2 branches covered.">            for (int i = 0; i &lt; array.length; i++) {</span>
+<span class="fc" id="L906">                append(array[i]);</span>
+            }
+        }
+<span class="fc" id="L909">        return this;</span>
+    }
+
+    /**
+     * &lt;p&gt;
+     * Append a &lt;code&gt;hashCode&lt;/code&gt; for a &lt;code&gt;short&lt;/code&gt;.
+     * &lt;/p&gt;
+     * 
+     * @param value
+     *            the short to add to the &lt;code&gt;hashCode&lt;/code&gt;
+     * @return this
+     */
+    public HashCodeBuilder append(short value) {
+<span class="fc" id="L922">        iTotal = iTotal * iConstant + value;</span>
+<span class="fc" id="L923">        return this;</span>
+    }
+
+    /**
+     * &lt;p&gt;
+     * Append a &lt;code&gt;hashCode&lt;/code&gt; for a &lt;code&gt;short&lt;/code&gt; array.
+     * &lt;/p&gt;
+     * 
+     * @param array
+     *            the array to add to the &lt;code&gt;hashCode&lt;/code&gt;
+     * @return this
+     */
+    public HashCodeBuilder append(short[] array) {
+<span class="fc bfc" id="L936" title="All 2 branches covered.">        if (array == null) {</span>
+<span class="fc" id="L937">            iTotal = iTotal * iConstant;</span>
+        } else {
+<span class="fc bfc" id="L939" title="All 2 branches covered.">            for (int i = 0; i &lt; array.length; i++) {</span>
+<span class="fc" id="L940">                append(array[i]);</span>
+            }
+        }
+<span class="fc" id="L943">        return this;</span>
+    }
+
+    /**
+     * &lt;p&gt;
+     * Adds the result of super.hashCode() to this builder.
+     * &lt;/p&gt;
+     * 
+     * @param superHashCode
+     *            the result of calling &lt;code&gt;super.hashCode()&lt;/code&gt;
+     * @return this HashCodeBuilder, used to chain calls.
+     * @since 2.0
+     */
+    public HashCodeBuilder appendSuper(int superHashCode) {
+<span class="fc" id="L957">        iTotal = iTotal * iConstant + superHashCode;</span>
+<span class="fc" id="L958">        return this;</span>
+    }
+
+    /**
+     * &lt;p&gt;
+     * Return the computed &lt;code&gt;hashCode&lt;/code&gt;.
+     * &lt;/p&gt;
+     * 
+     * @return &lt;code&gt;hashCode&lt;/code&gt; based on the fields appended
+     */
+    public int toHashCode() {
+<span class="fc" id="L969">        return iTotal;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

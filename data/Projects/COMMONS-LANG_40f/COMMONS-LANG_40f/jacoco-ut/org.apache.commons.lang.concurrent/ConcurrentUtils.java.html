@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ConcurrentUtils.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Commons Lang</a> &gt; <a href="index.source.html" class="el_package">org.apache.commons.lang.concurrent</a> &gt; <span class="el_source">ConcurrentUtils.java</span></div><h1>ConcurrentUtils.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.commons.lang.concurrent;
+
+import java.util.concurrent.ExecutionException;
+
+/**
+ * &lt;p&gt;
+ * An utility class providing functionality related to the {@code
+ * java.util.concurrent} package.
+ * &lt;/p&gt;
+ *
+ * @version $Id$
+ */
+public class ConcurrentUtils {
+    /**
+     * Private constructor so that no instances can be created. This class
+     * contains only static utility methods.
+     */
+    private ConcurrentUtils() {
+    }
+
+    /**
+     * Inspects the cause of the specified {@code ExecutionException} and
+     * creates a {@code ConcurrentException} with the checked cause if
+     * necessary. This method performs the following checks on the cause of the
+     * passed in exception:
+     * &lt;ul&gt;
+     * &lt;li&gt;If the passed in exception is &lt;b&gt;null&lt;/b&gt; or the cause is
+     * &lt;b&gt;null&lt;/b&gt;, this method returns &lt;b&gt;null&lt;/b&gt;.&lt;/li&gt;
+     * &lt;li&gt;If the cause is a runtime exception, it is directly thrown.&lt;/li&gt;
+     * &lt;li&gt;If the cause is an error, it is directly thrown, too.&lt;/li&gt;
+     * &lt;li&gt;In any other case the cause is a checked exception. The method then
+     * creates a {@link ConcurrentException}, initializes it with the cause, and
+     * returns it.&lt;/li&gt;
+     * &lt;/ul&gt;
+     *
+     * @param ex the exception to be processed
+     * @return a {@code ConcurrentException} with the checked cause
+     */
+    public static ConcurrentException extractCause(ExecutionException ex) {
+<span class="fc bfc" id="L56" title="All 4 branches covered.">        if (ex == null || ex.getCause() == null) {</span>
+<span class="fc" id="L57">            return null;</span>
+        }
+
+<span class="fc" id="L60">        throwCause(ex);</span>
+<span class="fc" id="L61">        return new ConcurrentException(ex.getMessage(), ex.getCause());</span>
+    }
+
+    /**
+     * Handles the specified {@code ExecutionException}. This method calls
+     * {@link #extractCause(ExecutionException)} for obtaining the cause of the
+     * exception - which might already cause an unchecked exception or an error
+     * being thrown. If the cause is a checked exception however, it is wrapped
+     * in a {@code ConcurrentException}, which is thrown. If the passed in
+     * exception is &lt;b&gt;null&lt;/b&gt; or has no cause, the method simply returns
+     * without throwing an exception.
+     *
+     * @param ex the exception to be handled
+     * @throws ConcurrentException if the cause of the {@code
+     * ExecutionException} is a checked exception
+     */
+    public static void handleCause(ExecutionException ex)
+            throws ConcurrentException {
+<span class="fc" id="L79">        ConcurrentException cex = extractCause(ex);</span>
+
+<span class="fc bfc" id="L81" title="All 2 branches covered.">        if (cex != null) {</span>
+<span class="fc" id="L82">            throw cex;</span>
+        }
+<span class="fc" id="L84">    }</span>
+
+    /**
+     * Tests whether the specified {@code Throwable} is a checked exception. If
+     * not, an exception is thrown.
+     *
+     * @param ex the {@code Throwable} to check
+     * @return a flag whether the passed in exception is a checked exception
+     * @throws IllegalArgumentException if the {@code Throwable} is not a
+     * checked exception
+     */
+    static Throwable checkedException(Throwable ex) {
+<span class="fc bfc" id="L96" title="All 6 branches covered.">        if (ex != null &amp;&amp; !(ex instanceof RuntimeException)</span>
+                &amp;&amp; !(ex instanceof Error)) {
+<span class="fc" id="L98">            return ex;</span>
+        } else {
+<span class="fc" id="L100">            throw new IllegalArgumentException(&quot;Not a checked exception: &quot; + ex);</span>
+        }
+    }
+
+    /**
+     * Tests whether the cause of the specified {@code ExecutionException}
+     * should be thrown and does it if necessary.
+     *
+     * @param ex the exception in question
+     */
+    private static void throwCause(ExecutionException ex) {
+<span class="fc bfc" id="L111" title="All 2 branches covered.">        if (ex.getCause() instanceof RuntimeException) {</span>
+<span class="fc" id="L112">            throw (RuntimeException) ex.getCause();</span>
+        }
+
+<span class="fc bfc" id="L115" title="All 2 branches covered.">        if (ex.getCause() instanceof Error) {</span>
+<span class="fc" id="L116">            throw (Error) ex.getCause();</span>
+        }
+<span class="fc" id="L118">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

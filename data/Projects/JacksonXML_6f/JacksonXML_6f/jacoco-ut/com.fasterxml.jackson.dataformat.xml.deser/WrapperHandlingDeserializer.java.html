@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>WrapperHandlingDeserializer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Jackson-dataformat-XML</a> &gt; <a href="index.source.html" class="el_package">com.fasterxml.jackson.dataformat.xml.deser</a> &gt; <span class="el_source">WrapperHandlingDeserializer.java</span></div><h1>WrapperHandlingDeserializer.java</h1><pre class="source lang-java linenums">package com.fasterxml.jackson.dataformat.xml.deser;
+
+import java.io.IOException;
+import java.util.*;
+
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.databind.*;
+import com.fasterxml.jackson.databind.deser.*;
+import com.fasterxml.jackson.databind.deser.std.DelegatingDeserializer;
+import com.fasterxml.jackson.databind.jsontype.TypeDeserializer;
+import com.fasterxml.jackson.dataformat.xml.util.TypeUtil;
+
+/**
+ * Delegating deserializer whose only function is to handle case of
+ * &quot;unwrapped&quot; List/array deserialization from XML.
+ */
+public class WrapperHandlingDeserializer
+    extends DelegatingDeserializer
+{
+    private static final long serialVersionUID = 1L;
+
+    /**
+     * (Simple) Names of properties, for which virtual wrapping is needed
+     * to compensate: these are so-called 'unwrapped' XML lists where property
+     * name is used for elements, and not as List markers.
+     */
+    protected final Set&lt;String&gt; _namesToWrap;
+
+    protected final JavaType _type;
+    
+    /*
+    /**********************************************************************
+    /* Construction
+    /**********************************************************************
+     */
+
+    public WrapperHandlingDeserializer(BeanDeserializerBase delegate) {
+<span class="fc" id="L38">        this(delegate, null);</span>
+<span class="fc" id="L39">    }</span>
+
+    public WrapperHandlingDeserializer(BeanDeserializerBase delegate, Set&lt;String&gt; namesToWrap)
+    {
+<span class="fc" id="L43">        super(delegate);</span>
+<span class="fc" id="L44">        _namesToWrap = namesToWrap;</span>
+<span class="fc" id="L45">        _type = delegate.getValueType();</span>
+<span class="fc" id="L46">    }</span>
+
+    /*
+    /**********************************************************************
+    /* Abstract method implementations
+    /**********************************************************************
+     */
+
+    @Override
+    protected JsonDeserializer&lt;?&gt; newDelegatingInstance(JsonDeserializer&lt;?&gt; newDelegatee0) {
+        // default not enough, as we may need to create a new wrapping deserializer
+        // even if delegatee does not change
+<span class="nc" id="L58">        throw new IllegalStateException(&quot;Internal error: should never get called&quot;);</span>
+    }
+
+    @Override
+    public JsonDeserializer&lt;?&gt; createContextual(DeserializationContext ctxt,
+            BeanProperty property)
+        throws JsonMappingException
+    {
+<span class="fc" id="L66">        JavaType vt = _type;</span>
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">        if (vt == null) {</span>
+<span class="nc" id="L68">            vt = ctxt.constructType(_delegatee.handledType());</span>
+        }
+<span class="fc" id="L70">        JsonDeserializer&lt;?&gt; del = ctxt.handleSecondaryContextualization(_delegatee, property, vt);</span>
+<span class="fc" id="L71">        BeanDeserializerBase newDelegatee = _verifyDeserType(del);</span>
+        
+        // Let's go through the properties now...
+<span class="fc" id="L74">        Iterator&lt;SettableBeanProperty&gt; it = newDelegatee.properties();</span>
+<span class="fc" id="L75">        HashSet&lt;String&gt; unwrappedNames = null;</span>
+<span class="fc bfc" id="L76" title="All 2 branches covered.">        while (it.hasNext()) {</span>
+<span class="fc" id="L77">            SettableBeanProperty prop = it.next();</span>
+            // First things first: only consider array/Collection types
+            // (not perfect check, but simplest reasonable check)
+<span class="fc" id="L80">            JavaType type = prop.getType();</span>
+<span class="fc bfc" id="L81" title="All 2 branches covered.">            if (!TypeUtil.isIndexedType(type)) {</span>
+<span class="fc" id="L82">                continue;</span>
+            }
+<span class="fc" id="L84">            PropertyName wrapperName = prop.getWrapperName();</span>
+            // skip anything with wrapper (should work as is)
+<span class="fc bfc" id="L86" title="All 4 branches covered.">            if ((wrapperName != null) &amp;&amp; (wrapperName != PropertyName.NO_NAME)) {</span>
+<span class="fc" id="L87">                continue;</span>
+            }
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">            if (unwrappedNames == null) {</span>
+<span class="fc" id="L90">                unwrappedNames = new HashSet&lt;String&gt;();</span>
+            }
+            // not optimal; should be able to use PropertyName...
+<span class="fc" id="L93">            unwrappedNames.add(prop.getName());</span>
+<span class="fc" id="L94">        }</span>
+        // Ok: if nothing to take care of, just return the delegatee...
+<span class="fc bfc" id="L96" title="All 2 branches covered.">        if (unwrappedNames == null) {</span>
+<span class="fc" id="L97">            return newDelegatee;</span>
+        }
+        // Otherwise, create the thing that can deal with virtual wrapping
+<span class="fc" id="L100">        return new WrapperHandlingDeserializer(newDelegatee, unwrappedNames);</span>
+    }
+
+    /*
+    /**********************************************************************
+    /* Overridden deserialization methods
+    /**********************************************************************
+     */
+
+    @Override
+    public Object deserialize(JsonParser p, DeserializationContext ctxt) throws IOException
+    {
+<span class="fc" id="L112">        _configureParser(p);</span>
+<span class="fc" id="L113">        return _delegatee.deserialize(p,  ctxt);</span>
+    }
+
+    @SuppressWarnings(&quot;unchecked&quot;)
+    @Override
+    public Object deserialize(JsonParser p, DeserializationContext ctxt,
+            Object intoValue) throws IOException
+    {
+<span class="nc" id="L121">        _configureParser(p);</span>
+<span class="nc" id="L122">        return ((JsonDeserializer&lt;Object&gt;)_delegatee).deserialize(p, ctxt, intoValue);</span>
+    }
+
+    @Override
+    public Object deserializeWithType(JsonParser p, DeserializationContext ctxt,
+            TypeDeserializer typeDeserializer) throws IOException
+    {
+<span class="nc" id="L129">        _configureParser(p);</span>
+<span class="nc" id="L130">        return _delegatee.deserializeWithType(p, ctxt, typeDeserializer);</span>
+    }
+    
+    /*
+    /**********************************************************************
+    /* Internal methods
+    /**********************************************************************
+     */
+
+    protected final void _configureParser(JsonParser p) throws IOException
+    {
+        // 19-Aug-2013, tatu: Although we should not usually get called with
+        //   parser of other types, there are some cases where this may happen:
+        //   specifically, during structural value conversions.
+<span class="fc bfc" id="L144" title="All 2 branches covered.">        if (p instanceof FromXmlParser) {</span>
+<span class="fc" id="L145">            ((FromXmlParser) p).addVirtualWrapping(_namesToWrap);</span>
+        }
+<span class="fc" id="L147">    }</span>
+    
+    protected BeanDeserializerBase _verifyDeserType(JsonDeserializer&lt;?&gt; deser)
+    {
+<span class="pc bpc" id="L151" title="1 of 2 branches missed.">        if (!(deser instanceof BeanDeserializerBase)) {</span>
+<span class="nc" id="L152">            throw new IllegalArgumentException(&quot;Can not change delegate to be of type &quot;</span>
+<span class="nc" id="L153">                    +deser.getClass().getName());</span>
+        }
+<span class="fc" id="L155">        return (BeanDeserializerBase) deser;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

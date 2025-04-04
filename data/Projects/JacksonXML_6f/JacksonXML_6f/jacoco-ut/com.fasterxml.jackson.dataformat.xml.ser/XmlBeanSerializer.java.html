@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>XmlBeanSerializer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Jackson-dataformat-XML</a> &gt; <a href="index.source.html" class="el_package">com.fasterxml.jackson.dataformat.xml.ser</a> &gt; <span class="el_source">XmlBeanSerializer.java</span></div><h1>XmlBeanSerializer.java</h1><pre class="source lang-java linenums">package com.fasterxml.jackson.dataformat.xml.ser;
+
+import java.io.IOException;
+import java.util.Set;
+
+import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.databind.JsonSerializer;
+import com.fasterxml.jackson.databind.SerializerProvider;
+import com.fasterxml.jackson.databind.ser.BeanPropertyWriter;
+import com.fasterxml.jackson.databind.ser.BeanSerializer;
+import com.fasterxml.jackson.databind.ser.impl.BeanAsArraySerializer;
+import com.fasterxml.jackson.databind.ser.impl.ObjectIdWriter;
+import com.fasterxml.jackson.databind.ser.std.BeanSerializerBase;
+import com.fasterxml.jackson.databind.util.NameTransformer;
+
+/**
+ * Variant of {@link BeanSerializer} for XML handling.
+ * 
+ * @author Pascal Gélinas
+ */
+public class XmlBeanSerializer extends XmlBeanSerializerBase
+{
+    private static final long serialVersionUID = 1L;
+
+    /*
+    /**********************************************************
+    /* Life-cycle: constructors
+    /**********************************************************
+     */
+    public XmlBeanSerializer(BeanSerializerBase src) {
+<span class="fc" id="L31">        super(src);</span>
+<span class="fc" id="L32">    }</span>
+
+    public XmlBeanSerializer(XmlBeanSerializerBase src, ObjectIdWriter objectIdWriter, Object filterId) {
+<span class="fc" id="L35">        super(src, objectIdWriter, filterId);</span>
+<span class="fc" id="L36">    }</span>
+
+    public XmlBeanSerializer(XmlBeanSerializerBase src, ObjectIdWriter objectIdWriter) {
+<span class="nc" id="L39">        super(src, objectIdWriter);</span>
+<span class="nc" id="L40">    }</span>
+
+    public XmlBeanSerializer(XmlBeanSerializerBase src, Set&lt;String&gt; toIgnore) {
+<span class="nc" id="L43">        super(src, toIgnore);</span>
+<span class="nc" id="L44">    }</span>
+
+    /*
+    /**********************************************************
+    /* Life-cycle: factory methods, fluent factories
+    /**********************************************************
+     */
+
+    @Override
+    public JsonSerializer&lt;Object&gt; unwrappingSerializer(NameTransformer unwrapper) {
+<span class="fc" id="L54">        return new UnwrappingXmlBeanSerializer(this, unwrapper);</span>
+    }
+    
+    @Override
+    public BeanSerializerBase withObjectIdWriter(ObjectIdWriter objectIdWriter) {
+<span class="fc" id="L59">        return new XmlBeanSerializer(this, objectIdWriter, _propertyFilterId);</span>
+    }
+
+    @Override
+    public BeanSerializerBase withFilterId(Object filterId) {
+<span class="nc" id="L64">        return new XmlBeanSerializer(this, _objectIdWriter, filterId);</span>
+    }
+
+    @Override
+    protected BeanSerializerBase withIgnorals(Set&lt;String&gt; toIgnore) {
+<span class="nc" id="L69">        return new XmlBeanSerializer(this, toIgnore);</span>
+    }
+
+    /**
+     * Implementation has to check whether as-array serialization
+     * is possible reliably; if (and only if) so, will construct
+     * a {@link BeanAsArraySerializer}, otherwise will return this
+     * serializer as is.
+     */
+    @Override
+    protected BeanSerializerBase asArraySerializer()
+    {
+        /* Can not:
+         * 
+         * - have Object Id (may be allowed in future)
+         * - have any getter
+         */
+<span class="nc bnc" id="L86" title="All 6 branches missed.">        if ((_objectIdWriter == null)</span>
+                &amp;&amp; (_anyGetterWriter == null)
+                &amp;&amp; (_propertyFilterId == null)
+                ) {
+<span class="nc" id="L90">            return new BeanAsArraySerializer(this);</span>
+        }
+        // already is one, so:
+<span class="nc" id="L93">        return this;</span>
+    }
+
+    /*
+    /**********************************************************
+    /* JsonSerializer implementation that differs between impls
+    /**********************************************************
+     */
+
+    /**
+     * Main serialization method that will delegate actual output to configured
+     * {@link BeanPropertyWriter} instances.
+     */
+    @Override
+    public void serialize(Object bean, JsonGenerator g, SerializerProvider provider) throws IOException
+    {
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">        if (_objectIdWriter != null) {</span>
+<span class="nc" id="L110">            _serializeWithObjectId(bean, g, provider, true);</span>
+<span class="nc" id="L111">            return;</span>
+        }
+<span class="fc" id="L113">        g.writeStartObject();</span>
+<span class="fc bfc" id="L114" title="All 2 branches covered.">        if (_propertyFilterId != null) {</span>
+<span class="fc" id="L115">            serializeFieldsFiltered(bean, g, provider);</span>
+        } else {
+<span class="fc" id="L117">            serializeFields(bean, g, provider);</span>
+        }
+<span class="fc" id="L119">        g.writeEndObject();</span>
+<span class="fc" id="L120">    }</span>
+
+    /*
+    /**********************************************************
+    /* Standard methods
+    /**********************************************************
+     */
+
+    @Override
+    public String toString() {
+<span class="nc" id="L130">        return &quot;XmlBeanSerializer for &quot; + handledType().getName();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>

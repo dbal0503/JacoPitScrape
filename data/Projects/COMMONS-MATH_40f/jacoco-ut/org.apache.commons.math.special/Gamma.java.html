@@ -1,0 +1,329 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Gamma.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">Commons Math</a> &gt; <a href="index.source.html" class="el_package">org.apache.commons.math.special</a> &gt; <span class="el_source">Gamma.java</span></div><h1>Gamma.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.apache.commons.math.special;
+
+import org.apache.commons.math.exception.MaxCountExceededException;
+import org.apache.commons.math.util.ContinuedFraction;
+import org.apache.commons.math.util.FastMath;
+
+/**
+ * This is a utility class that provides computation methods related to the
+ * Gamma family of functions.
+ *
+ * @version $Id$
+ */
+public class Gamma {
+    /**
+     * &lt;a href=&quot;http://en.wikipedia.org/wiki/Euler-Mascheroni_constant&quot;&gt;Euler-Mascheroni constant&lt;/a&gt;
+     * @since 2.0
+     */
+    public static final double GAMMA = 0.577215664901532860606512090082;
+    /** Maximum allowed numerical error. */
+    private static final double DEFAULT_EPSILON = 10e-15;
+    /** Lanczos coefficients */
+<span class="fc" id="L38">    private static final double[] LANCZOS = {</span>
+        0.99999999999999709182,
+        57.156235665862923517,
+        -59.597960355475491248,
+        14.136097974741747174,
+        -0.49191381609762019978,
+        .33994649984811888699e-4,
+        .46523628927048575665e-4,
+        -.98374475304879564677e-4,
+        .15808870322491248884e-3,
+        -.21026444172410488319e-3,
+        .21743961811521264320e-3,
+        -.16431810653676389022e-3,
+        .84418223983852743293e-4,
+        -.26190838401581408670e-4,
+        .36899182659531622704e-5,
+    };
+    /** Avoid repeated computation of log of 2 PI in logGamma */
+<span class="fc" id="L56">    private static final double HALF_LOG_2_PI = 0.5 * FastMath.log(2.0 * FastMath.PI);</span>
+    // limits for switching algorithm in digamma
+    /** C limit. */
+    private static final double C_LIMIT = 49;
+    /** S limit. */
+    private static final double S_LIMIT = 1e-5;
+
+    /**
+     * Default constructor.  Prohibit instantiation.
+     */
+    private Gamma() {}
+
+    /**
+     * Returns the natural logarithm of the gamma function &amp;#915;(x).
+     *
+     * The implementation of this method is based on:
+     * &lt;ul&gt;
+     * &lt;li&gt;&lt;a href=&quot;http://mathworld.wolfram.com/GammaFunction.html&quot;&gt;
+     * Gamma Function&lt;/a&gt;, equation (28).&lt;/li&gt;
+     * &lt;li&gt;&lt;a href=&quot;http://mathworld.wolfram.com/LanczosApproximation.html&quot;&gt;
+     * Lanczos Approximation&lt;/a&gt;, equations (1) through (5).&lt;/li&gt;
+     * &lt;li&gt;&lt;a href=&quot;http://my.fit.edu/~gabdo/gamma.txt&quot;&gt;Paul Godfrey, A note on
+     * the computation of the convergent Lanczos complex Gamma approximation
+     * &lt;/a&gt;&lt;/li&gt;
+     * &lt;/ul&gt;
+     *
+     * @param x Value.
+     * @return log(&amp;#915;(x))
+     */
+    public static double logGamma(double x) {
+        double ret;
+
+<span class="fc bfc" id="L88" title="All 4 branches covered.">        if (Double.isNaN(x) || (x &lt;= 0.0)) {</span>
+<span class="fc" id="L89">            ret = Double.NaN;</span>
+        } else {
+<span class="fc" id="L91">            double g = 607.0 / 128.0;</span>
+
+<span class="fc" id="L93">            double sum = 0.0;</span>
+<span class="fc bfc" id="L94" title="All 2 branches covered.">            for (int i = LANCZOS.length - 1; i &gt; 0; --i) {</span>
+<span class="fc" id="L95">                sum = sum + (LANCZOS[i] / (x + i));</span>
+            }
+<span class="fc" id="L97">            sum = sum + LANCZOS[0];</span>
+
+<span class="fc" id="L99">            double tmp = x + g + .5;</span>
+<span class="fc" id="L100">            ret = ((x + .5) * FastMath.log(tmp)) - tmp +</span>
+<span class="fc" id="L101">                HALF_LOG_2_PI + FastMath.log(sum / x);</span>
+        }
+
+<span class="fc" id="L104">        return ret;</span>
+    }
+
+    /**
+     * Returns the regularized gamma function P(a, x).
+     *
+     * @param a Parameter.
+     * @param x Value.
+     * @return the regularized gamma function P(a, x).
+     * @throws MaxCountExceededException if the algorithm fails to converge.
+     */
+    public static double regularizedGammaP(double a, double x) {
+<span class="fc" id="L116">        return regularizedGammaP(a, x, DEFAULT_EPSILON, Integer.MAX_VALUE);</span>
+    }
+
+    /**
+     * Returns the regularized gamma function P(a, x).
+     *
+     * The implementation of this method is based on:
+     * &lt;ul&gt;
+     *  &lt;li&gt;
+     *   &lt;a href=&quot;http://mathworld.wolfram.com/RegularizedGammaFunction.html&quot;&gt;
+     *   Regularized Gamma Function&lt;/a&gt;, equation (1)
+     *  &lt;/li&gt;
+     *  &lt;li&gt;
+     *   &lt;a href=&quot;http://mathworld.wolfram.com/IncompleteGammaFunction.html&quot;&gt;
+     *   Incomplete Gamma Function&lt;/a&gt;, equation (4).
+     *  &lt;/li&gt;
+     *  &lt;li&gt;
+     *   &lt;a href=&quot;http://mathworld.wolfram.com/ConfluentHypergeometricFunctionoftheFirstKind.html&quot;&gt;
+     *   Confluent Hypergeometric Function of the First Kind&lt;/a&gt;, equation (1).
+     *  &lt;/li&gt;
+     * &lt;/ul&gt;
+     *
+     * @param a the a parameter.
+     * @param x the value.
+     * @param epsilon When the absolute value of the nth item in the
+     * series is less than epsilon the approximation ceases to calculate
+     * further elements in the series.
+     * @param maxIterations Maximum number of &quot;iterations&quot; to complete.
+     * @return the regularized gamma function P(a, x)
+     * @throws MaxCountExceededException if the algorithm fails to converge.
+     */
+    public static double regularizedGammaP(double a,
+                                           double x,
+                                           double epsilon,
+                                           int maxIterations) {
+        double ret;
+
+<span class="fc bfc" id="L153" title="All 8 branches covered.">        if (Double.isNaN(a) || Double.isNaN(x) || (a &lt;= 0.0) || (x &lt; 0.0)) {</span>
+<span class="fc" id="L154">            ret = Double.NaN;</span>
+<span class="fc bfc" id="L155" title="All 2 branches covered.">        } else if (x == 0.0) {</span>
+<span class="fc" id="L156">            ret = 0.0;</span>
+<span class="fc bfc" id="L157" title="All 2 branches covered.">        } else if (x &gt;= a + 1) {</span>
+            // use regularizedGammaQ because it should converge faster in this
+            // case.
+<span class="fc" id="L160">            ret = 1.0 - regularizedGammaQ(a, x, epsilon, maxIterations);</span>
+        } else {
+            // calculate series
+<span class="fc" id="L163">            double n = 0.0; // current element index</span>
+<span class="fc" id="L164">            double an = 1.0 / a; // n-th element in the series</span>
+<span class="fc" id="L165">            double sum = an; // partial sum</span>
+<span class="pc bpc" id="L166" title="2 of 6 branches missed.">            while (FastMath.abs(an/sum) &gt; epsilon &amp;&amp;</span>
+                   n &lt; maxIterations &amp;&amp;
+                   sum &lt; Double.POSITIVE_INFINITY) {
+                // compute next element in the series
+<span class="fc" id="L170">                n = n + 1.0;</span>
+<span class="fc" id="L171">                an = an * (x / (a + n));</span>
+
+                // update partial sum
+<span class="fc" id="L174">                sum = sum + an;</span>
+            }
+<span class="pc bpc" id="L176" title="1 of 2 branches missed.">            if (n &gt;= maxIterations) {</span>
+<span class="nc" id="L177">                throw new MaxCountExceededException(maxIterations);</span>
+<span class="pc bpc" id="L178" title="1 of 2 branches missed.">            } else if (Double.isInfinite(sum)) {</span>
+<span class="nc" id="L179">                ret = 1.0;</span>
+            } else {
+<span class="fc" id="L181">                ret = FastMath.exp(-x + (a * FastMath.log(x)) - logGamma(a)) * sum;</span>
+            }
+        }
+
+<span class="fc" id="L185">        return ret;</span>
+    }
+
+    /**
+     * Returns the regularized gamma function Q(a, x) = 1 - P(a, x).
+     *
+     * @param a the a parameter.
+     * @param x the value.
+     * @return the regularized gamma function Q(a, x)
+     * @throws MaxCountExceededException if the algorithm fails to converge.
+     */
+    public static double regularizedGammaQ(double a, double x) {
+<span class="fc" id="L197">        return regularizedGammaQ(a, x, DEFAULT_EPSILON, Integer.MAX_VALUE);</span>
+    }
+
+    /**
+     * Returns the regularized gamma function Q(a, x) = 1 - P(a, x).
+     *
+     * The implementation of this method is based on:
+     * &lt;ul&gt;
+     *  &lt;li&gt;
+     *   &lt;a href=&quot;http://mathworld.wolfram.com/RegularizedGammaFunction.html&quot;&gt;
+     *   Regularized Gamma Function&lt;/a&gt;, equation (1).
+     *  &lt;/li&gt;
+     *  &lt;li&gt;
+     *   &lt;a href=&quot;http://functions.wolfram.com/GammaBetaErf/GammaRegularized/10/0003/&quot;&gt;
+     *   Regularized incomplete gamma function: Continued fraction representations
+     *   (formula 06.08.10.0003)&lt;/a&gt;
+     *  &lt;/li&gt;
+     * &lt;/ul&gt;
+     *
+     * @param a the a parameter.
+     * @param x the value.
+     * @param epsilon When the absolute value of the nth item in the
+     * series is less than epsilon the approximation ceases to calculate
+     * further elements in the series.
+     * @param maxIterations Maximum number of &quot;iterations&quot; to complete.
+     * @return the regularized gamma function P(a, x)
+     * @throws MaxCountExceededException if the algorithm fails to converge.
+     */
+    public static double regularizedGammaQ(final double a,
+                                           double x,
+                                           double epsilon,
+                                           int maxIterations) {
+        double ret;
+
+<span class="fc bfc" id="L231" title="All 8 branches covered.">        if (Double.isNaN(a) || Double.isNaN(x) || (a &lt;= 0.0) || (x &lt; 0.0)) {</span>
+<span class="fc" id="L232">            ret = Double.NaN;</span>
+<span class="fc bfc" id="L233" title="All 2 branches covered.">        } else if (x == 0.0) {</span>
+<span class="fc" id="L234">            ret = 1.0;</span>
+<span class="fc bfc" id="L235" title="All 2 branches covered.">        } else if (x &lt; a + 1.0) {</span>
+            // use regularizedGammaP because it should converge faster in this
+            // case.
+<span class="fc" id="L238">            ret = 1.0 - regularizedGammaP(a, x, epsilon, maxIterations);</span>
+        } else {
+            // create continued fraction
+<span class="fc" id="L241">            ContinuedFraction cf = new ContinuedFraction() {</span>
+
+                @Override
+                protected double getA(int n, double x) {
+<span class="fc" id="L245">                    return ((2.0 * n) + 1.0) - a + x;</span>
+                }
+
+                @Override
+                protected double getB(int n, double x) {
+<span class="fc" id="L250">                    return n * (a - n);</span>
+                }
+            };
+
+<span class="fc" id="L254">            ret = 1.0 / cf.evaluate(x, epsilon, maxIterations);</span>
+<span class="fc" id="L255">            ret = FastMath.exp(-x + (a * FastMath.log(x)) - logGamma(a)) * ret;</span>
+        }
+
+<span class="fc" id="L258">        return ret;</span>
+    }
+
+
+    /**
+     * &lt;p&gt;Computes the digamma function of x.&lt;/p&gt;
+     *
+     * &lt;p&gt;This is an independently written implementation of the algorithm described in
+     * Jose Bernardo, Algorithm AS 103: Psi (Digamma) Function, Applied Statistics, 1976.&lt;/p&gt;
+     *
+     * &lt;p&gt;Some of the constants have been changed to increase accuracy at the moderate expense
+     * of run-time.  The result should be accurate to within 10^-8 absolute tolerance for
+     * x &gt;= 10^-5 and within 10^-8 relative tolerance for x &gt; 0.&lt;/p&gt;
+     *
+     * &lt;p&gt;Performance for large negative values of x will be quite expensive (proportional to
+     * |x|).  Accuracy for negative values of x should be about 10^-8 absolute for results
+     * less than 10^5 and 10^-8 relative for results larger than that.&lt;/p&gt;
+     *
+     * @param x Argument.
+     * @return digamma(x) to within 10-8 relative or absolute error whichever is smaller.
+     * @see &lt;a href=&quot;http://en.wikipedia.org/wiki/Digamma_function&quot;&gt;Digamma&lt;/a&gt;
+     * @see &lt;a href=&quot;http://www.uv.es/~bernardo/1976AppStatist.pdf&quot;&gt;Bernardo&amp;apos;s original article &lt;/a&gt;
+     * @since 2.0
+     */
+    public static double digamma(double x) {
+<span class="fc bfc" id="L283" title="All 4 branches covered.">        if (x &gt; 0 &amp;&amp; x &lt;= S_LIMIT) {</span>
+            // use method 5 from Bernardo AS103
+            // accurate to O(x)
+<span class="fc" id="L286">            return -GAMMA - 1 / x;</span>
+        }
+
+<span class="fc bfc" id="L289" title="All 2 branches covered.">        if (x &gt;= C_LIMIT) {</span>
+            // use method 4 (accurate to O(1/x^8)
+<span class="fc" id="L291">            double inv = 1 / (x * x);</span>
+            //            1       1        1         1
+            // log(x) -  --- - ------ + ------- - -------
+            //           2 x   12 x^2   120 x^4   252 x^6
+<span class="fc" id="L295">            return FastMath.log(x) - 0.5 / x - inv * ((1.0 / 12) + inv * (1.0 / 120 - inv / 252));</span>
+        }
+
+<span class="fc" id="L298">        return digamma(x + 1) - 1 / x;</span>
+    }
+
+    /**
+     * Computes the trigamma function of x.
+     * This function is derived by taking the derivative of the implementation
+     * of digamma.
+     *
+     * @param x Argument.
+     * @return trigamma(x) to within 10-8 relative or absolute error whichever is smaller
+     * @see &lt;a href=&quot;http://en.wikipedia.org/wiki/Trigamma_function&quot;&gt;Trigamma&lt;/a&gt;
+     * @see Gamma#digamma(double)
+     * @since 2.0
+     */
+    public static double trigamma(double x) {
+<span class="pc bpc" id="L313" title="2 of 4 branches missed.">        if (x &gt; 0 &amp;&amp; x &lt;= S_LIMIT) {</span>
+<span class="nc" id="L314">            return 1 / (x * x);</span>
+        }
+
+<span class="fc bfc" id="L317" title="All 2 branches covered.">        if (x &gt;= C_LIMIT) {</span>
+<span class="fc" id="L318">            double inv = 1 / (x * x);</span>
+            //  1    1      1       1       1
+            //  - + ---- + ---- - ----- + -----
+            //  x      2      3       5       7
+            //      2 x    6 x    30 x    42 x
+<span class="fc" id="L323">            return 1 / x + inv / 2 + inv / x * (1.0 / 6 - inv * (1.0 / 30 + inv / 42));</span>
+        }
+
+<span class="fc" id="L326">        return trigamma(x + 1) + 1 / (x * x);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.6.202009150832</span></div></body></html>
