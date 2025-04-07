@@ -1,5 +1,6 @@
 """
-David Ballard: davidballard0503@gmail.com 40262526
+David Ballard: 40262526
+Anthony El-Khoury: 40262893
 
 This script is used to process JACOCO and PIT reports for Java projects. 
 This is used on projects from the defects4j project https://github.com/rjust/defects4j
@@ -13,7 +14,7 @@ The graphs generated are:
 - A visual table of complexity and mutation scores
 - Histograms of the complexity and mutation score distributions
 
-Date: 2025-04-04
+Date: 2025-04-07
 """
 import os
 import argparse
@@ -56,4 +57,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
