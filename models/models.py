@@ -46,7 +46,8 @@ class Package:
         """Remove classes that are not in both reports"""
         to_remove = []
         for class_name, java_class in self.classes.items():
-            if java_class.complexity == 0 or java_class.mutation_score == -1: # if they are the default values assigned in "add_class"
+            print(f"Class: {class_name}, Complexity: {java_class.complexity}, Mutation Score: {java_class.mutation_score}")
+            if java_class.complexity == 0 or java_class.mutation_score <0: # if they are the default values assigned in "add_class"
                 to_remove.append(class_name)
         
         for class_name in to_remove:
