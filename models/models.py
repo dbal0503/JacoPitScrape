@@ -1,4 +1,3 @@
-
 class JavaClass:
     def __init__(self, name: str, complexity: int = 0, mutation_score: int = 0):
         self._name = name
@@ -27,29 +26,28 @@ class JavaClass:
 
 class Package:
     def __init__(self, name: str):
-        self._name = name
-        self.classes = {}
+        self._name = name # Name of the package
+        self.classes = {} # Dictionary of {class_name : JavaClass}
     
     @property
     def name(self):
         return self._name
     
-    def add_class(self, class_name: str, complexity: int = 0, mutation_score: int = 0):
+    def add_class(self, class_name: str, complexity: int = 0, mutation_score: int = -1):
         if class_name in self.classes:
-            
             if complexity > 0:
                 self.classes[class_name].complexity = complexity
-            if mutation_score > 0:
+            if mutation_score >= 0:
                 self.classes[class_name].mutation_score = mutation_score
         else:
-            
             self.classes[class_name] = JavaClass(class_name, complexity, mutation_score)
             
     def cleanup_incomplete_classes(self):
-        """Remove classes that don't have both complexity and mutation score"""
+        """Remove classes that are not in both reports"""
         to_remove = []
         for class_name, java_class in self.classes.items():
-            if java_class.complexity == 0 or java_class.mutation_score == 0:
+            print(f"Class: {class_name}, Complexity: {java_class.complexity}, Mutation Score: {java_class.mutation_score}")
+            if java_class.complexity == 0 or java_class.mutation_score <0: # if they are the default values assigned in "add_class"
                 to_remove.append(class_name)
         
         for class_name in to_remove:
@@ -57,8 +55,8 @@ class Package:
 
 class Project:
     def __init__(self, name: str):
-        self.name = name
-        self.packages = {}
+        self.name = name # Name of project
+        self.packages = {} # Dictionary of {package_name : Package}
     
     def add_package(self, package_name: str):
         if package_name not in self.packages:

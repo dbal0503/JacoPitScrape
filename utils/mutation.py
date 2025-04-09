@@ -52,7 +52,7 @@ def extract_mutation_scores(html_content):
                 mutation_text = mutation_div.text.strip()
                 mutation_score = extract_number(mutation_text) or 0
                 
-                if mutation_score > 0:
+                if mutation_score >= 0:
                     result[class_name] = mutation_score
     
     return result

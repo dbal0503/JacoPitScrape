@@ -111,8 +111,9 @@ def process_pit_reports(directory, projects):
         project_name = extract_project_name(directory)
         package_name = extract_package_from_path(file_path)
         
-        if project_name not in projects:
-            projects[project_name] = Project(project_name)
+        # The check below is not needed
+        # if project_name not in projects:
+        #     projects[project_name] = Project(project_name)
         
         project = projects[project_name]
         package = project.add_package(package_name)

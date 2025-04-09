@@ -3,7 +3,6 @@ def display_results(projects):
     if not projects:
         print("No reports found or no classes with both complexity and mutation score metrics.")
         return
-    
     total_classes = 0
     all_complexities = []
     all_mutation_scores = []
@@ -61,7 +60,6 @@ def print_summary_statistics(total_classes, complexities, mutation_scores):
 def export_to_csv(projects, output_file):
     # Export the analysis results to a CSV file
     import csv
-    
     with open(output_file, 'w', newline='') as file:
         writer = csv.writer(file)
         writer.writerow(['Project', 'Package', 'Class', 'Complexity', 'Mutation Score'])
