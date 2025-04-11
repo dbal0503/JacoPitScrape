@@ -44,6 +44,9 @@ def extract_mutation_scores(html_content):
             else:
                 class_name = class_cell.text.strip()
             
+            if class_name.startswith("org.") or class_name.startswith("com."):
+                continue
+            
             if class_name.endswith(".java"):
                 class_name = class_name[:-5]
             

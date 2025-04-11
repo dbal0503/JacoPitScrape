@@ -34,6 +34,8 @@ class Package:
         return self._name
     
     def add_class(self, class_name: str, complexity: int = 0, mutation_score: int = -1):
+        if class_name.startswith("org.") or class_name.startswith("com."):
+            return
         if class_name in self.classes:
             if complexity > 0:
                 self.classes[class_name].complexity = complexity

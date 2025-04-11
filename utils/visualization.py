@@ -1,7 +1,7 @@
 import os
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib.table import Table
+from scipy import stats 
 
 def ensure_graph_dir(project_dir=None):
     # Ensure the graphs directory exists in the current working directory
@@ -33,8 +33,9 @@ def create_scatter_plot(projects):
         p = np.poly1d(z)
         plt.plot(complexities, p(complexities), "r--", alpha=0.8)
         
-        correlation = np.corrcoef(complexities, mutation_scores)[0, 1]
+        correlation, p_value = stats.pearsonr(complexities, mutation_scores)
         plt.text(0.05, 0.95, f"Correlation: {correlation:.2f}", transform=plt.gca().transAxes)
+        plt.text(0.05, 0.90, f"p-value: {p_value:.4f}", transform=plt.gca().transAxes)
     
     plt.xlabel('Cyclomatic Complexity')
     plt.ylabel('Mutation Score (%)')

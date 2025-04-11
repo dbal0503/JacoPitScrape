@@ -38,6 +38,8 @@ def extract_class_complexity(html_content):
         if len(cells) > complexity_col:
             class_name = cells[0].text.strip()
             # If the class name is "Total", skip the row
+            if class_name.startswith("org.") or class_name.startswith("com."):
+                continue
             if class_name == "Total":
                 continue
             # If the class name ends with ".java", remove the ".java" extension
